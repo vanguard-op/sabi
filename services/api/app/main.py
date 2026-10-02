@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.agent.client import build_agent_client
 from app.api import health
 from app.core.audit import AuditLog
 from app.core.config import Settings, get_settings
@@ -68,6 +71,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        yield
+        # Close whatever client is bound at shutdown time: the factory builds one,
+        # and a test may have substituted a double without a close method.
+        client = getattr(application.state, "agent_ai_client", None)
+        if client is not None and hasattr(client, "close"):
+            client.close()
+
     app = FastAPI(
         title="Sabi API",
         version="1.0.0",
@@ -75,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs",
         redoc_url=None,
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
     app.state.settings = settings
     session_factory = build_session_factory(settings)
@@ -86,6 +99,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         default_window_seconds=settings.auth_rate_limit_window_seconds,
     )
     app.state.audit_log = _build_audit_log(session_factory)
+    app.state.agent_ai_client = build_agent_client()
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(CorrelationIdMiddleware)
