@@ -39,46 +39,70 @@ class ReceiptCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            receipt.payee,
-                            style: SabTypography.body.copyWith(
-                              color: colors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
+                LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: SabSpacing.sm),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                receipt.payee,
+                                style: SabTypography.body.copyWith(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: SabSpacing.xs),
+                              Text(
+                                '${receipt.kind} · ${receipt.reference}',
+                                style: SabTypography.bodySmall.copyWith(
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: SabSpacing.xs),
-                          Text(
-                            '${receipt.kind} · ${receipt.reference}',
-                            style: SabTypography.bodySmall.copyWith(
-                              color: colors.textSecondary,
-                            ),
+                        ),
+                      ),
+                      // The amount keeps its full width whenever it fits and
+                      // only trims when it alone would exceed the row, so a
+                      // long value on a narrow phone cannot overflow the card.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth,
+                        ),
+                        child: Text(
+                          SabMoney.format(
+                            receipt.amount,
+                            currency: receipt.currency,
+                            locale: locale,
                           ),
-                        ],
+                          textAlign: TextAlign.end,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SabTypography.body.copyWith(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: SabSpacing.sm),
-                    Text(
-                      SabMoney.format(
-                        receipt.amount,
-                        currency: receipt.currency,
-                        locale: locale,
-                      ),
-                      style: SabTypography.body.copyWith(
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: SabSpacing.md),
-                Row(
+                // A Wrap, not a Row: the pill and the date share a line when
+                // they fit and the date falls to its own line when a long
+                // status label or a narrow phone would otherwise overflow the
+                // card. The amount and payee above are the primary content, so
+                // the metadata row yields first.
+                Wrap(
+                  spacing: SabSpacing.sm,
+                  runSpacing: SabSpacing.xs,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     StatusPill(
                       status: switch (receipt.status) {
@@ -89,21 +113,25 @@ class ReceiptCard extends ConsumerWidget {
                           SabStatus.awaitingReceipt,
                       },
                     ),
-                    const Spacer(),
-                    Text(
-                      SabMoney.formatDate(receipt.issuedAt, locale: locale),
-                      style: SabTypography.bodySmall.copyWith(
-                        color: colors.textSecondary,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          SabMoney.formatDate(receipt.issuedAt, locale: locale),
+                          style: SabTypography.bodySmall.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        if (onTap != null) ...[
+                          const SizedBox(width: SabSpacing.xs),
+                          SabIconView(
+                            SabIcons.chevronRight,
+                            size: SabSizes.iconSm,
+                            color: colors.textSecondary,
+                          ),
+                        ],
+                      ],
                     ),
-                    if (onTap != null) ...[
-                      const SizedBox(width: SabSpacing.xs),
-                      SabIconView(
-                        SabIcons.chevronRight,
-                        size: SabSizes.iconSm,
-                        color: colors.textSecondary,
-                      ),
-                    ],
                   ],
                 ),
               ],
