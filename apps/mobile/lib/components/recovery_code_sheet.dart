@@ -92,30 +92,49 @@ class _RecoveryCodeSheetState extends ConsumerState<_RecoveryCodeSheet> {
                 ),
               ),
               const SizedBox(height: SabSpacing.sm),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: SabSizes.minTouchTarget,
-                    height: SabSizes.minTouchTarget,
-                    child: Checkbox(
-                      value: _acknowledged,
-                      onChanged: (value) =>
-                          setState(() => _acknowledged = value ?? false),
-                    ),
+              // The whole row is the 44px touch target; the checkbox itself is a
+              // row child centred against the label so the two stay aligned at
+              // any text scale without a per-call-site vertical nudge. The
+              // label grows first (down) as the checkbox is smaller.
+              Semantics(
+                label: strings.recoveryAcknowledge,
+                checked: _acknowledged,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: SabSizes.minTouchTarget,
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: SabSpacing.md),
-                      child: Text(
-                        strings.recoveryAcknowledge,
-                        style: SabTypography.body.copyWith(
-                          color: colors.textPrimary,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // `radius-sm` (4px) is the documented checkbox radius; the
+                      // default M3 shape is 2px. `shrinkWrap` keeps the visual
+                      // square butting the label, while the row above still
+                      // carries the 44px minimum touch target.
+                      Checkbox(
+                        value: _acknowledged,
+                        onChanged: (value) =>
+                            setState(() => _acknowledged = value ?? false),
+                        isError: false,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(SabRadii.sm),
+                        ),
+                        side: BorderSide(color: colors.border),
+                        activeColor: colors.primary500,
+                        checkColor: colors.onPrimary,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: SabSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          strings.recoveryAcknowledge,
+                          style: SabTypography.body.copyWith(
+                            color: colors.textPrimary,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: SabSpacing.sm),
               Text(
