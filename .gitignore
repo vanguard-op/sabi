@@ -1,0 +1,40 @@
+# Local task routes
+.delivery/
+
+# Owner scratch space
+.scratch/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Flutter / Dart
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+.packages
+
+# Node tooling
+node_modules/
+
+# Terraform
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
