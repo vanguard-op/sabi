@@ -1,0 +1,41 @@
+name: sabi_mobile
+description: "Sabi client: say it, pay it, prove it."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.0.2
+  intl: ^0.20.3
+  rive: ^0.14.11
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand-mark/
+    - assets/illustrations/
+    - assets/animations/
+    - assets/splash/
+    - assets/app-icon.png
+
+  # Inter and JetBrains Mono are specified by the design system but are not in
+  # the asset ledger yet. Until the visual artist lands them the client falls
+  # back to the platform sans/mono, as branding.md allows.
+  # fonts:
+  #   - family: Inter
+  #     fonts: []
+  #   - family: JetBrainsMono
+  #     fonts: []
