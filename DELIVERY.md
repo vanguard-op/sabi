@@ -119,7 +119,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-007 | FEAT-003 | ai-engineer | Done | C-009 |
 | T-008 | FEAT-004 | backend-engineer | Done | C-010, C-011 |
 | T-009 | FEAT-004 | ai-engineer | Done | C-010 |
-| T-010 | FEAT-004, FEAT-011 | frontend-engineer | In Progress | C-009–C-012 |
+| T-010 | FEAT-004, FEAT-011 | frontend-engineer | Done | C-009–C-012 |
 | T-011 | FEAT-011 | ai-engineer | Done | C-012 |
 | T-012 | FEAT-012 | backend-engineer | Done | C-013–C-016 |
 | T-013 | — | visual-artist | Done | — |
