@@ -86,6 +86,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 - Commit messages cite durable IDs (FEAT-###, C-###), never task IDs or `.delivery/` paths.
 - Branching: from Phase 1 feature work onward, engineers commit to `dev`; the lead merges `dev` into `main` at each phase gate.
 - Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix.
+- AI feature modules are auto-discovered: expose `router: APIRouter` at `<feature>/router.py` (packages `intent`, `ranking`, `composition`) and declare paths without the `/v1` prefix.
 
 ## Behavior rules
 
@@ -113,17 +114,19 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-002 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
 | T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | Done | — |
 | T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Done | — |
-| T-005 | FEAT-001 | backend-engineer | Backlog | C-001–C-008 |
+| T-005 | FEAT-001 | backend-engineer | In Progress | C-001–C-008 |
 | T-006 | FEAT-001 | frontend-engineer | Backlog | C-001–C-008 |
 | T-007 | FEAT-003 | ai-engineer | Backlog | C-009 |
-| T-008 | FEAT-004 | backend-engineer | Backlog | C-010, C-011 |
+| T-008 | FEAT-004 | backend-engineer | In Progress | C-010, C-011 |
 | T-009 | FEAT-004 | ai-engineer | Backlog | C-010 |
 | T-010 | FEAT-004, FEAT-011 | frontend-engineer | Backlog | C-009–C-012 |
 | T-011 | FEAT-011 | ai-engineer | Backlog | C-012 |
-| T-012 | FEAT-012 | backend-engineer | Backlog | C-013–C-016 |
+| T-012 | FEAT-012 | backend-engineer | In Progress | C-013–C-016 |
 | T-013 | — | visual-artist | Done | — |
 | T-014 | — | infra-engineer | Done | — |
-| T-015 | — | infra-engineer | Backlog | — |
+| T-015 | — | infra-engineer | Done | — |
+| T-016 | — | visual-artist | In Progress | — |
+| T-017 | — | frontend-engineer | Backlog | — |
 
 ## Decisions log
 
@@ -141,6 +144,11 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-010 | Monetary amounts are integer minor units (kobo) | Removes floating-point rounding error from a payment; schema.md updated to match | user |
 | D-011 | Phase 1 FEAT-012 scoped to the provider registration and review API plus operator-gated endpoints; Operations Console and provider-portal UIs deferred | operations.md defines the Phase 1 review workflow, but branding.md and screens.md are mobile-only and specify no console or portal surface; recorded for acknowledgment | lead |
 | D-012 | Deployment region pinned to AWS af-south-1 (Cape Town) | Nearest managed Africa region to the Nigeria-primary residency intent under D-005; NDPA transfer assessment required before production | lead |
+| D-013 | Add an `on-error` role token | branding.md's #FFFFFF destructive text fails WCAG AA on the dark error fill; a dark on-error value satisfies NFR-030 in both modes | user |
+| D-014 | Bundle Inter and JetBrains Mono (Latin subset) | brand typography is part of the design system; platform fallback drifts across devices | user |
+| D-015 | Source a custom 24px outlined icon set | branding.md requires a custom set drawn to the mark's geometry; Material stand-ins are temporary | user |
+| D-016 | Ship one `assets/sabi.riv` and load artboards by name | Six byte-identical per-slot copies waste bundle size against NFR-001 cold-start and memory | user |
+| D-017 | Intent confidence cutoff is 0.70 | Below this, ask one clarifying question and never initiate payment; recorded for model-quality.md | user |
 
 ## Definition of Done
 
@@ -161,6 +169,9 @@ Provisional; infra-engineer pins these at Foundation.
 | Backend dev | `cd services/api && uvicorn app.main:app --reload` |
 | Backend tests | `cd services/api && pytest` |
 | Client dev | `cd apps/mobile && flutter run` |
+| Client on Android emulator | `cd apps/mobile && flutter run -d emulator-5554` |
 | Client tests | `cd apps/mobile && flutter test` |
 | AI tests | `cd services/ai && pytest` |
+| AI serve | `make ai-serve` |
+| AI dev | `make ai-dev` |
 | Lint | `ruff check .` and `flutter analyze` |

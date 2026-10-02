@@ -8,14 +8,17 @@ none exist, so every slot is sourced new.
 
 | Slot | File | Family / Variant | Status |
 |---|---|---|---|
-| A-001 | assets/brand-mark/master.riv | Brand mark / master | Done |
+| A-001 | assets/sabi.riv (artboard BrandMark) | Brand mark / master | Done |
 | A-002 | assets/app-icon/app-icon.png | Brand mark / app-icon | Done |
 | A-003 | assets/splash/splash.png | Brand mark / splash | Done |
-| A-004 | assets/illustrations/empty-state.riv | Empty-state illustration / single | Done |
-| A-005 | assets/illustrations/offline.riv | Offline illustration / single | Done |
-| A-006 | assets/animations/success.riv | Success animation / single | Done |
-| A-007 | assets/animations/pending.riv | Pending animation / single | Done |
-| A-008 | assets/animations/error.riv | Error animation / single | Done |
+| A-004 | assets/sabi.riv (artboard EmptyState) | Empty-state illustration / single | Done |
+| A-005 | assets/sabi.riv (artboard Offline) | Offline illustration / single | Done |
+| A-006 | assets/sabi.riv (artboard Success) | Success animation / single | Done |
+| A-007 | assets/sabi.riv (artboard Pending) | Pending animation / single | Done |
+| A-008 | assets/sabi.riv (artboard Error) | Error animation / single | Done |
+| A-009 | assets/icons/*.svg | Icon set / 24px outlined | Pending |
+| A-010 | assets/fonts/inter/*.woff2 | Brand type / Inter | Pending |
+| A-011 | assets/fonts/jetbrains-mono/*.woff2 | Brand type / JetBrains Mono | Pending |
 
 ## Brand mark — generation prompt
 
