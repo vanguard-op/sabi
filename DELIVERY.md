@@ -107,6 +107,12 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 |---|---|---|
 | Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022 |
 
+### Phase 1: Foundations
+
+| Task | Feature | Owner | Status | Contract |
+|---|---|---|---|---|
+| T-026 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | In Progress | — |
+
 ## Decisions log
 
 | # | Decision | Rationale | By |
