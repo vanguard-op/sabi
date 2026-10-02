@@ -105,36 +105,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Phase | Closed | Notes |
 |---|---|---|
-
-### Phase 1: Foundations
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-001 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | infra-engineer | Done | — |
-| T-002 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
-| T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | Done | — |
-| T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Done | — |
-| T-005 | FEAT-001 | backend-engineer | Done | C-001–C-008 |
-| T-006 | FEAT-001 | frontend-engineer | Done | C-001–C-008 |
-| T-007 | FEAT-003 | ai-engineer | Done | C-009 |
-| T-008 | FEAT-004 | backend-engineer | Done | C-010, C-011 |
-| T-009 | FEAT-004 | ai-engineer | Done | C-010 |
-| T-010 | FEAT-004, FEAT-011 | frontend-engineer | Done | C-009–C-012 |
-| T-011 | FEAT-011 | ai-engineer | Done | C-012 |
-| T-012 | FEAT-012 | backend-engineer | Done | C-013–C-016 |
-| T-013 | — | visual-artist | Done | — |
-| T-014 | — | infra-engineer | Done | — |
-| T-015 | — | infra-engineer | Done | — |
-| T-018 | — | ai-engineer | Done | — |
-| T-019 | — | infra-engineer | Done | — |
-| T-020 | — | frontend-engineer | Done | — |
-| T-021 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | Done | C-001–C-016 |
-| T-022 | FEAT-001 | backend-engineer | Done | C-007 |
-| T-023 | FEAT-003, FEAT-011 | backend-engineer | Done | C-009, C-012 |
-| T-024 | — | infra-engineer | Done | — |
-| T-025 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | In Progress | C-001–C-016 |
-| T-016 | — | visual-artist | Done | — |
-| T-017 | — | frontend-engineer | Done | — |
+| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022 |
 
 ## Decisions log
 
