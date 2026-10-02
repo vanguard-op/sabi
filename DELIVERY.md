@@ -127,8 +127,9 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-015 | — | infra-engineer | Done | — |
 | T-018 | — | ai-engineer | Done | — |
 | T-019 | — | infra-engineer | Done | — |
-| T-020 | — | frontend-engineer | Backlog | — |
-| T-021 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | In Progress | C-001–C-016 |
+| T-020 | — | frontend-engineer | Done | — |
+| T-021 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | Done | C-001–C-016 |
+| T-022 | FEAT-001 | backend-engineer | In Progress | C-007 |
 | T-016 | — | visual-artist | Done | — |
 | T-017 | — | frontend-engineer | Done | — |
 
@@ -156,6 +157,9 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-018 | HTTP wire fields are camelCase; the model-quality structured schema is model-internal | Removes the casing split between C-010 `ServiceSummary` and C-011 `Service`; the AI adapter maps the model's snake_case schema to camelCase at the API boundary. C-009 and C-010 revised to revision 2. | lead |
 | D-019 | MQ-002 and MQ-004 use the same 0.70 confidence cutoff; after the single MQ-001 clarification, an unresolved request offers catalogue search and human support | One consistent serving cutoff across the model capabilities; the unresolved branch matches features.md FEAT-003 and user-flow Flow 2 | user |
 | D-020 | Revise schema.md for the Phase 1 backend needs: AuthCredential credential id and recovery lookup digest, a capability review record, and Provider.name uniqueness | Replaces the internal credential envelope, the O(n) Argon2id recovery scan, and audit-only quarantine | user |
+| D-021 | Add an API gateway agent module forwarding C-009 and C-012 to the AI service | architecture.md makes the gateway the client's sole entry point, but the agent routes exist only on the AI service; without the module the Phase 1 outcome "a request resolves to a real agency" is unreachable | lead |
+| D-022 | Model quality is verified by QA-authored fixture-based harness runs in Phase 1; live golden-set accuracy with human judges is deferred | The MQ-001/MQ-002/MQ-003 datasets and judges require real labelled data and provider access, neither available at the gate; the pinned model, decoding, 0.70 cutoff, and fallbacks are verified | lead |
+| D-023 | Add a documented `make test-integration` target and run `tests/**` in CI | QA's integration and acceptance layer was not executed by `make test` or CI, so the gate was not enforced | lead |
 
 ## Definition of Done
 
