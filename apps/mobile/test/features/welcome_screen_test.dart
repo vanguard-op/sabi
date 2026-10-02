@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sabi_mobile/components/sab_button.dart';
 import 'package:sabi_mobile/core/connectivity.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
@@ -118,6 +119,35 @@ void main() {
       find.widgetWithText(ElevatedButton, 'Continue'),
     );
     expect(enabledButton.onPressed, isNotNull);
+  });
+
+  testWidgets('creating an account disables every action', (tester) async {
+    await pumpSab(
+      tester,
+      const WelcomeScreen(),
+      overrides: [
+        authRepositoryProvider.overrideWith(
+          (ref) =>
+              MockAuthRepository(latency: const Duration(milliseconds: 200)),
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Get started'));
+    await tester.pump();
+
+    // The action spinner is up and the alternatives can't be tapped mid-flight.
+    bool enabledFor(String label) => tester
+        .widgetList<SabButton>(find.byType(SabButton))
+        .firstWhere((b) => b.label == label)
+        .onPressed !=
+        null;
+    expect(enabledFor('Get started'), isFalse);
+    expect(enabledFor('Sign in'), isFalse);
+    expect(enabledFor('How Sabi handles your data'), isFalse);
+
+    await tester.pumpAndSettle();
+    expect(enabledFor('Sign in'), isTrue);
   });
 
   testWidgets('offline shows the banner and queues account creation', (

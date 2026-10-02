@@ -7,6 +7,7 @@ import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/features/account/account_screen.dart';
 import 'package:sabi_mobile/l10n/sab_strings.dart';
 import 'package:sabi_mobile/models/account.dart';
+import 'package:sabi_mobile/models/channel_link.dart';
 import 'package:sabi_mobile/models/payment_method.dart';
 
 import '../helpers.dart';
@@ -52,6 +53,9 @@ void main() {
     expect(find.text('Not verified'), findsOneWidget);
     expect(find.text('Verify identity'), findsOneWidget);
     expect(find.text('Ngozi'), findsOneWidget);
+    // The profile group states the account status next to the display name.
+    expect(find.text('Account status'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
   });
 
   testWidgets('pending shows a pending pill with the reason', (tester) async {
@@ -126,10 +130,67 @@ void main() {
       ],
     );
     await tester.pumpAndSettle();
-    expect(find.text('Suspended'), findsOneWidget);
+    // The profile row and the verification pill both state the suspended state.
+    expect(find.text('Suspended'), findsNWidgets(2));
     expect(find.textContaining('This account is suspended'), findsOneWidget);
     expect(find.text('Sabi wallet'), findsNothing);
     expect(find.text('Verify identity'), findsNothing);
+    // The profile group carries the same suspended status, not "Active".
+    expect(find.text('Account status'), findsOneWidget);
+    expect(find.text('Active'), findsNothing);
+  });
+
+  testWidgets('a channel link without a verification stamp reads as pending', (
+    tester,
+  ) async {
+    await pumpSab(
+      tester,
+      const AccountScreen(),
+      overrides: [
+        accountRepositoryProvider.overrideWith(
+          (ref) => MockAccountRepository(
+            latency: Duration.zero,
+            channelLinks: const [
+              ChannelLink(
+                id: 'link_1',
+                channel: 'whatsapp',
+                address: '08030000000',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('08030000000'), findsOneWidget);
+    expect(find.text('Pending'), findsOneWidget);
+    // The unlinked channels still offer the link action.
+    expect(find.text('Link'), findsNWidgets(2));
+  });
+
+  testWidgets('a verified channel link is labelled as linked', (tester) async {
+    await pumpSab(
+      tester,
+      const AccountScreen(),
+      overrides: [
+        accountRepositoryProvider.overrideWith(
+          (ref) => MockAccountRepository(
+            latency: Duration.zero,
+            channelLinks: [
+              ChannelLink(
+                id: 'link_1',
+                channel: 'whatsapp',
+                address: '08030000000',
+                verifiedAt: DateTime.utc(2026, 10, 1),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Linked'), findsOneWidget);
+    expect(find.text('Pending'), findsNothing);
   });
 
   testWidgets('changing the locale re-renders with a fallback note', (

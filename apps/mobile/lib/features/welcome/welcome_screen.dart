@@ -58,6 +58,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   Future<void> _getStarted() async {
     final strings = ref.read(sabStringsProvider);
+    if (_creating) return;
     if (!ref.read(connectivityProvider)) {
       setState(() => _queued = true);
       return;
@@ -184,19 +185,21 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               : strings.useRecoveryInstead,
                           loading: _checking || _creating,
                           expand: true,
-                          onPressed: _checking ? null : _getStarted,
+                          onPressed: _checking || _creating ? null : _getStarted,
                         ),
                         const SizedBox(height: SabSpacing.sm),
                         SabButton(
                           label: strings.signIn,
                           variant: SabButtonVariant.ghost,
-                          onPressed: () => context.go('/sign-in'),
+                          onPressed: _creating
+                              ? null
+                              : () => context.go('/sign-in'),
                         ),
                         const SizedBox(height: SabSpacing.xs),
                         SabButton(
                           label: strings.dataHandling,
                           variant: SabButtonVariant.ghost,
-                          onPressed: _showDataHandling,
+                          onPressed: _creating ? null : _showDataHandling,
                         ),
                       ],
                     ),

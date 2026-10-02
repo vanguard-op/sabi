@@ -140,6 +140,8 @@ class SabStrings {
   String get profileGroup => _t('profileGroup');
   String get displayName => _t('displayName');
   String get displayNameUnset => _t('displayNameUnset');
+  String get accountStatusLabel => _t('accountStatusLabel');
+  String get accountStatusActive => _t('accountStatusActive');
   String get localeLabel => _t('localeLabel');
   String get verificationGroup => _t('verificationGroup');
   String get verificationUnverified => _t('verificationUnverified');
@@ -152,6 +154,8 @@ class SabStrings {
   String get channelSms => _t('channelSms');
   String get channelWhatsapp => _t('channelWhatsapp');
   String get channelNotLinked => _t('channelNotLinked');
+  String get channelLinked => _t('channelLinked');
+  String get channelPending => _t('channelPending');
   String get linkChannelTitle => _t('linkChannelTitle');
   String get linkChannel => _t('linkChannel');
   String get channelAddressLabel => _t('channelAddressLabel');
@@ -274,6 +278,8 @@ class SabStrings {
     'profileGroup': 'Profile',
     'displayName': 'Name',
     'displayNameUnset': 'Not set',
+    'accountStatusLabel': 'Account status',
+    'accountStatusActive': 'Active',
     'localeLabel': 'Language',
     'verificationGroup': 'Identity',
     'verificationUnverified':
@@ -288,6 +294,8 @@ class SabStrings {
     'channelSms': 'SMS number',
     'channelWhatsapp': 'WhatsApp number',
     'channelNotLinked': 'Not linked',
+    'channelLinked': 'Linked',
+    'channelPending': 'Pending',
     'linkChannelTitle': 'Link a channel',
     'linkChannel': 'Link',
     'channelAddressLabel': 'Number',
@@ -351,6 +359,7 @@ class SabStrings {
     'verifyIdentity': 'Verify identity',
     'linkChannel': 'Link',
     'channelNotLinked': 'Never link',
+    'channelLinked': 'Don link',
     'fallbackNote':
         'Some words still dey English while we finish this language.',
   };

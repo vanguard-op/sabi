@@ -98,6 +98,12 @@ class _AccountBody extends ConsumerWidget {
               value: account.displayName ?? strings.displayNameUnset,
             ),
             SectionRow(
+              label: strings.accountStatusLabel,
+              value: suspended
+                  ? strings.statusSuspended
+                  : strings.accountStatusActive,
+            ),
+            SectionRow(
               label: strings.localeLabel,
               value: '',
               icon: SabIcons.language,
@@ -257,15 +263,27 @@ class _ChannelRow extends ConsumerWidget {
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  link!.address,
-                  style: SabTypography.bodySmall.copyWith(
-                    color: colors.textSecondary,
+                Flexible(
+                  child: Text(
+                    link!.address,
+                    overflow: TextOverflow.ellipsis,
+                    style: SabTypography.bodySmall.copyWith(
+                      color: colors.textSecondary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: SabSpacing.sm),
-                if (link!.isVerified)
-                  const StatusPill(status: SabStatus.verified, label: 'Linked'),
+                // A link with no verification stamp is awaiting confirmation,
+                // so it reads as pending rather than silently looking done
+                // (screens.md Account, "Pending"; C-007 `verifiedAt`).
+                StatusPill(
+                  status: link!.isVerified
+                      ? SabStatus.verified
+                      : SabStatus.pending,
+                  label: link!.isVerified
+                      ? strings.channelLinked
+                      : strings.channelPending,
+                ),
               ],
             )
           : SabButton(
