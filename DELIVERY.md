@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `f9b53e6`. 13 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `ff00546`. 13 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
@@ -117,7 +117,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-005 | FEAT-001 | backend-engineer | Done | C-001–C-008 |
 | T-006 | FEAT-001 | frontend-engineer | Backlog | C-001–C-008 |
 | T-007 | FEAT-003 | ai-engineer | In Progress | C-009 |
-| T-008 | FEAT-004 | backend-engineer | In Progress | C-010, C-011 |
+| T-008 | FEAT-004 | backend-engineer | Done | C-010, C-011 |
 | T-009 | FEAT-004 | ai-engineer | In Progress | C-010 |
 | T-010 | FEAT-004, FEAT-011 | frontend-engineer | Backlog | C-009–C-012 |
 | T-011 | FEAT-011 | ai-engineer | In Progress | C-012 |
