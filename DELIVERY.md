@@ -31,7 +31,7 @@ concurrent tasks within an owner use the subdirectories named in their route.
 | Data | PostgreSQL 16 + pgvector (primary, isolated payment store, full-text search, retrieval) |
 | AI | Google Gemini 3.1 Pro (primary; exact provider ID pinned at Foundation); Gemini flash path for high-volume intent; google-genai SDK; evaluation harness |
 | Infrastructure | Docker Compose (dev), GitHub Actions (CI), Terraform (IaC) |
-| Hosting | Managed cloud, Africa region — provider and region validated at Foundation; NDPA transfer assessment required |
+| Hosting | AWS af-south-1 (Cape Town) — nearest managed Africa region to the Nigeria-primary intent; NDPA transfer assessment required |
 
 ## Structure
 
@@ -83,6 +83,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 - Retrieved content is untrusted and never overrides payment policy.
 - No secrets in code or logs; configuration from a secret store.
 - Commit messages cite durable IDs (FEAT-###, C-###), never task IDs or `.delivery/` paths.
+- Branching: from Phase 1 feature work onward, engineers commit to `dev`; the lead merges `dev` into `main` at each phase gate.
 
 ## Behavior rules
 
@@ -106,7 +107,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-001 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | infra-engineer | Backlog | — |
+| T-001 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | infra-engineer | Done | — |
 | T-002 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Backlog | — |
 | T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | Backlog | — |
 | T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Backlog | — |
@@ -118,6 +119,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-010 | FEAT-004, FEAT-011 | frontend-engineer | Backlog | C-009–C-012 |
 | T-011 | FEAT-011 | ai-engineer | Backlog | C-012 |
 | T-012 | FEAT-012 | backend-engineer | Backlog | C-013–C-016 |
+| T-013 | — | visual-artist | In Progress | — |
 
 ## Decisions log
 
@@ -134,6 +136,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-009 | docs/ tracked as a git submodule, both repos under vanguard-op | Parent never points at an unpushed docs commit | user |
 | D-010 | Monetary amounts are integer minor units (kobo) | Removes floating-point rounding error from a payment; schema.md updated to match | user |
 | D-011 | Phase 1 FEAT-012 scoped to the provider registration and review API plus operator-gated endpoints; Operations Console and provider-portal UIs deferred | operations.md defines the Phase 1 review workflow, but branding.md and screens.md are mobile-only and specify no console or portal surface; recorded for acknowledgment | lead |
+| D-012 | Deployment region pinned to AWS af-south-1 (Cape Town) | Nearest managed Africa region to the Nigeria-primary residency intent under D-005; NDPA transfer assessment required before production | lead |
 
 ## Definition of Done
 
