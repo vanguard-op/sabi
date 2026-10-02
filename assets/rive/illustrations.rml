@@ -1,0 +1,114 @@
+<Rive version="1" kind="fragment">
+    <!--
+      Sabi UI-state illustrations. Flat vector, geometric forms echoing the
+      mark's rounded bubble and torn receipt edge.
+      Duotone: primary-500 #12805C and grey-600 #5B5F54, accent #D9643A.
+      Transparent ground.
+    -->
+
+    <Artboard width="1024" height="1024" name="EmptyState" styleId="0:101" x="0" y="1200" id="0:100">
+        <LayoutComponentStyle name="EmptyState Style" id="0:101"/>
+        <Node name="Illustration" x="512" y="512" id="0:102">
+            <!-- Front-to-back: pages, then the peeking receipt, then the cover. -->
+            <Shape name="LeftPage" x="-138" y="-8" rotation="-0.07" id="0:104">
+                <Rectangle width="250" height="320" cornerRadiusTL="20"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="RightPage" x="138" y="-8" rotation="0.07" id="0:106">
+                <Rectangle width="250" height="320" cornerRadiusTL="20"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Receipt" x="298" y="-36" id="0:108">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-52" y="-64" name="R0"/>
+                    <StraightVertex x="52" y="-64" name="R1"/>
+                    <StraightVertex x="52" y="52" name="R2"/>
+                    <StraightVertex x="26" y="26" name="R3"/>
+                    <StraightVertex x="26" y="52" name="R4"/>
+                    <StraightVertex x="0" y="26" name="R5"/>
+                    <StraightVertex x="0" y="52" name="R6"/>
+                    <StraightVertex x="-26" y="26" name="R7"/>
+                    <StraightVertex x="-26" y="52" name="R8"/>
+                    <StraightVertex x="-52" y="26" name="R9"/>
+                    <StraightVertex x="-52" y="52" name="R10"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FFD9643A" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Cover" x="0" y="46" id="0:110">
+                <Rectangle width="600" height="360" cornerRadiusTL="48"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF5B5F54" name="Color"/>
+                </Fill>
+            </Shape>
+        </Node>
+    </Artboard>
+
+    <Artboard width="1024" height="1024" name="Offline" styleId="0:151" x="1200" y="1200" id="0:150">
+        <LayoutComponentStyle name="Offline Style" id="0:151"/>
+        <Node name="Illustration" x="512" y="512" id="0:152">
+            <!-- Signal arcs, behind the phone and node. Two concentric arcs
+                 bow left between node and phone, broken at the midpoint with
+                 a torn gap. -->
+            <Shape name="ArcOuter" x="250" y="0" id="0:154">
+                <Ellipse width="520" height="520" originX="0.5" originY="0.5" name="Path"/>
+                <Stroke thickness="9" cap="round" name="Upper">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                    <TrimPath start="0.66" end="0.735" name="Trim"/>
+                </Stroke>
+                <Stroke thickness="9" cap="round" name="Lower">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                    <TrimPath start="0.765" end="0.84" name="Trim"/>
+                </Stroke>
+            </Shape>
+            <Shape name="ArcInner" x="250" y="0" id="0:156">
+                <Ellipse width="400" height="400" originX="0.5" originY="0.5" name="Path"/>
+                <Stroke thickness="9" cap="round" name="Upper">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                    <TrimPath start="0.66" end="0.735" name="Trim"/>
+                </Stroke>
+                <Stroke thickness="9" cap="round" name="Lower">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                    <TrimPath start="0.765" end="0.84" name="Trim"/>
+                </Stroke>
+            </Shape>
+            <!-- Torn gap accent at the leftmost point of the arcs. -->
+            <Shape name="Break" x="20" y="0" id="0:158">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="-14" y="-30" name="B0"/>
+                    <StraightVertex x="14" y="-22" name="B1"/>
+                    <StraightVertex x="-8" y="-8" name="B2"/>
+                    <StraightVertex x="16" y="4" name="B3"/>
+                    <StraightVertex x="-12" y="16" name="B4"/>
+                    <StraightVertex x="10" y="30" name="B5"/>
+                    <StraightVertex x="-2" y="34" name="B6"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FFD9643A" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Phone" x="-270" y="0" id="0:160">
+                <Rectangle width="230" height="390" cornerRadiusTL="46"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Stroke thickness="26" cap="round" join="round" name="Outline">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Stroke>
+            </Shape>
+            <Shape name="Node" x="300" y="0" id="0:162">
+                <Rectangle width="110" height="110" cornerRadiusTL="26"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Stroke thickness="14" cap="round" join="round" name="Outline">
+                    <SolidColor colorValue="FF5B5F54" name="Color"/>
+                </Stroke>
+            </Shape>
+        </Node>
+    </Artboard>
+</Rive>

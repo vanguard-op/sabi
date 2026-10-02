@@ -8,14 +8,14 @@ none exist, so every slot is sourced new.
 
 | Slot | File | Family / Variant | Status |
 |---|---|---|---|
-| A-001 | assets/brand-mark/master.svg | Brand mark / master | Pending |
-| A-002 | assets/app-icon/app-icon.png | Brand mark / app-icon | Pending |
-| A-003 | assets/splash/splash.png | Brand mark / splash | Pending |
-| A-004 | assets/illustrations/empty-state.svg | Empty-state illustration / single | Pending |
-| A-005 | assets/illustrations/offline.svg | Offline illustration / single | Pending |
-| A-006 | assets/animations/success.json | Success animation / single | Pending |
-| A-007 | assets/animations/pending.json | Pending animation / single | Pending |
-| A-008 | assets/animations/error.json | Error animation / single | Pending |
+| A-001 | assets/brand-mark/master.riv | Brand mark / master | Done |
+| A-002 | assets/app-icon/app-icon.png | Brand mark / app-icon | Done |
+| A-003 | assets/splash/splash.png | Brand mark / splash | Done |
+| A-004 | assets/illustrations/empty-state.riv | Empty-state illustration / single | Done |
+| A-005 | assets/illustrations/offline.riv | Offline illustration / single | Done |
+| A-006 | assets/animations/success.riv | Success animation / single | Done |
+| A-007 | assets/animations/pending.riv | Pending animation / single | Done |
+| A-008 | assets/animations/error.riv | Error animation / single | Done |
 
 ## Brand mark — generation prompt
 
