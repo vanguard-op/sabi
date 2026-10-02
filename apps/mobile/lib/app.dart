@@ -18,6 +18,11 @@ class SabApp extends ConsumerWidget {
       theme: buildSabTheme(Brightness.light),
       darkTheme: buildSabTheme(Brightness.dark),
       themeMode: ThemeMode.system,
+      // Surfaces without an app bar (Welcome, Sign In) still draw the token
+      // status and navigation bar style; a screen with an app bar is covered
+      // by AppBarTheme.systemOverlayStyle.
+      builder: (context, child) =>
+          SabSystemBars(child: child ?? const SizedBox.shrink()),
       routerConfig: router,
       supportedLocales: const [Locale('en', 'NG'), Locale('pcm')],
       locale: const Locale('en', 'NG'),

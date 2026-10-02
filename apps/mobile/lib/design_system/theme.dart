@@ -1,6 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'tokens.dart';
+
+/// The system status and navigation bar style for a token palette.
+///
+/// Both bars are made transparent and their icon brightness is chosen to
+/// contrast with [SabColorTokens.surface]. Android draws the bars edge-to-edge
+/// from API 35 on, where a bar colour is ignored and the app surface shows
+/// through; on older levels the surface behind the transparent bar reads the
+/// same way. The status and navigation bar contrast scrims are disabled so the
+/// surface is never toned to a different colour, and every field is token-
+/// derived rather than Material's default black bar (branding.md, "Color
+/// Palette"; NFR-030).
+SystemUiOverlayStyle sabSystemOverlayStyle(SabColorTokens colors) {
+  // Light surfaces take dark icons and dark surfaces light icons, so the icon
+  // brightness follows the surface luminance rather than the theme flag.
+  final surfaceIsLight = colors.surface.computeLuminance() > 0.5;
+  final iconBrightness = surfaceIsLight ? Brightness.dark : Brightness.light;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    // iOS reads the background brightness, which is the inverse of its icons.
+    statusBarBrightness: surfaceIsLight ? Brightness.light : Brightness.dark,
+    statusBarIconBrightness: iconBrightness,
+    systemStatusBarContrastEnforced: false,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: iconBrightness,
+    systemNavigationBarContrastEnforced: false,
+  );
+}
+
+/// Applies the token system bar style to a surface that has no app bar, such as
+/// the Welcome and Sign In screens. A screen with an [AppBar] is covered by
+/// [AppBarTheme.systemOverlayStyle] already; nesting is harmless because the
+/// framework lets the region nearest the bar win.
+class SabSystemBars extends StatelessWidget {
+  const SabSystemBars({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: sabSystemOverlayStyle(SabColorTokens.of(context)),
+      child: child,
+    );
+  }
+}
 
 /// Builds the Material theme from the Sabi tokens. Both light and dark themes
 /// come from the same token set, so a screen styled against tokens renders in
@@ -57,6 +104,7 @@ ThemeData buildSabTheme(Brightness brightness) {
         color: colors.textPrimary,
         size: SabSizes.iconMd,
       ),
+      systemOverlayStyle: sabSystemOverlayStyle(colors),
     ),
     dividerTheme: DividerThemeData(
       color: colors.border,
