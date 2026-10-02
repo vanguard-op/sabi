@@ -19,8 +19,8 @@ import '../../design_system/icons.dart';
 import '../../design_system/tokens.dart';
 import '../../l10n/sab_strings.dart';
 import '../../models/composed_surface.dart';
-import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
+import '../../models/service_summary.dart';
 import 'home_controller.dart';
 
 /// Screen 3: Home (`/home`). State a payment need, resolve it, and reach
@@ -48,18 +48,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (text.trim().isEmpty) return;
     _composer.clear();
     final controller = ref.read(homeControllerProvider.notifier);
-    final intent = await controller.submit(text);
-    if (!mounted || intent == null) return;
-    final candidates = intent.candidates;
+    final candidates = await controller.submit(text);
+    if (!mounted || candidates == null) return;
+    // More than one collecting body is ambiguous: the picker blocks until a
+    // choice is made, and the conversation underneath is preserved (screens.md).
     if (candidates.length > 1) {
       final chosen = await showSabProviderPickerSheet(
         context,
         candidates: candidates,
       );
       if (chosen != null && mounted) _openService(chosen.serviceId);
-    } else if (candidates.isNotEmpty) {
-      _openService(candidates.first.serviceId);
     }
+    // A single match stays on the composed discovery surface as a selectable
+    // row, so the user still confirms the target (FEAT-004).
   }
 
   void _openService(String serviceId) => context.push('/pay/$serviceId');
@@ -79,6 +80,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
     ref.read(reauthProvider.notifier).resolve();
     if (ok) ref.read(sessionProvider).signIn();
+  }
+
+  void _showSupport() {
+    final strings = ref.read(sabStringsProvider);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.contactSupport),
+        content: Text(strings.notCoveredBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(strings.close),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -125,8 +143,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 receipts: receipts,
                 state: state,
                 onOpenService: _openService,
-                onRetry: () =>
-                    ref.read(homeControllerProvider.notifier).retry(),
+                onRetry: () => ref.read(homeControllerProvider.notifier).retry(),
+                onSupport: _showSupport,
               ),
             ),
           ),
@@ -148,18 +166,23 @@ class _Conversation extends ConsumerWidget {
     required this.state,
     required this.onOpenService,
     required this.onRetry,
+    required this.onSupport,
   });
 
   final List<ReceiptSummary> receipts;
   final HomeState state;
   final ValueChanged<String> onOpenService;
   final VoidCallback onRetry;
+  final VoidCallback onSupport;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
     final colors = SabColorTokens.of(context);
-    final showEmpty = receipts.isEmpty && state.phase == HomePhase.idle;
+    final showEmpty =
+        receipts.isEmpty &&
+        state.phase == HomePhase.idle &&
+        !state.queued;
 
     if (showEmpty) {
       return EmptyState(
@@ -190,6 +213,7 @@ class _Conversation extends ConsumerWidget {
           state: state,
           onOpenService: onOpenService,
           onRetry: onRetry,
+          onSupport: onSupport,
         ),
       ],
     );
@@ -201,99 +225,129 @@ class _Interaction extends ConsumerWidget {
     required this.state,
     required this.onOpenService,
     required this.onRetry,
+    required this.onSupport,
   });
 
   final HomeState state;
   final ValueChanged<String> onOpenService;
   final VoidCallback onRetry;
+  final VoidCallback onSupport;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
     final colors = SabColorTokens.of(context);
-    switch (state.phase) {
-      case HomePhase.idle:
-        if (!state.queued) return const SizedBox.shrink();
-        return _Notice(
-          title: strings.queuedOffline,
-          body: strings.offlineNoPayment,
-        );
-      case HomePhase.composing:
-        return Container(
-          padding: const EdgeInsets.all(SabSpacing.md),
-          decoration: BoxDecoration(
-            color: colors.surfaceSecondary,
-            borderRadius: BorderRadius.circular(SabRadii.md),
+    final request = state.lastRequest;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (request != null && state.phase != HomePhase.idle) ...[
+          _RequestBubble(text: request),
+          const SizedBox(height: SabSpacing.md),
+        ],
+        switch (state.phase) {
+          HomePhase.idle => const SizedBox.shrink(),
+          HomePhase.composing => Container(
+            padding: const EdgeInsets.all(SabSpacing.md),
+            decoration: BoxDecoration(
+              color: colors.surfaceSecondary,
+              borderRadius: BorderRadius.circular(SabRadii.md),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: SabSizes.iconMd,
+                  height: SabSizes.iconMd,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: SabSpacing.sm),
+                Text(
+                  strings.composing,
+                  style: SabTypography.body.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: SabSizes.iconMd,
-                height: SabSizes.iconMd,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: SabSpacing.sm),
-              Text(
-                strings.composing,
-                style: SabTypography.body.copyWith(color: colors.textSecondary),
-              ),
-            ],
+          HomePhase.discovery => _Discovery(
+            candidates: state.candidates,
+            onOpenService: onOpenService,
           ),
-        );
-      case HomePhase.discovery:
-        return ComposedTaskSurface(
-          surface: _discoverySurface(state.intent!),
-          onServiceSelected: (service) => onOpenService(service.serviceId),
-          onFallbackAction: () =>
-              onOpenService(state.intent!.candidates.first.serviceId),
-        );
-      case HomePhase.clarifying:
-        return _Clarification(
-          intent: state.intent!,
-          onOpenService: onOpenService,
-        );
-      case HomePhase.notCovered:
-        return _Notice(
-          title: strings.notCoveredTitle,
-          body: strings.notCoveredBody,
-          actionLabel: strings.contactSupport,
-          onAction: () {},
-        );
-      case HomePhase.error:
-        return _Notice(
-          title: strings.somethingWrong,
-          body: strings.sendFailed,
-          actionLabel: strings.retry,
-          onAction: onRetry,
-        );
-    }
+          HomePhase.clarifying => _Clarification(
+            question: state.intent?.clarifyingQuestion,
+            candidates: state.candidates,
+            onOpenService: onOpenService,
+          ),
+          HomePhase.notCovered => _Notice(
+            title: strings.notCoveredTitle,
+            body: strings.notCoveredBody,
+            actionLabel: strings.contactSupport,
+            onAction: onSupport,
+          ),
+          HomePhase.error => _Notice(
+            title: strings.somethingWrong,
+            body: strings.sendFailed,
+            actionLabel: strings.retry,
+            onAction: onRetry,
+          ),
+        },
+      ],
+    );
   }
+}
 
-  ComposedSurface _discoverySurface(IntentResult intent) => ComposedSurface(
-    surfaceId: 'discovery',
-    task: SurfaceTask.discovery,
-    fallback: 'discovery',
-    components: [
-      for (final service in intent.candidates)
-        SurfaceComponent(
-          type: 'serviceResultRow',
-          data: {'service': service.toJson()},
-        ),
-    ],
-  );
+/// The composed discovery surface (FEAT-011). The agent names only catalogue
+/// components; an unknown component is refused and the fallback form keeps the
+/// task completable.
+class _Discovery extends StatelessWidget {
+  const _Discovery({
+    required this.candidates,
+    required this.onOpenService,
+  });
+
+  final List<ServiceSummary> candidates;
+  final ValueChanged<String> onOpenService;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = ComposedSurface(
+      surfaceId: 'discovery',
+      task: SurfaceTask.discovery,
+      fallback: 'discovery',
+      components: [
+        for (final service in candidates)
+          SurfaceComponent(
+            type: 'serviceResultRow',
+            data: {'service': service.toJson()},
+          ),
+      ],
+    );
+    return ComposedTaskSurface(
+      surface: surface,
+      onServiceSelected: (service) => onOpenService(service.serviceId),
+      onFallbackAction: candidates.isEmpty
+          ? null
+          : () => onOpenService(candidates.first.serviceId),
+    );
+  }
 }
 
 class _Clarification extends ConsumerWidget {
-  const _Clarification({required this.intent, required this.onOpenService});
+  const _Clarification({
+    required this.question,
+    required this.candidates,
+    required this.onOpenService,
+  });
 
-  final IntentResult intent;
+  final String? question;
+  final List<ServiceSummary> candidates;
   final ValueChanged<String> onOpenService;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
     final colors = SabColorTokens.of(context);
-    final question = intent.clarifyingQuestion;
     return Container(
       padding: const EdgeInsets.all(SabSpacing.md),
       decoration: BoxDecoration(
@@ -313,7 +367,7 @@ class _Clarification extends ConsumerWidget {
           if (question != null) ...[
             const SizedBox(height: SabSpacing.xs),
             Text(
-              question,
+              question!,
               style: SabTypography.body.copyWith(color: colors.info900),
             ),
           ],
@@ -323,7 +377,7 @@ class _Clarification extends ConsumerWidget {
             style: SabTypography.caption.copyWith(color: colors.info900),
           ),
           const SizedBox(height: SabSpacing.sm),
-          for (final service in intent.candidates) ...[
+          for (final service in candidates) ...[
             ServiceResultRow(
               service: service,
               onSelect: () => onOpenService(service.serviceId),
@@ -331,6 +385,37 @@ class _Clarification extends ConsumerWidget {
             const SizedBox(height: SabSpacing.sm),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The user's own words, shown above the result so the conversation reads in
+/// order (screens.md, Home layout).
+class _RequestBubble extends StatelessWidget {
+  const _RequestBubble({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SabColorTokens.of(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: SabSizes.contentMaxWidth),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SabSpacing.md,
+          vertical: SabSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: colors.primary100,
+          borderRadius: BorderRadius.circular(SabRadii.lg),
+        ),
+        child: Text(
+          text,
+          style: SabTypography.body.copyWith(color: colors.primary900),
+        ),
       ),
     );
   }
@@ -422,31 +507,65 @@ class _Composer extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                enabled: enabled,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                decoration: InputDecoration(hintText: strings.composerHint),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) => TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  enabled: enabled,
+                  minLines: 1,
+                  maxLines: 4,
+                  maxLength: homeRequestMaxLength,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => onSend(),
+                  style: SabTypography.body.copyWith(
+                    color: colors.textPrimary,
+                  ),
+                  // The bound only matters as it approaches; until then the
+                  // counter is noise, so it stays hidden (screens.md, very
+                  // long free-form input).
+                  buildCounter:
+                      (
+                        context, {
+                        required currentLength,
+                        required isFocused,
+                        maxLength,
+                      }) => currentLength < homeRequestMaxLength - 20
+                      ? null
+                      : Text(
+                          '$currentLength/$maxLength',
+                          style: SabTypography.caption.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                  decoration: InputDecoration(
+                    hintText: strings.composerHint,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: SabSpacing.sm),
-            Semantics(
-              button: true,
-              label: strings.send,
-              child: SizedBox(
-                width: SabSizes.minTouchTarget,
-                height: SabSizes.minTouchTarget,
-                child: IconButton(
-                  onPressed: enabled ? onSend : null,
-                  icon: const SabIconView(SabIcons.send),
-                  color: colors.primary500,
-                  tooltip: strings.send,
-                ),
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final canSend = enabled && value.text.trim().isNotEmpty;
+                return Semantics(
+                  button: true,
+                  enabled: canSend,
+                  label: strings.send,
+                  child: SizedBox(
+                    width: SabSizes.minTouchTarget,
+                    height: SabSizes.minTouchTarget,
+                    child: IconButton(
+                      onPressed: canSend ? onSend : null,
+                      icon: const SabIconView(SabIcons.send),
+                      color: colors.primary500,
+                      disabledColor: colors.textSecondary,
+                      tooltip: strings.send,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
