@@ -84,6 +84,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 - No secrets in code or logs; configuration from a secret store.
 - Commit messages cite durable IDs (FEAT-###, C-###), never task IDs or `.delivery/` paths.
 - Branching: from Phase 1 feature work onward, engineers commit to `dev`; the lead merges `dev` into `main` at each phase gate.
+- Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix.
 
 ## Behavior rules
 
@@ -108,9 +109,9 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
 | T-001 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | infra-engineer | Done | — |
-| T-002 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | In Progress | — |
-| T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | In Progress | — |
-| T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | In Progress | — |
+| T-002 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
+| T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | Done | — |
+| T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Done | — |
 | T-005 | FEAT-001 | backend-engineer | Backlog | C-001–C-008 |
 | T-006 | FEAT-001 | frontend-engineer | Backlog | C-001–C-008 |
 | T-007 | FEAT-003 | ai-engineer | Backlog | C-009 |
@@ -120,7 +121,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-011 | FEAT-011 | ai-engineer | Backlog | C-012 |
 | T-012 | FEAT-012 | backend-engineer | Backlog | C-013–C-016 |
 | T-013 | — | visual-artist | Done | — |
-| T-014 | — | infra-engineer | In Progress | — |
+| T-014 | — | infra-engineer | Done | — |
 
 ## Decisions log
 
