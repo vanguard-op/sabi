@@ -111,7 +111,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-026 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | In Progress | — |
+| T-026 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
 
 ## Decisions log
 
