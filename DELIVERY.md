@@ -64,6 +64,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | Spacing | space-xs, space-sm, space-md, space-lg, space-xl, space-2xl, space-3xl |
 | Sizing | radius-sm/md/lg/full, button-height, input-height, icon-sm/md/lg |
 | Shadows | shadow-none/sm/md/lg/xl (light and dark) |
+| Motion | skeleton-pulse; payment states: success 400–600ms one-shot, pending seamless loop, error firm stop with no bounce; honours reduced motion |
 
 ## Assets
 
@@ -122,6 +123,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-012 | FEAT-012 | backend-engineer | Backlog | C-013–C-016 |
 | T-013 | — | visual-artist | Done | — |
 | T-014 | — | infra-engineer | Done | — |
+| T-015 | — | infra-engineer | Backlog | — |
 
 ## Decisions log
 
