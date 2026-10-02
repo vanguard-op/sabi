@@ -4,6 +4,12 @@ The cross-service layer: it proves the delivered whole meets the frozen contract
 (CONTRACTS.md) and the phase's acceptance criteria, where the per-service unit
 suites prove module internals.
 
+The API half checks the full C-001..C-016 set against the assembled service,
+including the gateway agent paths C-009 and C-012 that the client actually calls
+(architecture.md makes the gateway the sole entry point). The gateway's AI-service
+client is a deterministic double, so the agent surface is exercised without a
+running AI service or model provider.
+
 The API service and the AI service each expose a top-level `app` package, so they
 cannot be imported in one interpreter. The two directories are therefore run as
 separate processes:

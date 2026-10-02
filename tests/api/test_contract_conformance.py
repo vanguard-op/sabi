@@ -1,15 +1,22 @@
-"""API-service contract conformance (C-001 to C-008, C-010, C-011, C-013 to C-016).
+"""API-service contract conformance (C-001 to C-016).
 
 This is the integration check the per-module unit suites do not make: that the
 assembled API service actually mounts the whole frozen contract set the client was
 built against, and that every error path uses the one shared envelope.
+
+The agent paths (C-009, C-012) are part of that set: architecture.md makes the
+gateway the client's sole entry point, so the client's contract is the gateway
+surface, not the private AI service. They are mounted and checked here.
 
 Reference: CONTRACTS.md, DELIVERY.md conventions.
 """
 
 from __future__ import annotations
 
-# Every path in CONTRACTS.md that the API service owns.
+from pathlib import Path
+
+# Every path in CONTRACTS.md that the API service owns. The agent paths are
+# served by the gateway module, which forwards to the AI service (D-021).
 API_CONTRACT_PATHS = {
     "/v1/auth/register/options",
     "/v1/auth/register/verify",
@@ -19,8 +26,10 @@ API_CONTRACT_PATHS = {
     "/v1/auth/recovery/regenerate",
     "/v1/auth/channel-links",
     "/v1/account/me",
+    "/v1/agent/intents",
     "/v1/catalogue/search",
     "/v1/catalogue/services/{serviceId}",
+    "/v1/agent/surfaces",
     "/v1/providers",
     "/v1/providers/{providerId}/capabilities",
     "/v1/capabilities/{capabilityId}",
@@ -41,6 +50,8 @@ def test_unauthenticated_requests_use_the_shared_error_envelope(api_client) -> N
         ("/v1/account/me", "get"),
         ("/v1/auth/channel-links", "post"),
         ("/v1/auth/recovery/regenerate", "post"),
+        ("/v1/agent/intents", "post"),
+        ("/v1/agent/surfaces", "post"),
         ("/v1/providers", "post"),
         ("/v1/catalogue/search", "get"),
     ):
@@ -131,3 +142,54 @@ def test_capability_read_returns_health_status_alongside_the_capability(
     assert set(body) == {"capability", "healthStatus"}
     assert body["healthStatus"] in {"healthy", "degraded", "unavailable"}
     assert body["capability"]["status"] == "pending"
+
+
+# --------------------------------------------------------------------------- #
+# Phase gate wiring: the integration layer must actually be run by the pipeline.
+# --------------------------------------------------------------------------- #
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def test_integration_suite_is_a_documented_and_pipeline_enforced_target() -> None:
+    """D-023: tests/** gates, so the pipeline must run it.
+
+    The cross-service suite proves the delivered whole; if no command or CI job
+    invokes it, the gate is advisory. This guards the wiring itself so it cannot
+    silently regress: a `test-integration` target exists and CI calls it.
+    """
+
+    makefile = (_repo_root() / "Makefile").read_text(encoding="utf-8")
+    assert "test-integration:" in makefile, "Makefile must expose a test-integration target"
+    assert "tests/api" in makefile and "tests/ai" in makefile, (
+        "the test-integration target must run both integration directories"
+    )
+
+    ci = (_repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "make test-integration" in ci, "CI must run the integration gate"
+    # And it must be a blocking job, not continue-on-error like the MQ report.
+    integration_job = ci.split("integration gate", 1)[1]
+    assert "continue-on-error: true" not in integration_job.split("model-quality", 1)[0], (
+        "the integration gate must block, not report-and-continue"
+    )
+
+
+def test_model_quality_bar_remains_reported_where_it_cannot_be_measured() -> None:
+    """MQ-001/002/003 need golden datasets and judges the delivery does not carry.
+
+    The bar is not silently dropped: the attestation test keeps the gap explicit
+    and a non-blocking pipeline job reports it every run, so an accepted
+    disposition stays visible rather than reading as a pass.
+    """
+
+    attestation = (_repo_root() / "tests" / "ai" / "test_model_quality_attestation.py").read_text(
+        encoding="utf-8"
+    )
+    assert "pytest.fail" in attestation, (
+        "the MQ attestation must fail to surface the unmeasured bar, not assert a pass"
+    )
+
+    ci = (_repo_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "make test-model-quality" in ci, "CI must report the model-quality attestation"

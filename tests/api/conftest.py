@@ -88,6 +88,61 @@ def session_manager(api_app: FastAPI) -> SessionManager:
     return api_app.state.session_manager
 
 
+class FakeAgentAIClient:
+    """A deterministic stand-in for the gateway's AI-service client.
+
+    The gateway is the client's single entry point, so the assembled API service
+    exposes the agent surface without a running AI service. This double lets the
+    integration suite prove the gateway forwards the contract request and returns
+    the AI service's body unchanged, while the model behaviour itself stays the AI
+    service's own suite.
+    """
+
+    def __init__(self) -> None:
+        self.intent_calls: list[dict] = []
+        self.surface_calls: list[dict] = []
+
+    def resolve_intent(self, *, text: str, locale: str, channel: str) -> dict:
+        self.intent_calls.append({"text": text, "locale": locale, "channel": channel})
+        return {
+            "intent": {
+                "intentType": "bill_payment",
+                "target": "svc-electric",
+                "amount": None,
+                "currency": "NGN",
+                "reference": None,
+                "constraints": {},
+                "confidence": 0.95,
+                "language": locale,
+                "clarifyingQuestion": None,
+            },
+            "candidates": [],
+            "source": "model",
+        }
+
+    def compose_surface(self, *, task: str, context: dict) -> dict:
+        self.surface_calls.append({"task": task, "context": context})
+        # Mirror the AI service's C-012 contract: an unknown task is a 400 with
+        # the shared envelope. The gateway must forward that as the same error.
+        from app.core.errors import APIError, ErrorCode
+
+        if task not in {"confirmation", "amount_entry", "receipt", "discovery"}:
+            raise APIError(400, ErrorCode.INVALID_REQUEST, "That task is not supported.")
+        return {"messages": [{"type": "createSurface", "surfaceId": "s1"}], "fallback": task}
+
+
+@pytest.fixture
+def agent_ai_client(api_app: FastAPI) -> FakeAgentAIClient:
+    """Substitute the AI-service client the gateway forwards to."""
+
+    from app.agent.deps import get_agent_client
+
+    double = FakeAgentAIClient()
+    api_app.state.agent_ai_client = double
+    api_app.dependency_overrides[get_agent_client] = lambda: double
+    return double
+
+
 def sign_in(
     client: TestClient,
     manager: SessionManager,
