@@ -369,11 +369,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Just to confirm'), findsOneWidget);
     // Answering the one question with another unresolved request escalates
-    // rather than asking a second question (MQ-001).
+    // rather than asking a second question (MQ-001). The first question stays
+    // in the conversation; the second low-confidence prompt is never rendered.
     await controller.submit('Ikeja');
     await tester.pumpAndSettle();
-    expect(find.text('Just to confirm'), findsNothing);
+    expect(find.text('Which one do you mean?'), findsNothing);
+    expect(find.text('Just to confirm'), findsOneWidget);
     expect(find.text('Not covered yet'), findsOneWidget);
+    // Both requests remain in the conversation, oldest first.
+    expect(find.text('I wan pay my electricity'), findsOneWidget);
+    expect(find.text('Ikeja'), findsOneWidget);
   });
 
   testWidgets('a coverage miss offers human support', (tester) async {
@@ -441,5 +446,123 @@ void main() {
     expect(field.maxLines, greaterThan(1));
     expect(_sendButton, findsOneWidget);
     expect(tester.widget<IconButton>(_sendButton).onPressed, isNotNull);
+  });
+
+  testWidgets('a new request appends and keeps the earlier result visible', (
+    tester,
+  ) async {
+    await pumpSab(
+      tester,
+      const HomeScreen(),
+      overrides: _overrides(receipts: const []),
+    );
+    await tester.pumpAndSettle();
+    final controller = containerOf(tester).read(
+      homeControllerProvider.notifier,
+    );
+    controller.submit('pay my land use charge');
+    await tester.pumpAndSettle();
+    // A second, unrelated request must not clear the first exchange.
+    controller.submit('buy airtime');
+    await tester.pumpAndSettle();
+    expect(find.text('pay my land use charge'), findsOneWidget);
+    expect(find.text('buy airtime'), findsOneWidget);
+    expect(find.text('Lagos State Government'), findsOneWidget);
+    expect(find.text('MTN Nigeria'), findsOneWidget);
+    // Both requests are preserved as turns, oldest first.
+    expect(
+      containerOf(tester).read(homeControllerProvider).turns,
+      hasLength(2),
+    );
+  });
+
+  testWidgets('a provider-picker round trip preserves the turns', (
+    tester,
+  ) async {
+    final catalogue = _Catalogue(
+      intents: [
+        IntentResult(
+          intentType: 'bill_payment',
+          confidence: 0.9,
+          candidates: [
+            _service('svc_onitsha_north', 'Onitsha North LGA'),
+            _service('svc_onitsha_south', 'Onitsha South LGA'),
+          ],
+        ),
+      ],
+    );
+    await pumpSab(
+      tester,
+      const HomeScreen(),
+      overrides: _overrides(receipts: const [], catalogue: catalogue),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'council levy');
+    await tester.pump();
+    await tester.tap(_sendButton);
+    await tester.pumpAndSettle();
+    // The sheet blocks on a choice; the conversation stays behind it.
+    expect(find.text('Which one do you mean?'), findsOneWidget);
+    // Dismiss without choosing: the turns are still there afterwards.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Which one do you mean?'), findsNothing);
+    expect(find.text('council levy'), findsOneWidget);
+    expect(find.text('Onitsha North LGA'), findsOneWidget);
+  });
+
+  testWidgets('an offline queued request stays in the conversation', (
+    tester,
+  ) async {
+    await pumpSab(
+      tester,
+      const HomeScreen(),
+      overrides: _overrides(receipts: const []),
+    );
+    await tester.pumpAndSettle();
+    final container = containerOf(tester);
+    container.read(connectivityProvider.notifier).setOnline(false);
+    await tester.pumpAndSettle();
+    await container
+        .read(homeControllerProvider.notifier)
+        .submit('pay my land use charge');
+    await tester.pumpAndSettle();
+    // The request is preserved as a turn and the banner explains it is queued.
+    expect(find.text('pay my land use charge'), findsOneWidget);
+    expect(
+      find.text('Your request is queued and will send when you’re back online.'),
+      findsOneWidget,
+    );
+    // A later, second queued request appends without discarding the first.
+    await container
+        .read(homeControllerProvider.notifier)
+        .submit('buy airtime');
+    await tester.pumpAndSettle();
+    expect(find.text('pay my land use charge'), findsOneWidget);
+    expect(find.text('buy airtime'), findsOneWidget);
+  });
+
+  testWidgets('a retry re-runs the request in place without duplicating it', (
+    tester,
+  ) async {
+    final catalogue = MockCatalogueRepository(latency: Duration.zero)
+      ..failNext = true;
+    await pumpSab(
+      tester,
+      const HomeScreen(),
+      overrides: _overrides(receipts: const [], catalogue: catalogue),
+    );
+    await tester.pumpAndSettle();
+    containerOf(tester)
+        .read(homeControllerProvider.notifier)
+        .submit('pay my land use charge');
+    await tester.pumpAndSettle();
+    expect(find.text('pay my land use charge'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lagos State Government'), findsOneWidget);
+    // The request bubble is not duplicated by the retry.
+    expect(find.text('pay my land use charge'), findsOneWidget);
+    expect(containerOf(tester).read(homeControllerProvider).turns, hasLength(1));
   });
 }

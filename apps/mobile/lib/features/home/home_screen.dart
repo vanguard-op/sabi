@@ -179,10 +179,7 @@ class _Conversation extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
     final colors = SabColorTokens.of(context);
-    final showEmpty =
-        receipts.isEmpty &&
-        state.phase == HomePhase.idle &&
-        !state.queued;
+    final showEmpty = receipts.isEmpty && state.turns.isEmpty;
 
     if (showEmpty) {
       return EmptyState(
@@ -209,26 +206,41 @@ class _Conversation extends ConsumerWidget {
             const SizedBox(height: SabSpacing.md),
           ],
         ],
-        _Interaction(
-          state: state,
-          onOpenService: onOpenService,
-          onRetry: onRetry,
-          onSupport: onSupport,
-        ),
+        // Every turn stays on screen, oldest first, so the conversation builds
+        // up in time order (screens.md, screen 3, Layout). The larger gap
+        // between turns groups each request with its result.
+        for (var i = 0; i < state.turns.length; i++) ...[
+          if (i > 0) const SizedBox(height: SabSpacing.lg),
+          _Turn(
+            turn: state.turns[i],
+            isLatest: i == state.turns.length - 1,
+            onOpenService: onOpenService,
+            onRetry: onRetry,
+            onSupport: onSupport,
+          ),
+        ],
       ],
     );
   }
 }
 
-class _Interaction extends ConsumerWidget {
-  const _Interaction({
-    required this.state,
+/// One conversation turn: the user's request followed by the assistant's
+/// outcome for it. Every turn renders, so earlier requests and results remain
+/// visible and are never discarded (screens.md, screen 3, Layout).
+class _Turn extends ConsumerWidget {
+  const _Turn({
+    required this.turn,
+    required this.isLatest,
     required this.onOpenService,
     required this.onRetry,
     required this.onSupport,
   });
 
-  final HomeState state;
+  final ConversationTurn turn;
+
+  /// A retry only makes sense for the request in front of the user; an earlier
+  /// failed turn is history, so it renders its notice without the action.
+  final bool isLatest;
   final ValueChanged<String> onOpenService;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
@@ -237,16 +249,16 @@ class _Interaction extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
     final colors = SabColorTokens.of(context);
-    final request = state.lastRequest;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (request != null && state.phase != HomePhase.idle) ...[
-          _RequestBubble(text: request),
-          const SizedBox(height: SabSpacing.md),
-        ],
-        switch (state.phase) {
+        _RequestBubble(text: turn.request),
+        const SizedBox(height: SabSpacing.md),
+        switch (turn.phase) {
           HomePhase.idle => const SizedBox.shrink(),
+          // The offline banner carries the queued explanation; the turn holds
+          // the request itself so it is not lost when connectivity returns.
+          HomePhase.queued => const SizedBox.shrink(),
           HomePhase.composing => Container(
             padding: const EdgeInsets.all(SabSpacing.md),
             decoration: BoxDecoration(
@@ -271,12 +283,12 @@ class _Interaction extends ConsumerWidget {
             ),
           ),
           HomePhase.discovery => _Discovery(
-            candidates: state.candidates,
+            candidates: turn.candidates,
             onOpenService: onOpenService,
           ),
           HomePhase.clarifying => _Clarification(
-            question: state.intent?.clarifyingQuestion,
-            candidates: state.candidates,
+            question: turn.intent?.clarifyingQuestion,
+            candidates: turn.candidates,
             onOpenService: onOpenService,
           ),
           HomePhase.notCovered => _Notice(
@@ -289,7 +301,7 @@ class _Interaction extends ConsumerWidget {
             title: strings.somethingWrong,
             body: strings.sendFailed,
             actionLabel: strings.retry,
-            onAction: onRetry,
+            onAction: isLatest ? onRetry : null,
           ),
         },
       ],
