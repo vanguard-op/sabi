@@ -1,9 +1,22 @@
 """Sabi AI serving application factory.
 
 One deployable service for the model-backed capabilities: intent resolution
-(MQ-001), discovery ranking (MQ-002), and interface composition (MQ-003). The
-pinned model build and cost ceilings live in :mod:`core.config`; each capability
-is exposed as a feature router under ``/v1``.
+(MQ-001, C-009), discovery ranking (MQ-002, C-010), and interface composition
+(MQ-003, C-012). The pinned model build and cost ceilings live in :mod:`core.config`;
+each capability is exposed as a feature router under ``/v1``.
+
+This is a private model-serving surface behind the API gateway, not a public API.
+The client and the channel gateways never call it directly: they reach the gateway
+(architecture.md, "API Gateway / Backend-for-Frontend"), which enforces session
+authentication and rate limiting and forwards to the corresponding C-009, C-010, or
+C-012 path here. The same service is consumed internally by the agent orchestrator.
+Because it sits behind the gateway it performs no authentication of its own; it
+validates input and returns the frozen contract body or the shared error envelope.
+
+Every capability grounds through the one shared retrieval registry in
+:mod:`app.retrieval` and fails closed through :mod:`app.provider`, so a provider
+failure degrades to keyword and search resolution with mandatory confirmation rather
+than an ungrounded answer.
 
 Feature routers are auto-discovered: a package at ``<feature>/router.py`` that
 exposes ``router: APIRouter`` is mounted at ``/v1``, and paths are declared
@@ -88,7 +101,9 @@ def create_app(settings: ModelSettings | None = None) -> FastAPI:
         title="Sabi AI",
         version="1.0.0",
         description=(
-            "Model serving for intent resolution, discovery ranking, and interface composition."
+            "Private model-serving surface for intent resolution (C-009), discovery "
+            "ranking (C-010), and interface composition (C-012). Reached through the "
+            "API gateway, which enforces authentication and rate limiting."
         ),
         openapi_url="/openapi.json",
     )

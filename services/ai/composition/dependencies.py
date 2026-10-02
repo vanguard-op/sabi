@@ -1,32 +1,25 @@
 """Wiring for the composition router.
 
-The serving layer is created once per process and stored on ``app.state`` so
-tests can override it. :class:`ModelServing` is constructed with the pinned
-settings (model IDs, decoding, timeout) and the injected retrieval index.
+The serving layer is created once per process and stored on ``app.state`` so tests
+can override it. :class:`~core.serving.ModelServing` is constructed with the pinned
+settings (model IDs, decoding, timeout), the shared fail-closed provider wrapper, and
+the service's single retrieval registry.
+
+Interface composition is grounded in the task context it receives, not in the
+catalogue, so it never queries the registry; binding the shared index anyway keeps
+every model-backed feature wired through one retrieval seam (see :mod:`app.retrieval`)
+rather than each package owning a private index.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from fastapi import Request
 
+from app.provider import FailClosedProvider
+from app.retrieval import LateBoundRetrievalIndex
 from core.config import ModelSettings
 from core.provider import GeminiProvider, ModelProvider
-from core.retrieval import RetrievalIndex, RetrievedRecord
 from core.serving import ModelServing
-
-
-class EmptyRetrievalIndex:
-    """A retrieval index with no records.
-
-    Interface composition is not grounded in the service catalogue: the task
-    context reaches the model through the request, not through retrieval. This
-    index keeps the serving seam satisfied without inventing catalogue facts.
-    """
-
-    def search(self, query: str, *, limit: int) -> Sequence[RetrievedRecord]:
-        return []
 
 
 def build_serving(
@@ -37,14 +30,13 @@ def build_serving(
     """Build the process-wide serving layer.
 
     A provider may be injected for tests; otherwise the pinned Gemini provider is
-    built, and an absent SDK degrades to the documented fallback at call time
-    rather than failing boot.
+    built and wrapped fail-closed, so an SDK or client-construction error degrades to
+    the documented fallback at call time rather than failing boot or returning a 500.
     """
 
     resolved = settings or ModelSettings.from_env()
-    model_provider = provider or GeminiProvider(resolved)
-    retrieval: RetrievalIndex = EmptyRetrievalIndex()
-    return ModelServing(model_provider, retrieval, settings=resolved)
+    model_provider = provider or FailClosedProvider(GeminiProvider(resolved))
+    return ModelServing(model_provider, LateBoundRetrievalIndex(), settings=resolved)
 
 
 def get_serving(request: Request) -> ModelServing:

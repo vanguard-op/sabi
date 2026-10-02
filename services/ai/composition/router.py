@@ -5,6 +5,10 @@ discovery) from the client's component catalogue as a declarative UI stream. The
 client renders natively; the agent never requests a component outside the
 catalogue, and never embeds executable content.
 
+This is a private model-serving surface behind the API gateway: the mobile client
+reaches the gateway, which enforces session authentication and rate limiting before
+forwarding here. It validates input and returns the frozen C-012 body.
+
 An invalid composition is not an error: the task stays completable through the
 client's static fallback form for the same task, so the endpoint answers 200
 with ``fallback`` set and an empty ``messages`` list. Only an unknown ``task``

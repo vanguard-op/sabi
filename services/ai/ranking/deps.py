@@ -1,23 +1,29 @@
 """Dependency wiring for discovery ranking.
 
-The provider is the pinned Gemini build, and the retrieval index resolves the
-catalogue's process-wide index at call time (see :mod:`ranking.catalogue`). The
-google-genai SDK is imported lazily by the provider only when a call is made, so
-the service boots and health-checks without the SDK or a network.
+The provider is the pinned Gemini build wrapped by the shared
+:class:`~app.provider.FailClosedProvider`, so a client-construction or setup error
+degrades to the documented keyword fallback rather than a 500. The retrieval index
+resolves the service's single process-wide registry at call time (see
+:mod:`app.retrieval`); the google-genai SDK is imported lazily by the provider only
+when a call is made, so the service boots and health-checks without the SDK or a
+network.
 
-``get_ranking_service`` is a FastAPI dependency so tests can swap the model and
-index with a deterministic double through ``app.dependency_overrides``.
+``get_ranking_service`` is a FastAPI dependency so tests can swap the model and index
+with a deterministic double through ``app.dependency_overrides``.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
+from app.provider import FailClosedProvider
+from app.retrieval import LateBoundRetrievalIndex
 from core.config import ModelSettings
 from core.provider import GeminiProvider
 from core.serving import ModelServing
-from ranking.catalogue import LateBoundRetrievalIndex
 from ranking.service import RankingService
+
+__all__ = ["build_ranking_service", "get_ranking_service"]
 
 
 def build_ranking_service(settings: ModelSettings | None = None) -> RankingService:
@@ -25,7 +31,7 @@ def build_ranking_service(settings: ModelSettings | None = None) -> RankingServi
 
     settings = settings or ModelSettings.from_env()
     serving = ModelServing(
-        GeminiProvider(settings),
+        FailClosedProvider(GeminiProvider(settings)),
         LateBoundRetrievalIndex(),
         settings=settings,
     )

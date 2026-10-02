@@ -5,6 +5,10 @@ MQ-001) and returns it with the candidate service records the client renders. Th
 module is the HTTP adapter only: the model call, grounding, guardrails, and fallback
 live in :mod:`core.serving`.
 
+This is a private model-serving surface behind the API gateway: the mobile client
+reaches the gateway, which enforces session authentication and rate limiting before
+forwarding here. It validates input and returns the frozen C-009 body.
+
 Contract conformance (CONTRACTS.md, C-009):
 - ``text`` is required, non-empty, and at most 200 characters; ``locale`` is ``en`` or
   ``pcm``; ``channel`` is ``app``, ``ussd``, ``sms``, or ``whatsapp``. A missing or

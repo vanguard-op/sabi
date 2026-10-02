@@ -40,7 +40,14 @@ where = ["."]
 include = ["app*", "core*", "intent*", "ranking*", "composition*"]
 
 [tool.pytest.ini_options]
+# Every AI feature package is collected: the model-serving foundation (core), the
+# service entrypoint (app), and each capability's feature package (intent, ranking,
+# composition). Listing them explicitly means `make test-ai` never silently skips a
+# capability as its package lands. ``pythonpath`` makes the service root importable
+# regardless of the rootdir pytest infers, so collection is stable from the service
+# directory and from CI alike.
 testpaths = ["core/tests", "app/tests", "intent/tests", "ranking/tests", "composition/tests"]
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.ruff]
