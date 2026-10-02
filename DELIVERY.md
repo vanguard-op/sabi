@@ -150,6 +150,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-016 | Ship one `assets/sabi.riv` and load artboards by name | Six byte-identical per-slot copies waste bundle size against NFR-001 cold-start and memory | user |
 | D-017 | Intent confidence cutoff is 0.70 | Below this, ask one clarifying question and never initiate payment; recorded for model-quality.md | user |
 | D-018 | HTTP wire fields are camelCase; the model-quality structured schema is model-internal | Removes the casing split between C-010 `ServiceSummary` and C-011 `Service`; the AI adapter maps the model's snake_case schema to camelCase at the API boundary. C-009 and C-010 revised to revision 2. | lead |
+| D-019 | MQ-002 and MQ-004 use the same 0.70 confidence cutoff; after the single MQ-001 clarification, an unresolved request offers catalogue search and human support | One consistent serving cutoff across the model capabilities; the unresolved branch matches features.md FEAT-003 and user-flow Flow 2 | user |
+| D-020 | Revise schema.md for the Phase 1 backend needs: AuthCredential credential id and recovery lookup digest, a capability review record, and Provider.name uniqueness | Replaces the internal credential envelope, the O(n) Argon2id recovery scan, and audit-only quarantine | user |
 
 ## Definition of Done
 
