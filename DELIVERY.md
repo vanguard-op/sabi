@@ -125,7 +125,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-013 | — | visual-artist | Done | — |
 | T-014 | — | infra-engineer | Done | — |
 | T-015 | — | infra-engineer | Done | — |
-| T-016 | — | visual-artist | In Progress | — |
+| T-016 | — | visual-artist | Done | — |
 | T-017 | — | frontend-engineer | Backlog | — |
 
 ## Decisions log

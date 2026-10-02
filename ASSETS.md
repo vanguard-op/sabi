@@ -16,9 +16,12 @@ none exist, so every slot is sourced new.
 | A-006 | assets/sabi.riv (artboard Success) | Success animation / single | Done |
 | A-007 | assets/sabi.riv (artboard Pending) | Pending animation / single | Done |
 | A-008 | assets/sabi.riv (artboard Error) | Error animation / single | Done |
-| A-009 | assets/icons/*.svg | Icon set / 24px outlined | Pending |
-| A-010 | assets/fonts/inter/*.woff2 | Brand type / Inter | Pending |
-| A-011 | assets/fonts/jetbrains-mono/*.woff2 | Brand type / JetBrains Mono | Pending |
+| A-009 | assets/sabi.riv (artboards Icon*) + assets/icons/*.png | Icon set / custom 24px outlined | Done |
+| A-010 | assets/fonts/inter/*.woff2 (+ *.ttf) | Brand type / Inter | Done |
+| A-011 | assets/fonts/jetbrains-mono/*.woff2 (+ *.ttf) | Brand type / JetBrains Mono | Done |
+
+Per **D-016** the runtime graphics ship as one file, `assets/sabi.riv`; every ledger slot that
+names an artboard is loaded from it by name. The former per-slot `.riv` copies are removed.
 
 ## Brand mark — generation prompt
 
@@ -187,3 +190,46 @@ frame held. Square 1:1.
 - Motion: 450ms at 24fps, one-shot, final frame held, no loop
 - Seed / reference: —
 - Negative prompt: bounce, overshoot, particles, gradient, text, background
+
+## Icon set — family block (A-009)
+
+**Medium**
+Vector (UI icon family; authored with the Rive CLI, shipped as artboards in `assets/sabi.riv`)
+
+**Grid & style** (branding.md, "Iconography Direction")
+- 24×24 grid; drawable band inset 2 units so the stroke stays inside the box.
+- 2px stroke, round caps and joins; outlined, single weight.
+- 2px corner radius on axis-aligned forms; curved forms use true arcs.
+- Drawn to the mark's rounded geometry. Small solid dots (2.3–2.8px) are allowed where an
+  outlined dot would not read at the weight; nothing else is filled except the retry arrow head.
+
+**Colour**
+- Authored one-colour in `grey-600 #5B5F54` (`text-secondary`), the default icon state.
+- States are carried by tint, not by separate art: default `text-secondary`; active `primary-500`;
+  disabled `text-secondary` at reduced opacity. The client tints the whole 24px artboard with a
+  colour filter, so one artboard serves every state and both themes.
+- Retry arrow head is the only non-stroke mark; it is the same colour.
+
+**Roster (28)** — one artboard per semantic name; `SabIcons` in the client maps one-to-one.
+
+| Group | Semantic names | Rive artboards |
+|---|---|---|
+| Navigation | home, receipts, account | IconHome, IconReceipts, IconAccount |
+| Actions | send, close, chevron-right, search, retry, copy, check, info, offline, help, add, sign-out, language | IconSend … IconLanguage |
+| Status | status-pending, status-settled, status-failed, status-awaiting-receipt, status-unverified, status-verified, status-suspended, error | IconStatus… , IconError |
+| Channels | channel-ussd, channel-sms, channel-whatsapp | IconChannelUssd, IconChannelSms, IconChannelWhatsapp |
+| Other | payment-method | IconPaymentMethod |
+
+`empty-receipts` reuses the `receipts` artboard. `status-failed` is a cross in a circle;
+`error` is a warning triangle, so an inline error is distinguishable from a failed payment.
+Status icons always pair with a text label (branding.md, Accessibility).
+
+**Delivery / format substitution (D-016)**
+- The ledger names `assets/icons/*.svg`. The Rive CLI emits the Rive runtime format and cannot
+  write SVG, and `rendering-vector-images` (the only SVG emitter) is retired. The set is therefore
+  delivered as `assets/sabi.riv` artboards loaded by name, per D-016, with per-icon PNG previews in
+  `assets/icons/`. Recolour at runtime rather than shipping per-state variants.
+
+**Open questions**
+- Whether the client tints via a colour filter or binds an icon-colour view-model property is
+  T-017's call; both read the same one-colour artboard.
