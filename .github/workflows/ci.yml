@@ -1,0 +1,253 @@
+# Sabi CI. Runs the same commands as the Makefile so a failure is reproducible
+# locally. Platform checks always run; each service job activates automatically
+# once its directory lands, so the pipeline is green at Foundation and starts
+# testing the moment code appears.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13"
+  FLUTTER_VERSION: "3.47.2"
+  TERRAFORM_VERSION: "1.16.5"
+  # Fallbacks used only when a service does not declare its own dev tooling.
+  RUFF_VERSION: "0.16.10"
+  PYTEST_VERSION: "9.1.1"
+
+jobs:
+  detect:
+    name: detect services
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.scan.outputs.api }}
+      ai: ${{ steps.scan.outputs.ai }}
+      mobile: ${{ steps.scan.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Scan for service directories
+        id: scan
+        run: |
+          for svc in api ai mobile; do
+            case "$svc" in
+              api)    dir=services/api ;;
+              ai)     dir=services/ai ;;
+              mobile) dir=apps/mobile ;;
+            esac
+            if [ -d "$dir" ]; then
+              echo "$svc=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$svc=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::$dir not present yet; the $svc job is skipped until it lands"
+            fi
+          done
+
+  platform:
+    name: platform config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate docker compose
+        run: docker compose -f docker-compose.yml config -q
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform format
+        run: make tf-fmt
+
+      - name: Terraform validate
+        run: make tf-validate
+
+      - name: Makefile targets
+        run: make help
+
+  backend:
+    name: backend
+    needs: detect
+    if: needs.detect.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: services/api
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f pyproject.toml ]; then
+            pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          fi
+          pip install "ruff==${RUFF_VERSION}" "pytest==${PYTEST_VERSION}"
+
+      - name: Lint
+        run: make lint-backend
+
+      - name: Test
+        run: make test-backend
+
+  ai:
+    name: ai
+    needs: detect
+    if: needs.detect.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/ai/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: services/ai
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f pyproject.toml ]; then
+            pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          fi
+          pip install "ruff==${RUFF_VERSION}" "pytest==${PYTEST_VERSION}"
+
+      - name: Lint
+        run: make lint-ai
+
+      - name: Test
+        run: make test-ai
+
+  mobile:
+    name: mobile
+    needs: detect
+    if: needs.detect.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Analyze
+        run: make lint-mobile
+
+      - name: Test
+        run: make test-mobile
+
+  # Fails fast when the API builds but will not boot, and prints its log.
+  boot:
+    name: boot smoke
+    needs: detect
+    if: needs.detect.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: services/api
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f pyproject.toml ]; then
+            pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          fi
+
+      - name: Prepare environment
+        run: make setup
+
+      - name: Start dependencies
+        run: make up
+
+      - name: Migrate
+        working-directory: services/api
+        run: |
+          if [ -f alembic.ini ]; then
+            set -a; source "$GITHUB_WORKSPACE/.env"; set +a
+            alembic upgrade head
+          else
+            echo "no alembic.ini yet; skipping migrations"
+          fi
+
+      - name: Boot and probe
+        run: |
+          set -uo pipefail
+          set -a; source "$GITHUB_WORKSPACE/.env"; set +a
+          cd services/api
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &
+          pid=$!
+          ready=false
+          for _ in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
+              || curl -fsS http://127.0.0.1:8000/healthz >/dev/null 2>&1 \
+              || curl -fsS http://127.0.0.1:8000/openapi.json >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          if [ "$ready" != "true" ]; then
+            echo "::error::API did not become ready; log follows"
+            cat /tmp/api.log
+            exit 1
+          fi
+          echo "API booted and answered a probe"
+
+      - name: Dependencies logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop dependencies
+        if: always()
+        run: make down

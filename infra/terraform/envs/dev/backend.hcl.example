@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in. `make tf-init ENV=dev` uses it.
+# Partial S3 backend: state is encrypted and locked natively (Terraform >= 1.10).
+bucket       = "REPLACE-WITH-TF-STATE-BUCKET"
+key          = "sabi/dev/terraform.tfstate"
+region       = "af-south-1"
+encrypt      = true
+use_lockfile = true

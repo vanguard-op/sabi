@@ -1,0 +1,23 @@
+# Root tooling config. Per-service Python projects may define their own
+# pyproject.toml; Ruff uses the nearest config to each file.
+#
+# Single source of truth for Python lint/format at the repository root:
+#   make lint        # ruff check .
+#   make format      # ruff format .
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [
+  ".venv",
+  ".scratch",
+  "docs",
+  "apps/mobile",
+  "node_modules",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"

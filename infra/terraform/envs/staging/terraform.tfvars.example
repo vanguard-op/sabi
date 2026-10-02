@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored). `make tf-plan ENV=staging` uses it.
+# Staging: anonymised production-like data (architecture.md, Environments).
+
+environment = "staging"
+region      = "af-south-1"
+
+db_instance_class      = "db.t4g.medium"
+db_allocated_storage   = 50
+db_multi_az            = false
+db_deletion_protection = true
+redis_node_type        = "cache.t4g.small"

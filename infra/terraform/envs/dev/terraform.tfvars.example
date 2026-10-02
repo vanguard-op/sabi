@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored). `make tf-plan ENV=dev` uses it.
+# Development: synthetic data, freely reset (architecture.md, Environments).
+
+environment = "dev"
+region      = "af-south-1"
+
+db_instance_class      = "db.t4g.medium"
+db_allocated_storage   = 20
+db_multi_az            = false
+db_deletion_protection = false
+redis_node_type        = "cache.t4g.micro"

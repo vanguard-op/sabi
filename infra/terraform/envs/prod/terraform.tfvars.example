@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (gitignored). `make tf-plan ENV=prod` uses it.
+# Production: real data, backups, retention rules (architecture.md, Environments).
+
+environment = "prod"
+region      = "af-south-1"
+
+db_instance_class      = "db.t4g.large"
+db_allocated_storage   = 100
+db_multi_az            = true
+db_deletion_protection = true
+redis_node_type        = "cache.t4g.medium"

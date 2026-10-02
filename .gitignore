@@ -33,6 +33,18 @@ node_modules/
 infra/**/.terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
+# Real values live outside the repo; committed templates are *.example
+*.tfvars
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example
+
+# Test / coverage artifacts
+.coverage
+coverage/
+htmlcov/
+*.log
 
 # IDE / OS
 .idea/

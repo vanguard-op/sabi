@@ -1,0 +1,6 @@
+# Copy to backend.hcl (gitignored) and fill in. `make tf-init ENV=prod` uses it.
+bucket       = "REPLACE-WITH-TF-STATE-BUCKET"
+key          = "sabi/prod/terraform.tfstate"
+region       = "af-south-1"
+encrypt      = true
+use_lockfile = true
