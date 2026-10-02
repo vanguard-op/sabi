@@ -115,7 +115,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-003 | FEAT-001, FEAT-004, FEAT-012 | backend-engineer | Done | — |
 | T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Done | — |
 | T-005 | FEAT-001 | backend-engineer | Done | C-001–C-008 |
-| T-006 | FEAT-001 | frontend-engineer | In Progress | C-001–C-008 |
+| T-006 | FEAT-001 | frontend-engineer | Done | C-001–C-008 |
 | T-007 | FEAT-003 | ai-engineer | Done | C-009 |
 | T-008 | FEAT-004 | backend-engineer | Done | C-010, C-011 |
 | T-009 | FEAT-004 | ai-engineer | Done | C-010 |
@@ -125,7 +125,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-013 | — | visual-artist | Done | — |
 | T-014 | — | infra-engineer | Done | — |
 | T-015 | — | infra-engineer | Done | — |
-| T-018 | — | ai-engineer | In Progress | — |
+| T-018 | — | ai-engineer | Done | — |
+| T-019 | — | infra-engineer | Backlog | — |
 | T-016 | — | visual-artist | Done | — |
 | T-017 | — | frontend-engineer | Done | — |
 
