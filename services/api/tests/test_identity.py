@@ -23,7 +23,7 @@ from webauthn.helpers.exceptions import (
 )
 
 from app.core.rate_limit import InMemoryRateLimitStore, RateLimiter
-from app.db.models import Notification
+from app.db.models import ChannelLink, Notification
 from app.identity import passkeys
 from app.identity.challenges import Challenge, ChallengeKind, InMemoryChallengeStore
 from app.identity.schemas import normalize_phone
@@ -314,6 +314,69 @@ def test_channel_link_conflict_notifies_the_existing_owner(
     assert len(notices) == 1
     assert notices[0].user_id == owner["id"]
     assert notices[0].template == "channel_link_conflict"
+
+
+def test_channel_link_conflict_across_channels_notifies_the_existing_owner(
+    identity: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    db_session_factory: sessionmaker[Session],
+) -> None:
+    """The same number on a different channel is still one identity.
+
+    A second account that presents the address on another channel must be
+    rejected and the existing owner notified (FEAT-001 edge case).
+    """
+    owner = _register(identity, monkeypatch, credential_id=b"owner-cred").json()["user"]
+    assert (
+        identity.post(
+            "/v1/auth/channel-links", json={"channel": "ussd", "address": "08031234567"}
+        ).status_code
+        == 201
+    )
+
+    identity.cookies.clear()
+    _register(identity, monkeypatch, credential_id=b"other-cred")
+    conflict = identity.post(
+        "/v1/auth/channel-links", json={"channel": "whatsapp", "address": "08031234567"}
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "conflict"
+
+    with db_session_factory() as session:
+        notices = session.execute(select(Notification)).scalars().all()
+        links = session.execute(select(ChannelLink)).scalars().all()
+    assert len(notices) == 1
+    assert notices[0].user_id == owner["id"]
+    assert notices[0].template == "channel_link_conflict"
+    # The conflicting link was never created, so the address still maps once.
+    assert len(links) == 1
+    assert links[0].channel == "ussd"
+
+
+def test_channel_link_same_address_same_account_is_idempotent(
+    identity: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    db_session_factory: sessionmaker[Session],
+) -> None:
+    """A second link for the account's own address returns the existing link."""
+    _register(identity, monkeypatch)
+    first = identity.post(
+        "/v1/auth/channel-links", json={"channel": "sms", "address": "08031234567"}
+    )
+    assert first.status_code == 201
+
+    second = identity.post(
+        "/v1/auth/channel-links", json={"channel": "whatsapp", "address": "08031234567"}
+    )
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["channel"] == "sms"
+
+    with db_session_factory() as session:
+        links = session.execute(select(ChannelLink)).scalars().all()
+        notices = session.execute(select(Notification)).scalars().all()
+    assert len(links) == 1
+    assert notices == []
 
 
 def test_account_endpoints_require_a_session(identity: TestClient) -> None:

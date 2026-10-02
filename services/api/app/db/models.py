@@ -88,9 +88,11 @@ class ChannelLink(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         _enum_check("channel", ("ussd", "sms", "whatsapp"), "channel"),
-        # A channel address maps to exactly one account: a second link is
-        # rejected rather than creating a duplicate (FEAT-001, architecture.md).
-        UniqueConstraint("channel", "address", name="uq_channel_links_channel_address"),
+        # An address maps to exactly one account across every channel: the same
+        # number on a second channel is the same identity, so a second link is
+        # rejected rather than creating a duplicate (FEAT-001, user-flow.md
+        # "Channel Identity Linking").
+        UniqueConstraint("address", name="uq_channel_links_address"),
     )
 
 

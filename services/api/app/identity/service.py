@@ -293,11 +293,13 @@ def create_channel_link(
 ) -> tuple[ChannelLink, User | None]:
     """Attach a channel address to the account.
 
+    An address identifies one account across every channel, so a link owned by
+    another account is a conflict regardless of the channel presented (FEAT-001).
     Returns the link and, when a different account already owns the address, its
-    owner so the caller can reject the link and notify them (FEAT-001).
+    owner so the caller can reject the link and notify them.
     """
     existing = db.execute(
-        select(ChannelLink).where(ChannelLink.channel == channel, ChannelLink.address == address)
+        select(ChannelLink).where(ChannelLink.address == address)
     ).scalar_one_or_none()
     if existing is not None:
         if existing.user_id == user_id:
@@ -309,12 +311,10 @@ def create_channel_link(
     try:
         db.flush()
     except IntegrityError:
-        # A concurrent link won the unique (channel, address) race.
+        # A concurrent link won the unique address race.
         db.rollback()
         existing = db.execute(
-            select(ChannelLink).where(
-                ChannelLink.channel == channel, ChannelLink.address == address
-            )
+            select(ChannelLink).where(ChannelLink.address == address)
         ).scalar_one_or_none()
         if existing is None:
             raise

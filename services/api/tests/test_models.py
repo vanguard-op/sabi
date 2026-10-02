@@ -67,4 +67,5 @@ def test_channel_link_is_unique_per_address() -> None:
         for constraint in table.constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
     }
-    assert ("address", "channel") in unique_column_sets
+    # An address maps to one account across every channel (FEAT-001).
+    assert ("address",) in unique_column_sets
