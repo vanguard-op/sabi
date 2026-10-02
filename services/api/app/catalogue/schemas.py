@@ -1,8 +1,7 @@
 """Wire models for catalogue discovery (C-010, C-011).
 
-Field names follow the frozen contract: the ServiceSummary and search envelope
-use the contract's own spelling, while the full Service record mirrors the
-schema.md entity fields (camelCase). Timestamps render as RFC 3339 UTC.
+Wire fields are camelCase throughout (D-018). The full Service record mirrors the
+schema.md entity fields; timestamps render as RFC 3339 UTC.
 """
 
 from __future__ import annotations
@@ -16,11 +15,11 @@ from app.db.models import Service
 class ServiceSummary(BaseModel):
     """One ranked discovery result (C-010)."""
 
-    service_id: str
+    serviceId: str
     name: str
-    collecting_body: str
+    collectingBody: str
     category: str
-    known_amount: int | None
+    knownAmount: int | None
     currency: str
     status: str
     confidence: float
@@ -28,7 +27,7 @@ class ServiceSummary(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[ServiceSummary]
-    no_match: bool
+    noMatch: bool
 
 
 class ServiceOut(BaseModel):

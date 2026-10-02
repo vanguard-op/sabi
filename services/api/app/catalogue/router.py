@@ -1,7 +1,7 @@
 """Catalogue discovery endpoints (C-010, C-011).
 
 Search returns ranked, structured service records with the collecting body and
-any known amount, and a ``no_match`` flag the client uses to offer human
+any known amount, and a ``noMatch`` flag the client uses to offer human
 support. A miss is recorded for coverage planning; the catalogue never
 fabricates a service (FEAT-004).
 """
@@ -68,22 +68,22 @@ def search_catalogue(
         # Record the query for coverage planning; a miss is never turned into a
         # fabricated result (FEAT-004).
         record_miss(query, category)
-        return SearchResponse(results=[], no_match=True)
+        return SearchResponse(results=[], noMatch=True)
 
     results = [
         ServiceSummary(
-            service_id=service.id,
+            serviceId=service.id,
             name=service.name,
-            collecting_body=service.collecting_body,
+            collectingBody=service.collecting_body,
             category=service.category,
-            known_amount=service.known_amount,
+            knownAmount=service.known_amount,
             currency=service.currency,
             status=service.status,
             confidence=round(confidence, 4),
         )
         for service, confidence in matches
     ]
-    return SearchResponse(results=results, no_match=False)
+    return SearchResponse(results=results, noMatch=False)
 
 
 @router.get("/catalogue/services/{serviceId}", response_model=ServiceResponse)

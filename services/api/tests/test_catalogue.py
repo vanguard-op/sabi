@@ -150,13 +150,13 @@ def test_search_lists_the_matching_collecting_body(catalogue) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["no_match"] is False
+    assert body["noMatch"] is False
     assert len(body["results"]) == 1
     result = body["results"][0]
-    assert result["service_id"] == service.id
+    assert result["serviceId"] == service.id
     assert result["name"] == "Onitsha South Local Government Council"
-    assert result["collecting_body"] == "Onitsha South LGA"
-    assert result["known_amount"] is None
+    assert result["collectingBody"] == "Onitsha South LGA"
+    assert result["knownAmount"] is None
     assert result["confidence"] > 0
 
 
@@ -166,7 +166,7 @@ def test_search_passes_through_a_known_amount(catalogue) -> None:
 
     response = catalogue.client.get("/v1/catalogue/search", params={"q": "council levy"})
 
-    assert response.json()["results"][0]["known_amount"] == 500_000
+    assert response.json()["results"][0]["knownAmount"] == 500_000
     assert response.json()["results"][0]["currency"] == "NGN"
 
 
@@ -187,7 +187,7 @@ def test_search_no_match_is_recorded_for_coverage(catalogue) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "no_match": True}
+    assert response.json() == {"results": [], "noMatch": True}
 
 
 def test_search_excludes_retired_records(catalogue) -> None:
@@ -196,7 +196,7 @@ def test_search_excludes_retired_records(catalogue) -> None:
 
     response = catalogue.client.get("/v1/catalogue/search", params={"q": "council levy"})
 
-    assert response.json()["no_match"] is True
+    assert response.json()["noMatch"] is True
 
 
 def test_search_filters_by_category(catalogue) -> None:
@@ -215,7 +215,7 @@ def test_search_filters_by_category(catalogue) -> None:
     levy = catalogue.client.get("/v1/catalogue/search", params={"q": "mtn", "category": "levy"})
 
     assert [r["category"] for r in airtime.json()["results"]] == ["airtime"]
-    assert levy.json()["no_match"] is True
+    assert levy.json()["noMatch"] is True
 
 
 def test_search_limit_is_clamped_between_one_and_five(catalogue) -> None:
