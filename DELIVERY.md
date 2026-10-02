@@ -130,6 +130,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-020 | — | frontend-engineer | Done | — |
 | T-021 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | Done | C-001–C-016 |
 | T-022 | FEAT-001 | backend-engineer | In Progress | C-007 |
+| T-023 | FEAT-003, FEAT-011 | backend-engineer | In Progress | C-009, C-012 |
+| T-024 | — | infra-engineer | In Progress | — |
 | T-016 | — | visual-artist | Done | — |
 | T-017 | — | frontend-engineer | Done | — |
 
