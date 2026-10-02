@@ -1,0 +1,64 @@
+# Sabi API service. Runtime dependencies are pinned here (NFR-029: versions
+# pinned); requirements.txt and requirements-dev.txt are thin editable-install
+# shims so CI's pip cache has a path to hash and there is one source of truth.
+#
+#   pip install -r requirements-dev.txt     # local + CI
+#   pip install -e .                        # runtime only
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sabi-api"
+version = "0.1.0"
+description = "Sabi modular monolith: identity, catalogue, agent, receipts, notifications."
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi==0.142.2",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.13.5",
+  "pydantic-settings==2.15.0",
+  "sqlalchemy==2.1.2",
+  "alembic==1.20.0",
+  "psycopg[binary]==3.3.6",
+  "redis==8.1.0",
+  "webauthn==3.0.1",
+  "argon2-cffi==25.1.0",
+  "itsdangerous==2.2.0",
+  "httpx==0.28.1",
+  "email-validator==2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.16.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+# The isolated payment module is tested from this run so one command on CI
+# covers the whole backend. Its tests add services/payments to sys.path.
+testpaths = ["tests", "../payments/tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's dependency-injection idiom uses call expressions in defaults.
+"app/api/deps.py" = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"

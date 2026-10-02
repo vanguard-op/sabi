@@ -1,0 +1,3 @@
+# Runtime dependencies live in pyproject.toml [project]. Install with:
+#   pip install -e .
+-e .

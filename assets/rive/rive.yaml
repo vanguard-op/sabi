@@ -1,0 +1,6 @@
+name: sabi
+artboard:
+  background: "#00000000"
+logs:
+  file: build/rive.log
+  problems: build/problems.log

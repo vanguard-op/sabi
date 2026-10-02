@@ -1,0 +1,242 @@
+<Rive version="1" kind="fragment">
+    <!--
+      Sabi payment-state animations. Flat vector, brand colours only, no
+      gradients, particles, confetti or audio.
+      success: one-shot 500ms @ 24fps (12f), final frame held.
+      pending: seamless loop 2s @ 24fps (48f).
+      error:   one-shot 450ms @ 24fps (11f), final frame held.
+    -->
+
+    <Artboard width="1024" height="1024" name="Success" styleId="0:201"
+              defaultStateMachineId="0:211" x="0" y="2400" id="0:200">
+        <LayoutComponentStyle name="Success Style" id="0:201"/>
+        <Node name="TornGroup" x="512" y="512" id="0:206">
+            <Node name="TornMove" x="-260" y="180" id="0:216">
+                <Shape name="TornEdge" id="0:207">
+                    <PointsPath isClosed="false" isClockwise="true" name="Path">
+                        <StraightVertex x="-160" y="0" name="P0"/>
+                        <StraightVertex x="-120" y="-36" name="P1"/>
+                        <StraightVertex x="-80" y="0" name="P2"/>
+                        <StraightVertex x="-40" y="-36" name="P3"/>
+                        <StraightVertex x="0" y="0" name="P4"/>
+                        <StraightVertex x="40" y="-36" name="P5"/>
+                        <StraightVertex x="80" y="0" name="P6"/>
+                        <StraightVertex x="120" y="-36" name="P7"/>
+                        <StraightVertex x="160" y="0" name="P8"/>
+                    </PointsPath>
+                    <Stroke thickness="40" cap="round" join="round" name="Stroke">
+                        <SolidColor colorValue="FF12805C" name="Color"/>
+                    </Stroke>
+                </Shape>
+            </Node>
+        </Node>
+        <Node name="Check" x="512" y="512" id="0:202">
+            <Shape name="CheckMark" id="0:203">
+                <PointsPath isClosed="false" isClockwise="true" name="Path">
+                    <StraightVertex x="-150" y="20" radius="20" name="C0"/>
+                    <StraightVertex x="-45" y="120" radius="24" name="C1"/>
+                    <StraightVertex x="160" y="-130" radius="24" name="C2"/>
+                </PointsPath>
+                <Stroke thickness="64" cap="round" join="round" name="Stroke" id="0:204">
+                    <SolidColor colorValue="FF12805C" name="Color" id="0:205"/>
+                    <TrimPath start="0" end="0" name="Trim" id="0:208"/>
+                </Stroke>
+            </Shape>
+        </Node>
+
+        <StateMachine name="Success SM" id="0:211">
+            <StateMachineLayer name="Layer 1" id="0:212">
+                <AnyState x="200" y="-120"/>
+                <ExitState x="400" y="-120"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="0:213"/>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="0:210" reset="true" id="0:213"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation fps="24" duration="12" loopValue="oneShot" name="Success" id="0:210">
+            <KeyedObject objectId="0:216">
+                <KeyedProperty propertyKey="13">
+                    <KeyFrameDouble value="-260" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="16" frame="7" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="14">
+                    <KeyFrameDouble value="180" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="-12" frame="7" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="0" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1" frame="6" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" frame="12" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:208">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" frame="3" interpolationType="cubic"><CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="11" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:205">
+                <KeyedProperty propertyKey="37">
+                    <KeyFrameColor value="FF12805C" frame="0" interpolationType="linear"/>
+                    <KeyFrameColor value="FF16A34A" frame="12" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+
+    <Artboard width="1024" height="1024" name="Pending" styleId="0:231"
+              defaultStateMachineId="0:241" x="1200" y="2400" id="0:230">
+        <LayoutComponentStyle name="Pending Style" id="0:231"/>
+        <!-- Segment declared before the outline so it paints on top; the
+             darker torn segment leads, the soft trail follows. -->
+        <Shape name="Leading" x="512" y="438.28" id="0:234">
+            <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="22" cap="round" join="round" name="Stroke" id="0:235">
+                <SolidColor colorValue="FF12805C" name="Color"/>
+                <TrimPath start="0" end="0.1" offset="0" name="Trim" id="0:236"/>
+                <DashPath name="Torn">
+                    <Dash length="15" name="On"/>
+                    <Dash length="10" name="Off"/>
+                </DashPath>
+            </Stroke>
+        </Shape>
+        <Shape name="Trailing" x="512" y="438.28" id="0:237">
+            <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="22" cap="round" join="round" name="Stroke">
+                <SolidColor colorValue="FF8FCDB2" name="Color"/>
+                <TrimPath start="0" end="0.22" offset="0.88" name="Trim" id="0:239"/>
+            </Stroke>
+        </Shape>
+        <Shape name="BubbleOutline" x="512" y="438.28" id="0:232">
+            <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="22" cap="round" join="round" name="Stroke">
+                <SolidColor colorValue="FFC6C9BE" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="TailOutline" id="0:233">
+            <PointsPath isClosed="false" isClockwise="true" name="Path">
+                <StraightVertex x="548.86" y="677.89" name="J0"/>
+                <StraightVertex x="548.86" y="825.34" name="T4"/>
+                <StraightVertex x="548.86" y="779.26" name="V3"/>
+                <StraightVertex x="594.94" y="825.34" name="T3"/>
+                <StraightVertex x="594.94" y="779.26" name="V2"/>
+                <StraightVertex x="641.02" y="825.34" name="T2"/>
+                <StraightVertex x="641.02" y="779.26" name="V1"/>
+                <StraightVertex x="687.1" y="825.34" name="T1"/>
+                <StraightVertex x="687.1" y="779.26" name="V0"/>
+                <StraightVertex x="733.18" y="825.34" name="T0"/>
+                <StraightVertex x="733.18" y="677.89" name="J1"/>
+            </PointsPath>
+            <Stroke thickness="22" cap="round" join="round" name="Stroke">
+                <SolidColor colorValue="FFC6C9BE" name="Color"/>
+            </Stroke>
+        </Shape>
+
+        <StateMachine name="Pending SM" id="0:241">
+            <StateMachineLayer name="Layer 1" id="0:242">
+                <AnyState x="200" y="-120"/>
+                <ExitState x="400" y="-120"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="0:243"/>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="0:240" reset="true" id="0:243"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation fps="24" duration="48" loopValue="loop" name="Pending" id="0:240">
+            <KeyedObject objectId="0:236">
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1" frame="48" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:239">
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.88" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1.88" frame="48" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+
+    <Artboard width="1024" height="1024" name="Error" styleId="0:261"
+              defaultStateMachineId="0:271" x="4200" y="2400" id="0:260">
+        <LayoutComponentStyle name="Error Style" id="0:261"/>
+        <Shape name="StraightEdge" x="512" y="512" id="0:267">
+            <PointsPath isClosed="false" isClockwise="true" name="Path">
+                <StraightVertex x="-260" y="0" name="S0"/>
+                <StraightVertex x="260" y="0" name="S1"/>
+            </PointsPath>
+            <Stroke thickness="40" cap="round" name="Stroke">
+                <SolidColor colorValue="FF12805C" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Node name="Edge" x="512" y="512" id="0:263">
+            <Shape name="TornEdge" id="0:264">
+                <PointsPath isClosed="false" isClockwise="true" name="Path">
+                    <StraightVertex x="-260" y="0" name="E0"/>
+                    <StraightVertex x="-208" y="-46" name="E1"/>
+                    <StraightVertex x="-156" y="0" name="E2"/>
+                    <StraightVertex x="-104" y="-46" name="E3"/>
+                    <StraightVertex x="-52" y="0" name="E4"/>
+                    <StraightVertex x="0" y="-46" name="E5"/>
+                    <StraightVertex x="52" y="0" name="E6"/>
+                    <StraightVertex x="104" y="-46" name="E7"/>
+                    <StraightVertex x="156" y="0" name="E8"/>
+                    <StraightVertex x="208" y="-46" name="E9"/>
+                    <StraightVertex x="260" y="0" name="E10"/>
+                </PointsPath>
+                <Stroke thickness="40" cap="round" join="round" name="Stroke">
+                    <SolidColor colorValue="FF12805C" name="Color" id="0:266"/>
+                    <TrimPath start="0" end="0" name="Trim" id="0:265"/>
+                </Stroke>
+            </Shape>
+        </Node>
+
+        <StateMachine name="Error SM" id="0:271">
+            <StateMachineLayer name="Layer 1" id="0:272">
+                <AnyState x="200" y="-120"/>
+                <ExitState x="400" y="-120"/>
+                <EntryState x="0" y="0">
+                    <StateTransition stateToId="0:273"/>
+                </EntryState>
+                <AnimationState x="160" y="0" animationId="0:270" reset="true" id="0:273"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation fps="24" duration="11" loopValue="oneShot" name="Error" id="0:270">
+            <KeyedObject objectId="0:267">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="1" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1" frame="4" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:263">
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0.02" frame="0" interpolationType="cubic"><CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/></KeyFrameDouble>
+                    <KeyFrameDouble value="1" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:265">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" frame="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="1" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:266">
+                <KeyedProperty propertyKey="37">
+                    <KeyFrameColor value="FF12805C" frame="0" interpolationType="linear"/>
+                    <KeyFrameColor value="FFDC2626" frame="9" interpolationType="linear"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+</Rive>

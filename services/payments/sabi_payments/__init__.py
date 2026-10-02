@@ -1,0 +1,1 @@
+"""Sabi isolated payment module."""

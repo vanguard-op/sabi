@@ -1,0 +1,49 @@
+# Isolated payment module. Runtime dependencies pinned here (NFR-029). It keeps
+# its own schema, transaction boundary, and audit log so it can sit behind the
+# licensed partner now and be extracted later (architecture.md).
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sabi-payments"
+version = "0.1.0"
+description = "Sabi isolated payment module: mandates, execution, state, audit."
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi==0.142.2",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.13.5",
+  "pydantic-settings==2.15.0",
+  "sqlalchemy==2.1.2",
+  "alembic==1.20.0",
+  "psycopg[binary]==3.3.6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.16.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sabi_payments*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"

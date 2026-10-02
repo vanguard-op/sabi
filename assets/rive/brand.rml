@@ -1,0 +1,118 @@
+<Rive version="1" kind="fragment">
+    <!--
+      Sabi foundation visual assets.
+      Brand mark: a rounded speech bubble whose lower-right tail tears like the
+      bottom edge of a receipt. Flat single-plane vector, one solid fill.
+      Colours (branding.md): ink #12805C, surface #FAF8F4, knockout #FFFFFF.
+    -->
+
+    <Artboard width="1024" height="1024" name="BrandMark" styleId="0:3" x="0" y="0" id="0:2">
+        <LayoutComponentStyle name="BrandMark Style" id="0:3"/>
+        <Node name="Mark" x="512" y="512" scaleX="1" scaleY="1" id="0:10">
+            <Shape name="Body" x="0" y="-73.72" id="0:11">
+                <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill" id="0:12">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Tail" id="0:13">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="36.86" y="128" name="A"/>
+                    <StraightVertex x="221.18" y="128" name="B"/>
+                    <StraightVertex x="221.18" y="313.34" name="T0"/>
+                    <StraightVertex x="175.1" y="267.26" name="V0"/>
+                    <StraightVertex x="175.1" y="313.34" name="T1"/>
+                    <StraightVertex x="129.02" y="267.26" name="V1"/>
+                    <StraightVertex x="129.02" y="313.34" name="T2"/>
+                    <StraightVertex x="82.94" y="267.26" name="V2"/>
+                    <StraightVertex x="82.94" y="313.34" name="T3"/>
+                    <StraightVertex x="36.86" y="267.26" name="V3"/>
+                    <StraightVertex x="36.86" y="313.34" name="T4"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+        </Node>
+    </Artboard>
+
+    <Artboard width="1024" height="1024" name="AppIcon" styleId="0:23" x="1200" y="0" id="0:20">
+        <LayoutComponentStyle name="AppIcon Style" id="0:23"/>
+        <!-- The CLI capture has no alpha, so the field is authored full-bleed
+             in the app field ink; the 22% squircle container is kept as the
+             visible form for masked / busy-background use. -->
+        <Fill name="IconField">
+            <SolidColor colorValue="FF12805C" name="Color"/>
+        </Fill>
+        <!-- Mark declared before the field: the first sibling paints on top. -->
+        <Node name="Mark" x="512" y="512" scaleX="1.19443" scaleY="1.19443" id="0:25">
+            <Shape name="Body" x="0" y="-73.72" id="0:26">
+                <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FFFFFFFF" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Tail" id="0:29">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="36.86" y="128" name="A"/>
+                    <StraightVertex x="221.18" y="128" name="B"/>
+                    <StraightVertex x="221.18" y="313.34" name="T0"/>
+                    <StraightVertex x="175.1" y="267.26" name="V0"/>
+                    <StraightVertex x="175.1" y="313.34" name="T1"/>
+                    <StraightVertex x="129.02" y="267.26" name="V1"/>
+                    <StraightVertex x="129.02" y="313.34" name="T2"/>
+                    <StraightVertex x="82.94" y="267.26" name="V2"/>
+                    <StraightVertex x="82.94" y="313.34" name="T3"/>
+                    <StraightVertex x="36.86" y="267.26" name="V3"/>
+                    <StraightVertex x="36.86" y="313.34" name="T4"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FFFFFFFF" name="Color"/>
+                </Fill>
+            </Shape>
+        </Node>
+        <Shape name="Field" x="512" y="512" id="0:21">
+            <Rectangle width="1024" height="1024" cornerRadiusTL="225.28"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF12805C" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <Artboard width="1440" height="2560" name="Splash" styleId="0:43" x="2600" y="0" id="0:40">
+        <LayoutComponentStyle name="Splash Style" id="0:43"/>
+        <Fill name="Background">
+            <SolidColor colorValue="FFFAF8F4" name="Color"/>
+        </Fill>
+        <Node name="Mark" x="720" y="1280" scaleX="0.78125" scaleY="0.78125" id="0:41">
+            <Shape name="Body" x="0" y="-73.72" id="0:45">
+                <Rectangle width="737.28" height="479.23" cornerRadiusTL="147.456"
+                           originX="0.5" originY="0.5" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+            <Shape name="Tail" id="0:48">
+                <PointsPath isClosed="true" isClockwise="true" name="Path">
+                    <StraightVertex x="36.86" y="128" name="A"/>
+                    <StraightVertex x="221.18" y="128" name="B"/>
+                    <StraightVertex x="221.18" y="313.34" name="T0"/>
+                    <StraightVertex x="175.1" y="267.26" name="V0"/>
+                    <StraightVertex x="175.1" y="313.34" name="T1"/>
+                    <StraightVertex x="129.02" y="267.26" name="V1"/>
+                    <StraightVertex x="129.02" y="313.34" name="T2"/>
+                    <StraightVertex x="82.94" y="267.26" name="V2"/>
+                    <StraightVertex x="82.94" y="313.34" name="T3"/>
+                    <StraightVertex x="36.86" y="267.26" name="V3"/>
+                    <StraightVertex x="36.86" y="313.34" name="T4"/>
+                </PointsPath>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FF12805C" name="Color"/>
+                </Fill>
+            </Shape>
+        </Node>
+    </Artboard>
+</Rive>

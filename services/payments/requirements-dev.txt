@@ -1,0 +1,3 @@
+# Local and CI install: runtime plus test/lint tooling.
+#   pip install -r requirements-dev.txt
+-e .[dev]

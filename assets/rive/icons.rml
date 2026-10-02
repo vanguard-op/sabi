@@ -1,0 +1,754 @@
+<Rive version="1" kind="fragment">
+    <!--
+      Sabi UI icon set. Custom 24px outlined set drawn to the mark's rounded
+      geometry: 24px grid, 2px stroke, round caps and joins, 2px corner radius.
+      Single flat colour (grey-600 #5B5F54 = text-secondary) so the client can
+      tint the whole glyph per state with a colour filter. No fills except the
+      small dots, which read at the 2px weight.
+      Artboards are named Icon<Name>; load by name from assets/sabi.riv (D-016).
+    -->
+
+    <!-- 0. home -->
+    <Artboard width="24" height="24" name="IconHome" styleId="0:300" x="0" y="3600" id="0:301">
+        <LayoutComponentStyle name="IconHome Style" id="0:300"/>
+        <Shape name="House">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="12" y="3.5" radius="1.6"/>
+                <StraightVertex x="20.5" y="10.5" radius="1.6"/>
+                <StraightVertex x="20.5" y="20.5" radius="1.6"/>
+                <StraightVertex x="3.5" y="20.5" radius="1.6"/>
+                <StraightVertex x="3.5" y="10.5" radius="1.6"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Door" x="12" y="17.5">
+            <Rectangle width="5" height="6" linkCornerRadius="false"
+                       cornerRadiusTL="1.8" cornerRadiusTR="1.8"
+                       cornerRadiusBL="0" cornerRadiusBR="0"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 1. search -->
+    <Artboard width="24" height="24" name="IconSearch" styleId="0:302" x="300" y="3600" id="0:303">
+        <LayoutComponentStyle name="IconSearch Style" id="0:302"/>
+        <Shape name="Lens" x="10.5" y="10.5">
+            <Ellipse width="13" height="13" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Handle">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="15.5" y="15.5"/>
+                <StraightVertex x="20" y="20"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 2. receipts -->
+    <Artboard width="24" height="24" name="IconReceipts" styleId="0:304" x="600" y="3600" id="0:305">
+        <LayoutComponentStyle name="IconReceipts Style" id="0:304"/>
+        <Shape name="Sheet">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="4.5" y="3.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="3.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="20"/>
+                <StraightVertex x="16.5" y="17.5"/>
+                <StraightVertex x="13.5" y="20"/>
+                <StraightVertex x="10.5" y="17.5"/>
+                <StraightVertex x="7.5" y="20"/>
+                <StraightVertex x="4.5" y="20"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Line1">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="7.5" y="8.5"/>
+                <StraightVertex x="16.5" y="8.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Line2">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="7.5" y="12.5"/>
+                <StraightVertex x="16.5" y="12.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 3. account -->
+    <Artboard width="24" height="24" name="IconAccount" styleId="0:306" x="900" y="3600" id="0:307">
+        <LayoutComponentStyle name="IconAccount Style" id="0:306"/>
+        <Shape name="Head" x="12" y="7.5">
+            <Ellipse width="8" height="8" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Shoulders">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="4.5" y="20.5"/>
+                <CubicMirroredVertex x="12" y="14.5" rotation="0" distance="5"/>
+                <StraightVertex x="19.5" y="20.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 4. send -->
+    <Artboard width="24" height="24" name="IconSend" styleId="0:308" x="1200" y="3600" id="0:309">
+        <LayoutComponentStyle name="IconSend Style" id="0:308"/>
+        <Shape name="Plane">
+            <PointsPath isClosed="true" isClockwise="false" name="Path">
+                <StraightVertex x="3.5" y="20.5"/>
+                <StraightVertex x="20.5" y="12"/>
+                <StraightVertex x="3.5" y="3.5"/>
+                <StraightVertex x="3.5" y="10"/>
+                <StraightVertex x="13.5" y="12"/>
+                <StraightVertex x="3.5" y="14"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 5. close -->
+    <Artboard width="24" height="24" name="IconClose" styleId="0:310" x="1500" y="3600" id="0:311">
+        <LayoutComponentStyle name="IconClose Style" id="0:310"/>
+        <Shape name="Stroke1">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="6.5" y="6.5"/>
+                <StraightVertex x="17.5" y="17.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Stroke2">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="17.5" y="6.5"/>
+                <StraightVertex x="6.5" y="17.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 6. chevron-right -->
+    <Artboard width="24" height="24" name="IconChevronRight" styleId="0:312" x="1800" y="3600" id="0:313">
+        <LayoutComponentStyle name="IconChevronRight Style" id="0:312"/>
+        <Shape name="Chevron">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="9" y="5.5"/>
+                <StraightVertex x="15.5" y="12"/>
+                <StraightVertex x="9" y="18.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 7. retry: circle open at the top, arrow head at the top-right -->
+    <Artboard width="24" height="24" name="IconRetry" styleId="0:314" x="2100" y="3600" id="0:315">
+        <LayoutComponentStyle name="IconRetry Style" id="0:314"/>
+        <Shape name="Head">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="15.6" y="7.6"/>
+                <StraightVertex x="19.8" y="8.6"/>
+                <StraightVertex x="18.9" y="4.3"/>
+            </PointsPath>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+        <Shape name="Arc" x="12" y="12">
+            <Ellipse width="16" height="16" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+                <TrimPath start="0.125" end="0.875" name="Trim"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 8. copy -->
+    <Artboard width="24" height="24" name="IconCopy" styleId="0:316" x="2400" y="3600" id="0:317">
+        <LayoutComponentStyle name="IconCopy Style" id="0:316"/>
+        <Shape name="Back">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="8" y="4.5"/>
+                <StraightVertex x="4.5" y="4.5" radius="1.4"/>
+                <StraightVertex x="4.5" y="15" radius="1.4"/>
+                <StraightVertex x="8" y="15"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Front" x="14.25" y="14.25">
+            <Rectangle width="11.5" height="11.5" cornerRadiusTL="2"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 9. check -->
+    <Artboard width="24" height="24" name="IconCheck" styleId="0:318" x="2700" y="3600" id="0:319">
+        <LayoutComponentStyle name="IconCheck Style" id="0:318"/>
+        <Shape name="Tick">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="5" y="12.5"/>
+                <StraightVertex x="10" y="17.5"/>
+                <StraightVertex x="19" y="6.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 10. info -->
+    <Artboard width="24" height="24" name="IconInfo" styleId="0:320" x="3000" y="3600" id="0:321">
+        <LayoutComponentStyle name="IconInfo Style" id="0:320"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Stem">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="10.8"/>
+                <StraightVertex x="12" y="16.4"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Dot" x="12" y="7.7">
+            <Ellipse width="2.3" height="2.3" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <!-- 11. offline: wifi arcs, dot and a slash -->
+    <Artboard width="24" height="24" name="IconOffline" styleId="0:322" x="3300" y="3600" id="0:323">
+        <LayoutComponentStyle name="IconOffline Style" id="0:322"/>
+        <Shape name="ArcOuter">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="4.5" y="20"/>
+                <CubicMirroredVertex x="12" y="12.5" rotation="0" distance="4.14"/>
+                <StraightVertex x="19.5" y="20"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="ArcInner">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="8" y="20"/>
+                <CubicMirroredVertex x="12" y="16" rotation="0" distance="2.21"/>
+                <StraightVertex x="16" y="20"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Dot" x="12" y="19.6">
+            <Ellipse width="2.4" height="2.4" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+        <Shape name="Slash">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="4.5" y="4.5"/>
+                <StraightVertex x="19.5" y="19.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 12. help -->
+    <Artboard width="24" height="24" name="IconHelp" styleId="0:324" x="3600" y="3600" id="0:325">
+        <LayoutComponentStyle name="IconHelp Style" id="0:324"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Question">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="9.6" y="9.7" radius="1.2"/>
+                <StraightVertex x="10.6" y="7.3" radius="1.2"/>
+                <StraightVertex x="13.4" y="7.3" radius="1.2"/>
+                <StraightVertex x="14.4" y="9.7" radius="1.2"/>
+                <StraightVertex x="12.4" y="11.6" radius="1.2"/>
+                <StraightVertex x="12.4" y="13.4"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Dot" x="12.4" y="16.5">
+            <Ellipse width="2.3" height="2.3" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <!-- 13. add -->
+    <Artboard width="24" height="24" name="IconAdd" styleId="0:326" x="3900" y="3600" id="0:327">
+        <LayoutComponentStyle name="IconAdd Style" id="0:326"/>
+        <Shape name="Vertical">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="5"/>
+                <StraightVertex x="12" y="19"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Horizontal">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="5" y="12"/>
+                <StraightVertex x="19" y="12"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 14. sign-out -->
+    <Artboard width="24" height="24" name="IconSignOut" styleId="0:328" x="4200" y="3600" id="0:329">
+        <LayoutComponentStyle name="IconSignOut Style" id="0:328"/>
+        <Shape name="Door">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="9.5" y="4.5" radius="1.6"/>
+                <StraightVertex x="4.5" y="4.5" radius="1.6"/>
+                <StraightVertex x="4.5" y="19.5" radius="1.6"/>
+                <StraightVertex x="9.5" y="19.5" radius="1.6"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Shaft">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="11" y="12"/>
+                <StraightVertex x="20" y="12"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Head">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="16" y="8"/>
+                <StraightVertex x="20" y="12"/>
+                <StraightVertex x="16" y="16"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 15. language: globe -->
+    <Artboard width="24" height="24" name="IconLanguage" styleId="0:330" x="4500" y="3600" id="0:331">
+        <LayoutComponentStyle name="IconLanguage Style" id="0:330"/>
+        <Shape name="Globe" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Meridian" x="12" y="12">
+            <Ellipse width="8.4" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Equator">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="3.5" y="12"/>
+                <StraightVertex x="20.5" y="12"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 16. status: pending (clock) -->
+    <Artboard width="24" height="24" name="IconStatusPending" styleId="0:332" x="4800" y="3600" id="0:333">
+        <LayoutComponentStyle name="IconStatusPending Style" id="0:332"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Hands">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="12"/>
+                <StraightVertex x="12" y="7.2"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="HandLong">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="12"/>
+                <StraightVertex x="15.4" y="14.2"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 17. status: settled (circle check) -->
+    <Artboard width="24" height="24" name="IconStatusSettled" styleId="0:334" x="5100" y="3600" id="0:335">
+        <LayoutComponentStyle name="IconStatusSettled Style" id="0:334"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Tick">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="8" y="12.3"/>
+                <StraightVertex x="11" y="15.3"/>
+                <StraightVertex x="16.2" y="8.8"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 18. status: failed (circle x) -->
+    <Artboard width="24" height="24" name="IconStatusFailed" styleId="0:336" x="5400" y="3600" id="0:337">
+        <LayoutComponentStyle name="IconStatusFailed Style" id="0:336"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Cross">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="8.6" y="8.6"/>
+                <StraightVertex x="15.4" y="15.4"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="CrossB">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="15.4" y="8.6"/>
+                <StraightVertex x="8.6" y="15.4"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 19. status: awaiting receipt (hourglass) -->
+    <Artboard width="24" height="24" name="IconStatusAwaitingReceipt" styleId="0:338" x="5700" y="3600" id="0:339">
+        <LayoutComponentStyle name="IconStatusAwaitingReceipt Style" id="0:338"/>
+        <Shape name="Glass">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="6.5" y="4" radius="1.4"/>
+                <StraightVertex x="17.5" y="4" radius="1.4"/>
+                <StraightVertex x="12" y="11.5"/>
+                <StraightVertex x="17.5" y="20" radius="1.4"/>
+                <StraightVertex x="6.5" y="20" radius="1.4"/>
+                <StraightVertex x="12" y="11.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 20. status: unverified (shield, bang) -->
+    <Artboard width="24" height="24" name="IconStatusUnverified" styleId="0:340" x="0" y="4200" id="0:341">
+        <LayoutComponentStyle name="IconStatusUnverified Style" id="0:340"/>
+        <Shape name="Shield">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="12" y="3.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="6.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="11" radius="1.6"/>
+                <StraightVertex x="12" y="20.5" radius="2.2"/>
+                <StraightVertex x="4.5" y="11" radius="1.6"/>
+                <StraightVertex x="4.5" y="6.5" radius="1.6"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Bang">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="9"/>
+                <StraightVertex x="12" y="14"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Dot" x="12" y="16.6">
+            <Ellipse width="2.3" height="2.3" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <!-- 21. status: verified (shield, check) -->
+    <Artboard width="24" height="24" name="IconStatusVerified" styleId="0:342" x="300" y="4200" id="0:343">
+        <LayoutComponentStyle name="IconStatusVerified Style" id="0:342"/>
+        <Shape name="Shield">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="12" y="3.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="6.5" radius="1.6"/>
+                <StraightVertex x="19.5" y="11" radius="1.6"/>
+                <StraightVertex x="12" y="20.5" radius="2.2"/>
+                <StraightVertex x="4.5" y="11" radius="1.6"/>
+                <StraightVertex x="4.5" y="6.5" radius="1.6"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Tick">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="9" y="12"/>
+                <StraightVertex x="11.5" y="14.5"/>
+                <StraightVertex x="15.3" y="9.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 22. status: suspended (block) -->
+    <Artboard width="24" height="24" name="IconStatusSuspended" styleId="0:344" x="600" y="4200" id="0:345">
+        <LayoutComponentStyle name="IconStatusSuspended Style" id="0:344"/>
+        <Shape name="Ring" x="12" y="12">
+            <Ellipse width="17" height="17" originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Bar">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="6.05" y="6.05"/>
+                <StraightVertex x="17.95" y="17.95"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 23. error (triangle warning) -->
+    <Artboard width="24" height="24" name="IconError" styleId="0:346" x="900" y="4200" id="0:347">
+        <LayoutComponentStyle name="IconError Style" id="0:346"/>
+        <Shape name="Triangle">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="12" y="4" radius="2"/>
+                <StraightVertex x="20.5" y="19.5" radius="2"/>
+                <StraightVertex x="3.5" y="19.5" radius="2"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Bang">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="12" y="9.5"/>
+                <StraightVertex x="12" y="14.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Dot" x="12" y="17">
+            <Ellipse width="2.3" height="2.3" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <!-- 24. channel: USSD (dialpad) -->
+    <Artboard width="24" height="24" name="IconChannelUssd" styleId="0:348" x="1200" y="4200" id="0:349">
+        <LayoutComponentStyle name="IconChannelUssd Style" id="0:348"/>
+        <Shape name="Keys">
+            <Ellipse x="7" y="7" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="12" y="7" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="17" y="7" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="7" y="12" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="12" y="12" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="17" y="12" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="7" y="17" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="12" y="17" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Ellipse x="17" y="17" width="2.8" height="2.8" originX="0.5" originY="0.5"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+
+    <!-- 25. channel: SMS (bubble, message lines) -->
+    <Artboard width="24" height="24" name="IconChannelSms" styleId="0:350" x="1500" y="4200" id="0:351">
+        <LayoutComponentStyle name="IconChannelSms Style" id="0:350"/>
+        <Shape name="Bubble">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="7" y="4" radius="2"/>
+                <StraightVertex x="17" y="4" radius="2"/>
+                <StraightVertex x="20" y="7" radius="2"/>
+                <StraightVertex x="20" y="12" radius="2"/>
+                <StraightVertex x="17" y="15" radius="2"/>
+                <StraightVertex x="11" y="15" radius="1"/>
+                <StraightVertex x="6" y="20"/>
+                <StraightVertex x="6" y="15" radius="1"/>
+                <StraightVertex x="4" y="12" radius="2"/>
+                <StraightVertex x="4" y="7" radius="2"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Line1">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="7.5" y="8.5"/>
+                <StraightVertex x="16.5" y="8.5"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Line2">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="7.5" y="12"/>
+                <StraightVertex x="13.5" y="12"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 26. channel: WhatsApp (bubble, handset) -->
+    <Artboard width="24" height="24" name="IconChannelWhatsapp" styleId="0:352" x="1800" y="4200" id="0:353">
+        <LayoutComponentStyle name="IconChannelWhatsapp Style" id="0:352"/>
+        <Shape name="Bubble">
+            <PointsPath isClosed="true" isClockwise="true" name="Path">
+                <StraightVertex x="7" y="4" radius="2"/>
+                <StraightVertex x="17" y="4" radius="2"/>
+                <StraightVertex x="20" y="7" radius="2"/>
+                <StraightVertex x="20" y="12" radius="2"/>
+                <StraightVertex x="17" y="15" radius="2"/>
+                <StraightVertex x="11" y="15" radius="1"/>
+                <StraightVertex x="6" y="20"/>
+                <StraightVertex x="6" y="15" radius="1"/>
+                <StraightVertex x="4" y="12" radius="2"/>
+                <StraightVertex x="4" y="7" radius="2"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Bar">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="10.2" y="10.2"/>
+                <StraightVertex x="13.8" y="13.8"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Ear">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="8.6" y="10.1"/>
+                <StraightVertex x="10.1" y="8.6"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Mouth">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="13.9" y="15.4"/>
+                <StraightVertex x="15.4" y="13.9"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+    </Artboard>
+
+    <!-- 27. payment method (wallet) -->
+    <Artboard width="24" height="24" name="IconPaymentMethod" styleId="0:354" x="2100" y="4200" id="0:355">
+        <LayoutComponentStyle name="IconPaymentMethod Style" id="0:354"/>
+        <Shape name="Wallet" x="12" y="12.5">
+            <Rectangle width="17.5" height="11" cornerRadiusTL="2.5"
+                       originX="0.5" originY="0.5" name="Path"/>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Slot">
+            <PointsPath isClosed="false" name="Path">
+                <StraightVertex x="16.5" y="7.2"/>
+                <StraightVertex x="16.5" y="17.8"/>
+            </PointsPath>
+            <Stroke thickness="2" cap="round" join="round" name="Outline">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape name="Clasp" x="18.6" y="12.5">
+            <Ellipse width="2.3" height="2.3" originX="0.5" originY="0.5" name="Path"/>
+            <Fill name="Fill">
+                <SolidColor colorValue="FF5B5F54" name="Color"/>
+            </Fill>
+        </Shape>
+    </Artboard>
+</Rive>
