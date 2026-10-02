@@ -84,7 +84,7 @@ class StatusPill extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: SabSizes.iconSm, color: foreground),
+            SabIconView(icon, size: SabSizes.iconSm, color: foreground),
             const SizedBox(width: SabSpacing.xs),
             Text(
               resolved,

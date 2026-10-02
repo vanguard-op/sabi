@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design_system/icons.dart';
 import '../design_system/tokens.dart';
 
 /// Button variants from branding.md ("Component Tokens"): one true primary
@@ -24,7 +25,7 @@ class SabButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final SabButtonVariant variant;
   final bool loading;
-  final IconData? icon;
+  final SabIcon? icon;
   final bool expand;
 
   @override
@@ -50,9 +51,9 @@ class SabButton extends StatelessWidget {
         null,
       ),
       // The destructive fill is light red in dark mode, so the light-mode
-      // knockout would fail WCAG AA there. The on-primary role token is white
-      // on the light fill and deep green on the dark fill, readable in both.
-      SabButtonVariant.destructive => (colors.error500, colors.onPrimary, null),
+      // knockout would fail WCAG AA there. The on-error role token is white on
+      // the light fill and near-black on the dark fill, readable in both.
+      SabButtonVariant.destructive => (colors.error500, colors.onError, null),
     };
 
     final content = loading
@@ -66,7 +67,7 @@ class SabButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: SabSizes.iconMd, color: foreground),
+                SabIconView(icon!, size: SabSizes.iconMd, color: foreground),
                 const SizedBox(width: SabSpacing.sm),
               ],
               Flexible(

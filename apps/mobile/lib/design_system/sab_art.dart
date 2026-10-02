@@ -3,20 +3,23 @@ import 'package:rive/rive.dart';
 
 import 'tokens.dart';
 
-/// The eight artboards delivered by the visual artist (ASSETS.md A-001–A-008),
-/// mapped to the file and state machine the client loads. Slots are named after
-/// the ledger, not the screen that happens to use them.
+/// The runtime graphics delivered by the visual artist (ASSETS.md A-001–A-009),
+/// each loaded by artboard name from the single runtime file `assets/sabi.riv`.
+///
+/// Per **D-016** there is one `.riv` file; the enum never names a per-slot file
+/// and no artwork is duplicated. Slots are named after the ledger, not the
+/// screen that happens to use them.
 enum SabArtboard {
-  brandMark('assets/brand-mark/master.riv', 'BrandMark', null),
-  emptyState('assets/illustrations/empty-state.riv', 'EmptyState', null),
-  offline('assets/illustrations/offline.riv', 'Offline', null),
-  success('assets/animations/success.riv', 'Success', 'Success SM'),
-  pending('assets/animations/pending.riv', 'Pending', 'Pending SM'),
-  error('assets/animations/error.riv', 'Error', 'Error SM');
+  brandMark('BrandMark', null),
+  emptyState('EmptyState', null),
+  offline('Offline', null),
+  success('Success', 'Success SM'),
+  pending('Pending', 'Pending SM'),
+  error('Error', 'Error SM');
 
-  const SabArtboard(this.asset, this.artboard, this.stateMachine);
+  const SabArtboard(this.artboard, this.stateMachine);
 
-  final String asset;
+  /// The artboard name inside [sabRiveFile].
   final String artboard;
 
   /// Null for the static artboards; the three state stings each carry a named
@@ -25,6 +28,17 @@ enum SabArtboard {
 
   bool get isAnimated => stateMachine != null;
 }
+
+/// The one runtime file every artboard is loaded from (D-016, ASSETS.md).
+const String sabRiveFile = 'assets/sabi.riv';
+
+/// A shared loader so the file is decoded once and reused by [SabArt] and
+/// [SabIconArt]; the underlying [File] is disposed when the app tears the
+/// loader down. Kept private to the art layer.
+final FileLoader _sabFileLoader = FileLoader.fromAsset(
+  sabRiveFile,
+  riveFactory: Factory.rive,
+);
 
 /// Opts a subtree into static-only art rendering. Production leaves this at the
 /// default; widget tests set it so screens render without decoding Rive files.
@@ -90,36 +104,114 @@ class _SabArtState extends State<SabArt> {
       );
     }
 
-    final stateMachine = widget.artboard.stateMachine;
+    return _RiveArtboard(
+      artboard: widget.artboard.artboard,
+      stateMachine: widget.artboard.stateMachine,
+      size: widget.size,
+      semanticLabel: widget.semanticLabel,
+      fallback: _ArtFallback(
+        artboard: widget.artboard,
+        size: widget.size,
+        colors: colors,
+        semanticLabel: widget.semanticLabel,
+      ),
+    );
+  }
+}
+
+/// Renders one named artboard from the single runtime file at [size] onto a
+/// [tint] colour through a colour filter, so one artboard serves every state
+/// (ASSETS.md A-009).
+///
+/// [artboardName] is the raw artboard name; the caller passes a value that is
+/// guaranteed to exist in [sabRiveFile].
+class SabIconArt extends StatelessWidget {
+  const SabIconArt({
+    super.key,
+    required this.artboardName,
+    required this.size,
+    required this.tint,
+    this.semanticLabel,
+  });
+
+  final String artboardName;
+  final double size;
+  final Color tint;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final staticOnly = SabArtMode.staticOnlyOf(context);
+    final fallback = _IconFallback(
+      name: artboardName,
+      size: size,
+      tint: tint,
+      semanticLabel: semanticLabel,
+    );
+    if (staticOnly) return fallback;
+    return _RiveArtboard(
+      artboard: artboardName,
+      stateMachine: null,
+      size: size,
+      semanticLabel: semanticLabel,
+      tint: tint,
+      fallback: fallback,
+    );
+  }
+}
+
+/// Loads a named artboard from the shared runtime file and paints it. Any
+/// decode, artboard-selection, or paint failure yields [fallback] so a task is
+/// never blocked by artwork.
+class _RiveArtboard extends StatelessWidget {
+  const _RiveArtboard({
+    required this.artboard,
+    required this.stateMachine,
+    required this.size,
+    required this.fallback,
+    this.semanticLabel,
+    this.tint,
+  });
+
+  final String artboard;
+  final String? stateMachine;
+  final double size;
+  final Widget fallback;
+  final String? semanticLabel;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final machine = stateMachine;
     return _artSemantics(
-      widget.semanticLabel,
+      semanticLabel,
       SizedBox(
-        width: widget.size,
-        height: widget.size,
+        width: size,
+        height: size,
         child: RiveWidgetBuilder(
-          fileLoader: FileLoader.fromAsset(
-            widget.artboard.asset,
-            riveFactory: Factory.rive,
-          ),
-          artboardSelector: ArtboardSelector.byName(widget.artboard.artboard),
-          stateMachineSelector: stateMachine == null
+          fileLoader: _sabFileLoader,
+          artboardSelector: ArtboardSelector.byName(artboard),
+          stateMachineSelector: machine == null
               ? const StateMachineDefault()
-              : StateMachineSelector.byName(stateMachine),
+              : StateMachineSelector.byName(machine),
           builder: (context, state) => switch (state) {
-            RiveLoaded(:final controller) => RiveWidget(
-              controller: controller,
-              fit: Fit.contain,
+            RiveLoaded(:final controller) => _maybeTint(
+              RiveWidget(controller: controller, fit: Fit.contain),
             ),
-            RiveFailed() => _ArtFallback(
-              artboard: widget.artboard,
-              size: widget.size,
-              colors: colors,
-              semanticLabel: widget.semanticLabel,
-            ),
-            RiveLoading() => SizedBox(width: widget.size, height: widget.size),
+            RiveFailed() => fallback,
+            RiveLoading() => SizedBox(width: size, height: size),
           },
         ),
       ),
+    );
+  }
+
+  Widget _maybeTint(Widget child) {
+    final colour = tint;
+    if (colour == null) return child;
+    return ColorFiltered(
+      colorFilter: ColorFilter.mode(colour, BlendMode.srcIn),
+      child: child,
     );
   }
 }
@@ -168,3 +260,71 @@ class _ArtFallback extends StatelessWidget {
     );
   }
 }
+
+/// Static stand-in for an icon artboard when Rive is unavailable (tests) or a
+/// decode fails. The Material bridge shares the artboard's name so a broken
+/// custom set is visible rather than blank.
+class _IconFallback extends StatelessWidget {
+  const _IconFallback({
+    required this.name,
+    required this.size,
+    required this.tint,
+    this.semanticLabel,
+  });
+
+  final String name;
+  final double size;
+  final Color tint;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return _artSemantics(
+      semanticLabel,
+      SizedBox(
+        width: size,
+        height: size,
+        child: Icon(materialIconForArtboard(name), size: size, color: tint),
+      ),
+    );
+  }
+}
+
+/// Maps an artboard name to its Material Symbols Outlined counterpart.
+///
+/// A temporary bridge for the static fallback only: the shipped set is the
+/// custom artboards rendered by [SabIconArt]. Material Symbols Outlined sits on
+/// the same 24px grid as branding.md's "Iconography", so a fallback still reads
+/// as the right glyph. A name Material does not know resolves to
+/// `Icons.help_outline` so a wrong bridge is visible rather than blank.
+IconData materialIconForArtboard(String artboard) => switch (artboard) {
+  'IconHome' => Icons.home_outlined,
+  'IconReceipts' => Icons.receipt_long_outlined,
+  'IconAccount' => Icons.person_outline_rounded,
+  'IconSend' => Icons.send_rounded,
+  'IconClose' => Icons.close_rounded,
+  'IconChevronRight' => Icons.chevron_right_rounded,
+  'IconSearch' => Icons.search_rounded,
+  'IconRetry' => Icons.refresh_rounded,
+  'IconCopy' => Icons.copy_rounded,
+  'IconCheck' => Icons.check_rounded,
+  'IconInfo' => Icons.info_outline_rounded,
+  'IconOffline' => Icons.wifi_off_outlined,
+  'IconHelp' => Icons.help_outline_rounded,
+  'IconAdd' => Icons.add_rounded,
+  'IconSignOut' => Icons.logout_rounded,
+  'IconLanguage' => Icons.translate_rounded,
+  'IconStatusPending' => Icons.schedule_outlined,
+  'IconStatusSettled' => Icons.check_circle_outline,
+  'IconStatusFailed' => Icons.error_outline,
+  'IconStatusAwaitingReceipt' => Icons.hourglass_bottom_outlined,
+  'IconStatusUnverified' => Icons.gpp_maybe_outlined,
+  'IconStatusVerified' => Icons.verified_outlined,
+  'IconStatusSuspended' => Icons.block_outlined,
+  'IconError' => Icons.error_outline_rounded,
+  'IconChannelUssd' => Icons.dialpad_outlined,
+  'IconChannelSms' => Icons.sms_outlined,
+  'IconChannelWhatsapp' => Icons.chat_outlined,
+  'IconPaymentMethod' => Icons.account_balance_wallet_outlined,
+  _ => Icons.help_outline_rounded,
+};

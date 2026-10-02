@@ -23,7 +23,7 @@ ThemeData buildSabTheme(Brightness brightness) {
     surfaceContainerHighest: colors.surfaceSecondary,
     onSurfaceVariant: colors.textSecondary,
     error: colors.error500,
-    onError: colors.onPrimary,
+    onError: colors.onError,
     errorContainer: colors.error100,
     onErrorContainer: colors.error900,
     outline: colors.border,

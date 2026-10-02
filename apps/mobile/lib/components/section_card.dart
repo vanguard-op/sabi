@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design_system/icons.dart';
 import '../design_system/tokens.dart';
 
 /// A titled group used for Account's profile, verification, channels, and
@@ -67,7 +68,7 @@ class SectionRow extends StatelessWidget {
   final String value;
   final Widget? valueWidget;
   final VoidCallback? onTap;
-  final IconData? icon;
+  final SabIcon? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +83,11 @@ class SectionRow extends StatelessWidget {
           child: Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: SabSizes.iconMd, color: colors.textSecondary),
+                SabIconView(
+                  icon!,
+                  size: SabSizes.iconMd,
+                  color: colors.textSecondary,
+                ),
                 const SizedBox(width: SabSpacing.sm),
               ],
               Expanded(

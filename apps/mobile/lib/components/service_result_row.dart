@@ -92,7 +92,7 @@ class ServiceResultRow extends ConsumerWidget {
                 ),
                 const SizedBox(width: SabSpacing.sm),
                 if (selected)
-                  Icon(
+                  SabIconView(
                     SabIcons.check,
                     size: SabSizes.iconMd,
                     color: colors.primary700,

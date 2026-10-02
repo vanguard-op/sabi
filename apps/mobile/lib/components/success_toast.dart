@@ -15,7 +15,7 @@ void showSabSuccessToast(BuildContext context, String message) {
         duration: SabMotion.emphasized * 6,
         content: Row(
           children: [
-            Icon(
+            SabIconView(
               SabIcons.check,
               size: SabSizes.iconMd,
               color: colors.success500,

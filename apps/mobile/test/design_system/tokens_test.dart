@@ -71,6 +71,11 @@ void main() {
       expect(dark.onPrimary, const Color(0xFF0A2E22));
     });
 
+    test('on-error role flips for dark surfaces', () {
+      expect(light.onError, const Color(0xFFFFFFFF));
+      expect(dark.onError, const Color(0xFF17181A));
+    });
+
     test('each semantic scale has the five documented steps', () {
       for (final scale in [
         [
@@ -156,15 +161,12 @@ void main() {
 
     test('destructive text meets 4.5:1 on the error fill in both modes', () {
       // The fill is dark red in light mode and light red in dark mode, so the
-      // foreground must flip with the mode; white alone fails in dark.
+      // on-error role token flips with the mode; white alone fails in dark.
       expect(
-        _contrast(light.onPrimary, light.error500),
+        _contrast(light.onError, light.error500),
         greaterThanOrEqualTo(4.5),
       );
-      expect(
-        _contrast(dark.onPrimary, dark.error500),
-        greaterThanOrEqualTo(4.5),
-      );
+      expect(_contrast(dark.onError, dark.error500), greaterThanOrEqualTo(4.5));
     });
 
     test('status pill text meets 4.5:1 on its tint in both modes', () {

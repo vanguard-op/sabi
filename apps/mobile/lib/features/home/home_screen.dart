@@ -98,7 +98,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: [
           IconButton(
             tooltip: strings.accountTooltip,
-            icon: const Icon(SabIcons.account),
+            icon: const SabIconView(SabIcons.account),
             onPressed: () => context.go('/account'),
           ),
         ],
@@ -442,7 +442,7 @@ class _Composer extends ConsumerWidget {
                 height: SabSizes.minTouchTarget,
                 child: IconButton(
                   onPressed: enabled ? onSend : null,
-                  icon: const Icon(SabIcons.send),
+                  icon: const SabIconView(SabIcons.send),
                   color: colors.primary500,
                   tooltip: strings.send,
                 ),

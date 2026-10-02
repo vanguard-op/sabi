@@ -98,7 +98,7 @@ class ReceiptCard extends ConsumerWidget {
                     ),
                     if (onTap != null) ...[
                       const SizedBox(width: SabSpacing.xs),
-                      Icon(
+                      SabIconView(
                         SabIcons.chevronRight,
                         size: SabSizes.iconSm,
                         color: colors.textSecondary,

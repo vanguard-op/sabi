@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sabi_mobile/components/status_pill.dart';
 import 'package:sabi_mobile/design_system/icons.dart';
+import 'package:sabi_mobile/design_system/sab_art.dart';
 
 import '../helpers.dart';
 
 void main() {
-  final cases = <SabStatus, (String label, IconData icon)>{
+  IconData iconFor(SabIcon icon) => materialIconForArtboard(icon.artboard);
+
+  final cases = <SabStatus, (String label, SabIcon icon)>{
     SabStatus.pending: ('Pending', SabIcons.statusPending),
     SabStatus.settled: ('Settled', SabIcons.statusSettled),
     SabStatus.failed: ('Failed', SabIcons.statusFailed),
@@ -25,7 +28,7 @@ void main() {
     ) async {
       await pumpSab(tester, Scaffold(body: StatusPill(status: status)));
       expect(find.text(expected.$1), findsOneWidget);
-      expect(find.byIcon(expected.$2), findsOneWidget);
+      expect(find.byIcon(iconFor(expected.$2)), findsOneWidget);
     });
   }
 
@@ -47,6 +50,6 @@ void main() {
       brightness: Brightness.dark,
     );
     expect(find.text('Failed'), findsOneWidget);
-    expect(find.byIcon(SabIcons.statusFailed), findsOneWidget);
+    expect(find.byIcon(iconFor(SabIcons.statusFailed)), findsOneWidget);
   });
 }

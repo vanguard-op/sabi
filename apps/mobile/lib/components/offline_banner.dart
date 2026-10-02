@@ -30,7 +30,7 @@ class OfflineBanner extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
+            SabIconView(
               SabIcons.offline,
               size: SabSizes.iconSm,
               color: colors.warning700,

@@ -31,18 +31,18 @@ class NavigationShell extends ConsumerWidget {
               navigationShell.goBranch(i, initialLocation: i == index),
           items: [
             BottomNavigationBarItem(
-              icon: const Icon(SabIcons.home),
-              activeIcon: const Icon(SabIcons.homeActive),
+              icon: const SabIconView(SabIcons.home),
+              activeIcon: const SabIconView(SabIcons.home),
               label: strings.homeTitle,
             ),
             BottomNavigationBarItem(
-              icon: const Icon(SabIcons.receipts),
-              activeIcon: const Icon(SabIcons.receiptsActive),
+              icon: const SabIconView(SabIcons.receipts),
+              activeIcon: const SabIconView(SabIcons.receipts),
               label: strings.receiptsTitle,
             ),
             BottomNavigationBarItem(
-              icon: const Icon(SabIcons.account),
-              activeIcon: const Icon(SabIcons.accountActive),
+              icon: const SabIconView(SabIcons.account),
+              activeIcon: const SabIconView(SabIcons.account),
               label: strings.accountTitle,
             ),
           ],

@@ -25,17 +25,25 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/brand-mark/
-    - assets/illustrations/
-    - assets/animations/
+    # One runtime file holds every artboard (D-016); load by artboard name.
+    - assets/sabi.riv
     - assets/splash/
     - assets/app-icon.png
 
-  # Inter and JetBrains Mono are specified by the design system but are not in
-  # the asset ledger yet. Until the visual artist lands them the client falls
-  # back to the platform sans/mono, as branding.md allows.
-  # fonts:
-  #   - family: Inter
-  #     fonts: []
-  #   - family: JetBrainsMono
-  #     fonts: []
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Medium.ttf
+          weight: 500

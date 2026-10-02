@@ -23,6 +23,7 @@ class SabColorTokens {
     required this.textSecondary,
     required this.border,
     required this.onPrimary,
+    required this.onError,
     required this.shadows,
   });
 
@@ -48,8 +49,14 @@ class SabColorTokens {
   /// Semantic role: text and icons on a primary fill.
   final Color onPrimary;
 
-  /// The brand's flat white, used for text and icons on an error fill. It is
-  /// constant across light and dark (branding.md, Component Tokens — Destructive).
+  /// Semantic role: text and icons on an error fill. Distinct from
+  /// [onPrimary] because the dark-mode `error-500` fill is light red, where
+  /// white fails WCAG AA (branding.md, "Color Palette", "Accessibility";
+  /// decision D-013).
+  final Color onError;
+
+  /// The brand's flat white, used where a true knockout is required. It is the
+  /// light-mode [onError] value and stays constant across modes.
   static const Color knockout = Color(0xFFFFFFFF);
 
   /// Elevation shadows by [SabElevation].
@@ -222,6 +229,7 @@ class SabColorTokens {
       textSecondary: grey[600]!,
       border: grey[300]!,
       onPrimary: isDark ? const Color(0xFF0A2E22) : const Color(0xFFFFFFFF),
+      onError: isDark ? const Color(0xFF17181A) : const Color(0xFFFFFFFF),
       shadows: _shadowScale(isDark),
     );
   }
@@ -375,8 +383,8 @@ abstract final class SabMotion {
 }
 
 /// The type scale (`branding.md`, "Typography"). Inter is the declared family
-/// and the platform sans is the documented fallback; the font assets are not in
-/// the ledger yet, so the fallback is what ships today.
+/// with JetBrains Mono for references and codes; both are bundled (D-014), and
+/// the platform sans/mono remain the fallback if a family fails to load.
 abstract final class SabTypography {
   static const String fontFamily = 'Inter';
   static const String monoFamily = 'JetBrainsMono';

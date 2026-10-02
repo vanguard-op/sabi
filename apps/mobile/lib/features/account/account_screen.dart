@@ -359,7 +359,11 @@ class _FallbackNote extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(SabIcons.info, size: SabSizes.iconSm, color: colors.info900),
+          SabIconView(
+            SabIcons.info,
+            size: SabSizes.iconSm,
+            color: colors.info900,
+          ),
           const SizedBox(width: SabSpacing.sm),
           Expanded(
             child: Text(
