@@ -116,17 +116,17 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-004 | FEAT-003, FEAT-004, FEAT-011 | ai-engineer | Done | — |
 | T-005 | FEAT-001 | backend-engineer | Done | C-001–C-008 |
 | T-006 | FEAT-001 | frontend-engineer | Backlog | C-001–C-008 |
-| T-007 | FEAT-003 | ai-engineer | Backlog | C-009 |
+| T-007 | FEAT-003 | ai-engineer | In Progress | C-009 |
 | T-008 | FEAT-004 | backend-engineer | In Progress | C-010, C-011 |
-| T-009 | FEAT-004 | ai-engineer | Backlog | C-010 |
+| T-009 | FEAT-004 | ai-engineer | In Progress | C-010 |
 | T-010 | FEAT-004, FEAT-011 | frontend-engineer | Backlog | C-009–C-012 |
-| T-011 | FEAT-011 | ai-engineer | Backlog | C-012 |
+| T-011 | FEAT-011 | ai-engineer | In Progress | C-012 |
 | T-012 | FEAT-012 | backend-engineer | Done | C-013–C-016 |
 | T-013 | — | visual-artist | Done | — |
 | T-014 | — | infra-engineer | Done | — |
 | T-015 | — | infra-engineer | Done | — |
 | T-016 | — | visual-artist | Done | — |
-| T-017 | — | frontend-engineer | Backlog | — |
+| T-017 | — | frontend-engineer | In Progress | — |
 
 ## Decisions log
 
