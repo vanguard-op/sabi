@@ -1,0 +1,57 @@
+# Sabi dependency updates (NFR-029: versions pinned, no known critical CVEs).
+#
+# Dependabot raises a reviewed PR whenever a pinned dependency or a SHA-pinned
+# GitHub Action can move forward, so the CI critical-CVE gate
+# (workflows/supply-chain.yml) re-scans every proposed change. Security updates
+# are enabled by default and take priority over the weekly schedule below.
+#
+# Entries for a service directory activate automatically once that directory
+# lands; Dependabot skips a path that has no manifest yet.
+
+version: 2
+updates:
+  # Third-party workflow actions are pinned to full commit SHAs; Dependabot
+  # keeps the SHA and its version comment current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: pip
+    directory: /services/api
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: pip
+    directory: /services/ai
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: pub
+    directory: /apps/mobile
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Base images in docker-compose.yml (Postgres+pgvector, Redis).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Provider and module version constraints under infra/terraform.
+  - package-ecosystem: terraform
+    directory: /infra/terraform
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"

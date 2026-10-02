@@ -1,0 +1,83 @@
+# Sabi supply-chain controls (NFR-029: SBOM maintained, no known critical CVEs,
+# versions pinned). The tools run the same way on a developer machine:
+#
+#   syft dir:. -o cyclonedx-json=sabi.cdx.json
+#   trivy fs --scanners vuln --severity CRITICAL --exit-code 1 .
+#
+# Dependabot (dependabot.yml) keeps the pins current; this workflow proves the
+# repository still has no known critical CVE and still pins its own actions.
+
+name: supply-chain
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly sweep, so a CVE disclosed after a pin was set is still caught even
+    # when nothing in the repository changed.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # NFR-029 "SBOM maintained": one CycloneDX inventory of every dependency the
+  # repository carries, retained as a workflow artifact on every run.
+  sbom:
+    name: sbom
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sabi.cdx.json
+          artifact-name: sabi-sbom-cyclonedx
+          upload-artifact: true
+          upload-artifact-retention: 90
+
+  # NFR-029 "no known critical CVEs": Trivy resolves pip, Dart/pub, and image
+  # manifests on the filesystem. Any known CRITICAL CVE (fixed or not) fails the
+  # job and prints the finding table into the log.
+  vulnerabilities:
+    name: critical CVEs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: false
+          exit-code: "1"
+          format: table
+          skip-dirs: .git
+          hide-progress: true
+
+  # NFR-029 "versions pinned": every action referenced from a workflow must be
+  # pinned to a full 40-character commit SHA, never a moving tag or branch.
+  pins:
+    name: action pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Require full-SHA action pins
+        run: |
+          set -euo pipefail
+          if grep -rEn 'uses:[[:space:]]+[^[:space:]#]+@' .github/workflows \
+            | grep -Ev '@[0-9a-f]{40}([[:space:]]|$)' ; then
+            echo "::error::unpinned GitHub Action above; pin it to a full commit SHA and leave the version as a comment (NFR-029)"
+            exit 1
+          fi
+          echo "all workflow actions pinned to full commit SHAs"
