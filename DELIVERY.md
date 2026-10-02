@@ -127,6 +127,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-015 | — | infra-engineer | Done | — |
 | T-018 | — | ai-engineer | Done | — |
 | T-019 | — | infra-engineer | Backlog | — |
+| T-020 | — | frontend-engineer | Backlog | — |
+| T-021 | FEAT-001, FEAT-003, FEAT-004, FEAT-011, FEAT-012 | qa-engineer | In Progress | C-001–C-016 |
 | T-016 | — | visual-artist | Done | — |
 | T-017 | — | frontend-engineer | Done | — |
 
