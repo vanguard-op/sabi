@@ -18,7 +18,9 @@ import importlib
 import logging
 from types import ModuleType
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api import health
 from core.config import ModelSettings
@@ -54,6 +56,25 @@ def load_feature_router(module_name: str) -> APIRouter | None:
     return router
 
 
+async def _validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """Map a request body that fails a schema to the shared error envelope.
+
+    The frozen contracts define 400 (invalid input), not the framework's default
+    422 body, so a bad request keeps one wire error shape across the service. Only
+    field names are echoed, never the submitted value.
+    """
+
+    fields = sorted(
+        {str(error.get("loc", ("body",))[-1]) for error in exc.errors() if error.get("loc")}
+    )
+    detail = ", ".join(fields) if fields else "request body"
+    message = f"invalid request field(s): {detail}"
+    return JSONResponse(
+        status_code=400,
+        content={"error": {"code": "invalid_request", "message": message}},
+    )
+
+
 def _include_feature_routers(app: FastAPI) -> None:
     for name in FEATURE_MODULES:
         router = load_feature_router(name)
@@ -73,6 +94,7 @@ def create_app(settings: ModelSettings | None = None) -> FastAPI:
     )
     app.state.settings = settings
 
+    app.add_exception_handler(RequestValidationError, _validation_error_handler)
     app.include_router(health.router)
     _include_feature_routers(app)
     return app

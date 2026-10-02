@@ -40,7 +40,7 @@ where = ["."]
 include = ["app*", "core*", "intent*", "ranking*", "composition*"]
 
 [tool.pytest.ini_options]
-testpaths = ["core/tests", "app/tests"]
+testpaths = ["core/tests", "app/tests", "composition/tests"]
 addopts = "-q"
 
 [tool.ruff]
