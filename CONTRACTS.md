@@ -60,19 +60,19 @@ Response 200: id: string, displayName: string|null, locale: string, preferredCha
 Errors: 401 (unauthenticated)
 
 ### C-009: POST /v1/agent/intents
-Status: Frozen
+Status: Frozen (revision 2)
 Auth: Session cookie (authenticated account owner)
-Request: text: string (non-empty), locale: string (en|pcm), channel: string (app|ussd|sms|whatsapp)
-Response 200: intent: object (intent_type: string, target: string|null, amount: integer|null (minor units, kobo), currency: string, reference: string|null, constraints: object, confidence: number, language: string, clarifying_question: string|null), candidates: array of ServiceSummary, source: string (model|fallback)
+Request: text: string (non-empty, max 200 chars), locale: string (en|pcm), channel: string (app|ussd|sms|whatsapp)
+Response 200: intent: object (intentType: string, target: string|null, amount: integer|null (minor units, kobo), currency: string, reference: string|null, constraints: object, confidence: number, language: string, clarifyingQuestion: string|null), candidates: ServiceSummary[], source: string (model|fallback)
 Errors: 400 (empty or oversized text), 429 (rate limited)
 
 ### C-010: GET /v1/catalogue/search
-Status: Frozen
+Status: Frozen (revision 2)
 Auth: Session cookie (authenticated account owner)
-Request: q: string (non-empty), category: string|null, limit: integer (default 5, max 5)
-Response 200: results: ServiceSummary[], no_match: boolean
-Errors: 400 (missing q), 429 (rate limited)
-ServiceSummary: service_id: string, name: string, collecting_body: string, category: string, known_amount: integer|null (minor units, kobo), currency: string, status: string, confidence: number
+Request: q: string (non-empty, max 200 chars), category: string|null, limit: integer (default 5, max 5)
+Response 200: results: ServiceSummary[], noMatch: boolean
+Errors: 400 (missing or over-length q), 429 (rate limited)
+ServiceSummary: serviceId: string, name: string, collectingBody: string, category: string, knownAmount: integer|null (minor units, kobo), currency: string, status: string, confidence: number
 
 ### C-011: GET /v1/catalogue/services/{serviceId}
 Status: Frozen
