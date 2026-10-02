@@ -42,6 +42,14 @@ def test_intent_prompt_carries_grounding_and_refusal_rules():
     assert "untrusted" in text.lower()
 
 
+def test_intent_prompt_states_the_pinned_cutoff():
+    from core.config import INTENT_CONFIDENCE_CUTOFF
+
+    text = load_prompt(Capability.INTENT_RESOLUTION).text
+    assert str(INTENT_CONFIDENCE_CUTOFF) in text
+    assert "0.80" not in text
+
+
 def test_composition_prompt_forbids_executable_content():
     text = load_prompt(Capability.INTERFACE_COMPOSITION).text
     assert "executable code" in text

@@ -28,6 +28,13 @@ FLASH_MODEL_ID = "gemini-3-flash-preview"
 # Prompt artifacts are versioned alongside the model build they were tuned for.
 PROMPT_VERSION = "v1"
 
+# The serving confidence cutoff for intent resolution. Below it the model asks exactly
+# one clarifying question and never presents a payment intent (model-quality.md,
+# "MQ-001" and "Quality bar"; fixed at 0.70 by D-017). It is a product decision, not a
+# per-run tuning knob, and it is evaluated against the golden set rather than adjusted
+# to make a run pass.
+INTENT_CONFIDENCE_CUTOFF = 0.70
+
 # Retrieval breadth passed to grounding and ranking. The catalogue API caps a result
 # set at five (C-010), so the retriever returns a slightly wider candidate pool for
 # the model to filter and rank.

@@ -22,6 +22,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from core.config import INTENT_CONFIDENCE_CUTOFF
 from core.grounding import GroundingContext, ground_intent
 from core.schemas import (
     COMPOSITION_MESSAGE_TYPES,
@@ -30,9 +31,10 @@ from core.schemas import (
 )
 
 # A resolved request must clear this confidence before a payment intent is presented.
-# The quality bar states accuracy thresholds but not a numeric confidence cutoff; this
-# value is pinned here and evaluated, not tuned per run.
-INTENT_CONFIDENCE_THRESHOLD = 0.80
+# The cutoff is a single product decision fixed at 0.70 (D-017) and stated in
+# model-quality.md, "MQ-001" and "Quality bar"; below it the model asks exactly one
+# clarifying question. It is evaluated, never tuned per run.
+INTENT_CONFIDENCE_THRESHOLD = INTENT_CONFIDENCE_CUTOFF
 
 # A ranking result below this relevance is not shown as a match.
 RANKING_CONFIDENCE_THRESHOLD = 0.50

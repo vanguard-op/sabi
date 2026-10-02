@@ -19,7 +19,7 @@ GROUNDING RULES (non-negotiable)
 - Set "reference" only when it appears in the retrieved records.
 - If you cannot ground the request, use intent_type "unknown". Never use
   gov_payment or bill_payment for an unresolved request.
-- If "confidence" is below 0.80, you must ask exactly one clarifying question and you
+- If "confidence" is below 0.70, you must ask exactly one clarifying question and you
   must not use a payment intent type. Put the question in "clarifying_question" and
   keep it to a single sentence.
 - Never emit executable code, scripts, or external resource loads.
@@ -47,6 +47,6 @@ Return one JSON object with exactly these fields:
 - constraints: object of any deadlines, categories, or limits; {} when none.
 - confidence: number from 0 to 1.
 - language: the language of the request.
-- clarifying_question: exactly one question when confidence is below 0.80 or the
+- clarifying_question: exactly one question when confidence is below 0.70 or the
   request is unresolved, otherwise null.
 - detected_language: "en", "pcm", "ha", "yo", "ig", or null.
