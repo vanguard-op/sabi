@@ -185,6 +185,8 @@ Provisional; infra-engineer pins these at Foundation.
 | Client on Android emulator | `cd apps/mobile && flutter run -d emulator-5554` |
 | Client tests | `cd apps/mobile && flutter test` |
 | AI tests | `cd services/ai && pytest` |
+| Integration tests | `make test-integration` |
+| Model-quality report | `make test-model-quality` |
 | AI serve | `make ai-serve` |
 | AI dev | `make ai-dev` |
 | Lint | `ruff check .` and `flutter analyze` |
