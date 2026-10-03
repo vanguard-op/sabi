@@ -86,17 +86,32 @@ locals {
   }
 }
 
+# Session and rate-limit store selection for the API gateway, environment-driven
+# so no code change is needed to move between environments. Staging runs with no
+# Memorystore (D-032), so the stores must be an explicit in-memory choice or the
+# settings validator refuses the first boot; production supplies a cache_url, so
+# "auto" resolves to redis there. Only the API gateway keeps session state.
+locals {
+  store_env = var.environment == "staging" ? {
+    SESSION_STORE_BACKEND    = "memory"
+    RATE_LIMIT_STORE_BACKEND = "memory"
+  } : {}
+}
+
 # The gateway's environment, resolved after the private services exist. Kept in
 # its own local so it can name their Cloud Run URLs without a cycle.
 locals {
-  api_env = {
-    AI_BASE_URL       = google_cloud_run_v2_service.private_services["ai"].uri
-    PAYMENTS_BASE_URL = google_cloud_run_v2_service.private_services["payments"].uri
-    # WebAuthn staging relying party (route staging config).
-    WEBAUTHN_RP_ID   = local.services["api"].host
-    WEBAUTHN_RP_NAME = "Sabi"
-    WEBAUTHN_ORIGIN  = "https://${local.services["api"].host}"
-  }
+  api_env = merge(
+    {
+      AI_BASE_URL       = google_cloud_run_v2_service.private_services["ai"].uri
+      PAYMENTS_BASE_URL = google_cloud_run_v2_service.private_services["payments"].uri
+      # WebAuthn staging relying party (route staging config).
+      WEBAUTHN_RP_ID   = local.services["api"].host
+      WEBAUTHN_RP_NAME = "Sabi"
+      WEBAUTHN_ORIGIN  = "https://${local.services["api"].host}"
+    },
+    local.store_env,
+  )
 }
 
 # --- Private services ------------------------------------------------------------
