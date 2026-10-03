@@ -115,7 +115,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-027 | FEAT-001 | frontend-engineer | Done | — |
 | T-028 | FEAT-003, FEAT-004, FEAT-011 | frontend-engineer | Done | C-009, C-010 |
 | T-029 | — | frontend-engineer | Done | — |
-| T-045 | — | visual-artist | In Progress | — |
+| T-045 | — | visual-artist | Done | — |
 
 ### Phase 2: The payment loop
 
