@@ -118,7 +118,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 ### Phase 2: The payment loop
 
-Planned only; nothing dispatched. No task below has a `.delivery/T-###.md` route yet: a route is written immediately before its dispatch and deleted when the task closes, so the absence of route files here is the hold. Contracts are frozen; board status is the gate.
+Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.md` route on disk and a frozen contract. Board status is the gate: no engineer starts until the status moves off `Backlog`, which waits on the dependencies below.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
