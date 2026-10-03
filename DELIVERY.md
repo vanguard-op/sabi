@@ -147,7 +147,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-057 | — | backend-engineer | Done | C-039 |
 | T-058 | — | frontend-engineer | Done | — |
 | T-059 | — | frontend-engineer | Done | C-039, C-044 |
-| T-060 | FEAT-001, FEAT-003, FEAT-004, FEAT-005, FEAT-008, FEAT-009 | frontend-engineer | In Progress | C-001–C-043 |
+| T-060 | FEAT-001, FEAT-003, FEAT-004, FEAT-005, FEAT-008, FEAT-009 | frontend-engineer | Done | C-001–C-043 |
 
 Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
 
