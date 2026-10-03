@@ -113,6 +113,59 @@ void main() {
     });
   });
 
+  group('public auth endpoints opt out of the re-authorisation signal', () {
+    const rejection = {
+      'error': {'code': 'unauthenticated', 'message': 'No match.'},
+    };
+
+    test('C-004 login/verify 401 stays an inline credential error', () async {
+      var reauth = 0;
+      final client = SabApiClient(
+        config: _config,
+        httpClient: _StubClient(401, jsonEncode(rejection)),
+        onUnauthenticated: () => reauth++,
+      );
+      await expectLater(
+        client.post('/auth/login/verify', body: const {}),
+        throwsA(isA<ApiUnauthenticated>()),
+      );
+      // The rejection is still thrown for the caller to map; only the shared
+      // session-expiry signal is withheld.
+      expect(reauth, 0);
+    });
+
+    test(
+      'C-005 recovery/verify 401 stays an inline credential error',
+      () async {
+        var reauth = 0;
+        final client = SabApiClient(
+          config: _config,
+          httpClient: _StubClient(401, jsonEncode(rejection)),
+          onUnauthenticated: () => reauth++,
+        );
+        await expectLater(
+          client.post('/auth/recovery/verify', body: const {}),
+          throwsA(isA<ApiUnauthenticated>()),
+        );
+        expect(reauth, 0);
+      },
+    );
+
+    test('an authenticated auth endpoint still raises the signal', () async {
+      var reauth = 0;
+      final client = SabApiClient(
+        config: _config,
+        httpClient: _StubClient(401, jsonEncode(rejection)),
+        onUnauthenticated: () => reauth++,
+      );
+      await expectLater(
+        client.post('/auth/channel-links', body: const {}),
+        throwsA(isA<ApiUnauthenticated>()),
+      );
+      expect(reauth, 1);
+    });
+  });
+
   group('status preservation', () {
     test('getWithStatus keeps a 202 while get returns its body', () async {
       final client = SabApiClient(

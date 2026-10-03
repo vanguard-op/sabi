@@ -241,6 +241,37 @@ void main() {
         throwsA(isA<InvalidCredentialException>()),
       );
     });
+
+    test('a rejected assertion does not raise the session-expiry signal', () async {
+      var reauth = 0;
+      final client = _RecordingClient({
+        '/v1/auth/login/options': (
+          status: 200,
+          body: {'challengeId': 'ch_2', 'publicKey': <String, dynamic>{}},
+        ),
+        '/v1/auth/login/verify': (
+          status: 401,
+          body: {
+            'error': {'code': 'unauthenticated', 'message': 'No match.'},
+          },
+        ),
+      });
+      final repo = HttpAuthRepository(
+        SabApiClient(
+          config: _config,
+          httpClient: client,
+          onUnauthenticated: () => reauth++,
+        ),
+        ceremony: _FakeCeremony(),
+      );
+      await expectLater(
+        repo.signInWithPasskey(),
+        throwsA(isA<InvalidCredentialException>()),
+      );
+      // The screen shows the reason inline; the Re-authorisation overlay is for
+      // an expired session on a protected screen (screens/02-sign-in).
+      expect(reauth, 0);
+    });
   });
 
   group('unavailable fallback (FEAT-001 edge case)', () {

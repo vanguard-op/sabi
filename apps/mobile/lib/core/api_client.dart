@@ -37,11 +37,40 @@ class SabApiClient {
   /// Called once when the gateway rejects the session cookie, before
   /// [ApiUnauthenticated] is thrown. The client raises the shared
   /// Re-authorisation flow; it does not know about Riverpod itself.
+  ///
+  /// A `401` from one of [_publicAuthPaths] does not call this: those requests
+  /// carry no session, so the rejection is a credential outcome, not an expired
+  /// session.
   final void Function()? onUnauthenticated;
 
   /// Called once when the gateway cannot be reached at all, before
   /// [ApiUnreachable] is thrown, so the surface can flip to its offline states.
   final void Function()? onUnreachable;
+
+  /// The endpoints documented as `Auth: None` in C-001–C-005. They are called
+  /// while signed out, so a `401` from one is a rejected credential or recovery
+  /// code — which the sign-in screen renders inline — never a refused session
+  /// cookie. Firing the shared Re-authorisation flow from here would raise the
+  /// overlay over a signed-out screen and leave it pending after a later
+  /// successful sign-in (FEAT-001; screens/02-sign-in "Error"). Every other
+  /// endpoint, including the authenticated `/auth/recovery/regenerate` (C-006)
+  /// and `/auth/channel-links` (C-007), keeps the signal.
+  static const _publicAuthPaths = <String>{
+    '/auth/register/options', // C-001
+    '/auth/register/verify', // C-002
+    '/auth/login/options', // C-003
+    '/auth/login/verify', // C-004: no matching credential.
+    '/auth/recovery/verify', // C-005: invalid recovery code.
+  };
+
+  /// Endpoint-level opt-out: the request may be sent from a signed-out surface,
+  /// so its `401` must not be read as an expired session. This is the
+  /// equivalent of a per-request opt-out for the auth calls: their call sites
+  /// stay on the plain [post], and the client withholds the signal by path.
+  static bool _isPublicAuthPath(String path) {
+    final normalised = path.startsWith('/') ? path : '/$path';
+    return _publicAuthPaths.contains(normalised);
+  }
 
   Uri _uri(String path, [Map<String, String?> query = const {}]) {
     final cleaned = path.startsWith('/') ? path.substring(1) : path;
@@ -109,10 +138,10 @@ class SabApiClient {
       throw ApiUnreachable(error);
     }
 
-    return _decode(response);
+    return _decode(response, raiseReauth: !_isPublicAuthPath(path));
   }
 
-  ApiResponse _decode(http.Response response) {
+  ApiResponse _decode(http.Response response, {required bool raiseReauth}) {
     final status = response.statusCode;
     Map<String, dynamic>? decoded;
     if (response.body.isNotEmpty) {
@@ -143,9 +172,14 @@ class SabApiClient {
     if (status == 401) {
       // The session cookie is absent or rejected: raise the shared
       // Re-authorisation flow rather than a bare error (user-flow
-      // "Authentication Gate").
-      onUnauthenticated?.call();
-      throw ApiUnauthenticated(code: code, message: rawMessage, details: details);
+      // "Authentication Gate"). Public auth endpoints opt out — their 401 is a
+      // credential outcome the sign-in screen shows inline.
+      if (raiseReauth) onUnauthenticated?.call();
+      throw ApiUnauthenticated(
+        code: code,
+        message: rawMessage,
+        details: details,
+      );
     }
     if (status == 403) {
       throw ApiForbidden(code: code, message: rawMessage, details: details);
