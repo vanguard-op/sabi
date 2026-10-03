@@ -117,15 +117,15 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-031 | FEAT-002 | backend-engineer | Done | C-020–C-022 |
 | T-032 | FEAT-008 | backend-engineer | Done | C-023–C-025 |
 | T-033 | FEAT-009 | backend-engineer | Done | C-026–C-029 |
-| T-034 | FEAT-006 | backend-engineer | In Progress | C-030–C-032 |
-| T-035 | FEAT-007 | backend-engineer | In Progress | C-033–C-035 |
-| T-036 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
+| T-034 | FEAT-006 | backend-engineer | Backlog | C-030–C-032 |
+| T-035 | FEAT-007 | backend-engineer | Backlog | C-033–C-035 |
+| T-036 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
 | T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Backlog | C-017–C-019, C-030–C-035 |
 | T-038 | FEAT-008, FEAT-009 | frontend-engineer | Backlog | C-023–C-029 |
 | T-039 | FEAT-002 | frontend-engineer | Backlog | C-020–C-022 |
 | T-040 | FEAT-005, FEAT-009 | ai-engineer | In Progress | C-017, C-026–C-029 |
-| T-041 | FEAT-005 | backend-engineer | In Progress | C-017 |
-| T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | In Progress | C-026–C-035 |
+| T-041 | FEAT-005 | backend-engineer | Backlog | C-017 |
+| T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Backlog | C-026–C-035 |
 | T-043 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
 | T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
 
@@ -133,11 +133,11 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-046 | FEAT-008 | backend-engineer | In Progress | C-024 |
-| T-047 | — | backend-engineer | Backlog | — |
+| T-046 | FEAT-008 | backend-engineer | Done | C-024 |
+| T-047 | — | backend-engineer | Done | — |
 | T-048 | FEAT-009 | backend-engineer | Backlog | C-029 |
-| T-049 | — | backend-engineer | In Progress | C-039, C-040 |
-| T-050 | — | backend-engineer | In Progress | C-041–C-043 |
+| T-049 | — | backend-engineer | Done | C-039, C-040 |
+| T-050 | — | backend-engineer | Backlog | C-041–C-043 |
 | T-051 | — | frontend-engineer | In Progress | C-013–C-016, C-039–C-043 |
 | T-052 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
 
