@@ -10,6 +10,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.ids import new_id
+from app.core.time import utcnow
 from app.db.models import PaymentCase, Service
 from app.federal.models import FederalCollection
 
@@ -47,4 +49,40 @@ def find_open_reconciliation(db: Session, payment_id: str) -> PaymentCase | None
     ).scalar_one_or_none()
 
 
-__all__ = ["OPEN_CASE_STATUSES", "find_open_reconciliation", "get_collection", "get_service"]
+def create_reconciliation_case(
+    db: Session,
+    *,
+    payment_id: str,
+    user_id: str,
+    reason: str,
+    assignee_role: str,
+) -> PaymentCase:
+    """Open a reconciliation case for a federal payment.
+
+    ``reason`` is user-supplied and may carry personal data; it is accepted for
+    the contract but not copied onto the case row, matching how a dispute reason
+    is handled (app.cases.service), so it never lands in an unencrypted column.
+    """
+    now = utcnow()
+    case = PaymentCase(
+        id=new_id(),
+        payment_id=payment_id,
+        user_id=user_id,
+        type="receipt_missing",
+        status="open",
+        assignee_role=assignee_role,
+        opened_at=now,
+        updated_at=now,
+    )
+    db.add(case)
+    db.flush()
+    return case
+
+
+__all__ = [
+    "OPEN_CASE_STATUSES",
+    "create_reconciliation_case",
+    "find_open_reconciliation",
+    "get_collection",
+    "get_service",
+]
