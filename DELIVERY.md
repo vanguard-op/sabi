@@ -116,6 +116,30 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-028 | FEAT-003, FEAT-004, FEAT-011 | frontend-engineer | Done | C-009, C-010 |
 | T-029 | — | frontend-engineer | In Progress | — |
 
+### Phase 2: The payment loop
+
+Planned only; nothing dispatched. Routes are written at dispatch time.
+
+| Task | Feature | Owner | Status | Contract |
+|---|---|---|---|---|
+| T-030 | FEAT-005 | backend-engineer | Backlog | C-017–C-019 |
+| T-031 | FEAT-002 | backend-engineer | Backlog | C-020–C-022 |
+| T-032 | FEAT-008 | backend-engineer | Backlog | C-023–C-025 |
+| T-033 | FEAT-009 | backend-engineer | Backlog | C-026–C-029 |
+| T-034 | FEAT-006 | backend-engineer | Backlog | C-030–C-032 |
+| T-035 | FEAT-007 | backend-engineer | Backlog | C-033–C-035 |
+| T-036 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
+| T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Backlog | C-017–C-019, C-030–C-035 |
+| T-038 | FEAT-008, FEAT-009 | frontend-engineer | Backlog | C-023–C-029 |
+| T-039 | FEAT-002 | frontend-engineer | Backlog | C-020–C-022 |
+| T-040 | FEAT-005, FEAT-009 | ai-engineer | Backlog | C-017, C-026–C-029 |
+| T-041 | FEAT-005 | backend-engineer | Backlog | C-017 |
+| T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Backlog | C-026–C-035 |
+| T-043 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
+| T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
+
+Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
+
 ## Decisions log
 
 | # | Decision | Rationale | By |

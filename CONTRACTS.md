@@ -115,3 +115,167 @@ Auth: Operator session cookie + MFA, role provider review analyst
 Request: decision: string (approve|reject|quarantine|deregister), reason: string|null, schemaVersion: string
 Response 200: capability: Capability (status active|withdrawn|quarantined)
 Errors: 401 (unauthenticated), 403 (role or MFA missing), 404 (unknown capability), 409 (capability not pending, or schema version mismatch)
+
+## Phase 2: The payment loop
+
+Planned and frozen; none implemented. Numbering continues from C-016. Amounts are integer minor units
+(kobo). Money movements require an `Idempotency-Key` header.
+
+### C-017: POST /v1/payments/authorise
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: serviceId: string, amount: integer (minor units, kobo), currency: string (NGN), payeeReference: string|null, paymentMethodId: string|null, channel: string (app|ussd|sms|whatsapp), secondConfirmation: boolean (required true above the user's set limit)
+Response 201: paymentId: string, status: string (initiated|authorized|pending|succeeded|failed|reversed|refunded), mandateId: string, railReference: string|null
+Errors: 400 (invalid amount or missing second confirmation), 401 (unauthenticated), 402 (insufficient funds or limit), 409 (duplicate authorisation; returns the existing paymentId and reference), 422 (amount above limit without confirmation)
+
+### C-018: POST /v1/payments/{paymentId}/execute
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: mandateId: string, Idempotency-Key header
+Response 200: paymentId: string, status: string, railReference: string|null
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (mandate already consumed or duplicate key), 410 (mandate expired), 422 (mandate does not bind the amount and payee)
+
+### C-019: GET /v1/payments
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: cursor: string|null, limit: integer (default 20), status: string|null
+Response 200: payments: PaymentSummary[], nextCursor: string|null
+Errors: 401 (unauthenticated), 429 (rate limited)
+PaymentSummary: paymentId: string, serviceId: string, amount: integer, currency: string, payee: string, status: string, channel: string, createdAt: string, updatedAt: string
+
+### C-020: POST /v1/identity/verifications
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: method: string (nin|bvn), identifier: string
+Response 202: verificationId: string, status: string (pending|verified|failed|corrected)
+Errors: 400 (invalid identifier), 401 (unauthenticated), 409 (verification already in progress)
+
+### C-021: GET /v1/identity/verifications/{verificationId}
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: verificationId: string, method: string, status: string, reason: string|null, verifiedAt: string|null
+Errors: 401 (unauthenticated), 404 (unknown verification)
+
+### C-022: GET /v1/account/verification
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: kycStatus: string (unverified|pending|verified|rejected), method: string|null, canCorrect: boolean
+Errors: 401 (unauthenticated)
+
+### C-023: GET /v1/receipts
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: q: string|null, cursor: string|null, limit: integer (default 20)
+Response 200: receipts: ReceiptSummary[], nextCursor: string|null
+Errors: 401 (unauthenticated), 429 (rate limited)
+ReceiptSummary: receiptId: string, paymentId: string, reference: string, payee: string, amount: integer, currency: string, kind: string (official_e_receipt|biller_confirmation|token), status: string, issuedAt: string|null
+
+### C-024: GET /v1/receipts/{receiptId}
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: receipt: Receipt, payment: PaymentSummary
+Errors: 401 (unauthenticated), 404 (unknown receipt)
+
+### C-025: GET /v1/receipts/{receiptId}/document
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: documentRef: string, contentType: string, shareToken: string|null
+Errors: 401 (unauthenticated), 404 (unknown receipt), 409 (receipt awaiting the source document)
+
+### C-026: GET /v1/cases
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: cursor: string|null, limit: integer (default 20), status: string|null
+Response 200: cases: CaseSummary[], nextCursor: string|null
+Errors: 401 (unauthenticated), 429 (rate limited)
+CaseSummary: caseId: string, paymentId: string, type: string (failed_no_delivery|disputed|refund|receipt_missing), status: string (open|awaiting_provider|resolved|escalated|closed), openedAt: string, updatedAt: string
+
+### C-027: GET /v1/cases/{caseId}
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: case: PaymentCase, payment: PaymentSummary, timeline: PaymentEvent[]
+Errors: 401 (unauthenticated), 404 (unknown case)
+
+### C-028: POST /v1/cases/{caseId}/dispute
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: reason: string
+Response 201: caseId: string, status: string, openedAt: string
+Errors: 401 (unauthenticated), 404 (unknown case), 409 (a dispute already exists for this payment)
+
+### C-029: POST /v1/payments/{paymentId}/refund
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: reason: string, Idempotency-Key header
+Response 202: paymentId: string, status: string (reversed|refunded), refundReference: string|null
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (duplicate refund for the reference), 422 (payment not refundable in its current state)
+
+### C-030: POST /v1/payments/federal/prepare
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: serviceId: string, payerReference: string|null
+Response 200: serviceId: string, collectingBody: string, amount: integer|null, currency: string, requiresReference: boolean, instructions: string|null
+Errors: 400 (invalid service), 401 (unauthenticated), 409 (agency collection account changed; re-resolve), 422 (service not a federal collection)
+
+### C-031: GET /v1/payments/federal/{paymentId}/receipt
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 202: status: string (awaiting_receipt), retryAfterSeconds: integer
+Response 200: receiptId: string, receiptNumber: string, verificationStatus: string (verified|unverified|pending)
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment did not succeed)
+
+### C-032: POST /v1/payments/federal/{paymentId}/reconcile
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: reason: string
+Response 202: caseId: string, status: string
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (reconciliation case already open)
+
+### C-033: POST /v1/payments/bills/validate
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: serviceId: string, recipientIdentifier: string, amount: integer|null
+Response 200: valid: boolean, recipientIdentifier: string, knownAmount: integer|null, currency: string, range: object|null, reason: string|null
+Errors: 400 (invalid identifier), 401 (unauthenticated), 404 (unknown service), 503 (biller offline; payment prevented)
+
+### C-034: POST /v1/payments/bills
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: serviceId: string, recipientIdentifier: string, amount: integer, currency: string (NGN), Idempotency-Key header
+Response 201: paymentId: string, status: string, token: string|null, receiptId: string|null
+Errors: 400 (invalid input), 401 (unauthenticated), 402 (insufficient funds), 409 (duplicate authorisation), 503 (biller offline)
+
+### C-035: GET /v1/payments/bills/{paymentId}/token
+Status: Frozen
+Auth: Session cookie (authenticated account owner)
+Request: —
+Response 200: token: string, receiptId: string
+Response 202: status: string (awaiting_token), retryAfterSeconds: integer
+Errors: 401 (unauthenticated), 404 (unknown payment)
+
+### C-036: POST /v1/channels/ussd/session
+Status: Frozen
+Auth: Channel identity (MSISDN session, no app session)
+Request: sessionId: string, msisdn: string, input: string|null, step: string|null
+Response 200: prompt: string, step: string, done: boolean
+Errors: 400 (invalid session input), 409 (session already open elsewhere), 410 (session timed out; pending payment resumable)
+
+### C-037: POST /v1/channels/ussd/authorise
+Status: Frozen
+Auth: Channel identity (MSISDN session)
+Request: sessionId: string, confirmation: string, Idempotency-Key header
+Response 200: status: string (succeeded|pending|failed), reference: string|null
+Errors: 400 (invalid confirmation), 409 (duplicate authorisation), 410 (session timed out after authorisation; payment pending)
+
+### C-038: GET /v1/channels/sms/status/{reference}
+Status: Frozen
+Auth: Channel identity (MSISDN session)
+Request: —
+Response 200: reference: string, status: string (queued|sent|delivered|failed), token: string|null
+Errors: 404 (unknown reference)
