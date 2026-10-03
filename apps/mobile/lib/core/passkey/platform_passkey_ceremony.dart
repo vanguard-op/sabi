@@ -66,9 +66,11 @@ class PlatformPasskeyCeremony implements PasskeyCeremony {
         return (await _authenticator.authenticate(request)).toJson();
       });
 
-  /// Runs a ceremony and normalises the plugin's failures: a device that cannot
-  /// host a credential becomes [PasskeyUnavailable] (the fallback trigger);
-  /// every other failure is a retryable [PasskeyCeremonyFailure].
+  /// Runs a ceremony and normalises the plugin's failures into the seam's
+  /// typed outcomes: a device or relying party that cannot host a credential
+  /// becomes [PasskeyUnavailable] (the fallback trigger, with its [reason]); a
+  /// user cancellation and a retryable failure both become a
+  /// [PasskeyCeremonyFailure] distinguished by [PasskeyFailureReason].
   Future<Map<String, dynamic>> _guard(
     Future<Map<String, dynamic>> Function() ceremony,
   ) async {
@@ -82,14 +84,38 @@ class PlatformPasskeyCeremony implements PasskeyCeremony {
       throw const PasskeyUnavailable();
     } on NoCredentialsAvailableException {
       throw const PasskeyUnavailable();
+    } on DomainNotAssociatedException {
+      // The RP origin is not associated with this build, so the OS refuses the
+      // ceremony before a credential exists. A setup problem, not a rejected
+      // user; the recovery-code path is the honest fallback.
+      throw const PasskeyUnavailable(
+        PasskeyUnavailableReason.domainNotAssociated,
+      );
+    } on PasskeyAuthCancelledException {
+      // The user dismissed the sheet: not an error, so the caller returns to
+      // the ready state rather than showing a failure.
+      throw const PasskeyCeremonyFailure(null, PasskeyFailureReason.cancelled);
+    } on TimeoutException catch (error) {
+      throw PasskeyCeremonyFailure(error.message, PasskeyFailureReason.timeout);
+    } on UnhandledAuthenticatorException catch (error) {
+      throw PasskeyCeremonyFailure(
+        error.message,
+        PasskeyFailureReason.unhandled,
+      );
     } on AuthenticatorException catch (error) {
       throw PasskeyCeremonyFailure(error.toString());
     } on FormatException catch (error) {
       // The gateway sent options the platform could not parse; a retry is
       // meaningful, a recovery-code fallback is not.
-      throw PasskeyCeremonyFailure(error.message);
+      throw PasskeyCeremonyFailure(
+        error.message,
+        PasskeyFailureReason.malformed,
+      );
     } on ArgumentError catch (error) {
-      throw PasskeyCeremonyFailure(error.message?.toString());
+      throw PasskeyCeremonyFailure(
+        error.message?.toString(),
+        PasskeyFailureReason.malformed,
+      );
     }
   }
 }

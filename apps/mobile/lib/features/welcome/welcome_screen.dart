@@ -6,6 +6,7 @@ import '../../components/offline_banner.dart';
 import '../../components/recovery_code_sheet.dart';
 import '../../components/sab_button.dart';
 import '../../core/connectivity.dart';
+import '../../core/passkey/passkey_ceremony.dart';
 import '../../data/providers.dart';
 import '../../data/repositories.dart';
 import '../../design_system/sab_art.dart';
@@ -27,6 +28,7 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   bool _checking = true;
   bool _passkeySupported = true;
+  bool _setupUnavailable = false;
   bool _creating = false;
   bool _queued = false;
   String? _error;
@@ -75,6 +77,32 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             locale: ref.read(localeProvider),
             withPasskey: _passkeySupported,
           );
+    } on PasskeyUnavailable catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _creating = false;
+        _error = null;
+        // No passkey can be enrolled here; offer the recovery-code path. The
+        // relying-party case is a build setup problem, so it gets its own copy
+        // rather than implying the user's input was rejected.
+        _passkeySupported = false;
+        if (error.reason == PasskeyUnavailableReason.domainNotAssociated) {
+          _setupUnavailable = true;
+        }
+      });
+      return;
+    } on PasskeyCeremonyFailure catch (error) {
+      if (!mounted) return;
+      // A dismissed sheet is not a failure: quietly return to the ready state.
+      if (error.reason == PasskeyFailureReason.cancelled) {
+        setState(() => _creating = false);
+        return;
+      }
+      setState(() {
+        _creating = false;
+        _error = strings.passkeyRetry;
+      });
+      return;
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -164,8 +192,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                         if (!_passkeySupported && !_checking) ...[
                           const SizedBox(height: SabSpacing.lg),
                           _UnsupportedCallout(
-                            title: strings.passkeyUnsupportedTitle,
-                            body: strings.passkeyUnsupportedBody,
+                            title: _setupUnavailable
+                                ? strings.passkeySetupUnavailableTitle
+                                : strings.passkeyUnsupportedTitle,
+                            body: _setupUnavailable
+                                ? strings.passkeySetupUnavailableBody
+                                : strings.passkeyUnsupportedBody,
                           ),
                         ],
                         if (_error != null) ...[
@@ -185,7 +217,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               : strings.useRecoveryInstead,
                           loading: _checking || _creating,
                           expand: true,
-                          onPressed: _checking || _creating ? null : _getStarted,
+                          onPressed: _checking || _creating
+                              ? null
+                              : _getStarted,
                         ),
                         const SizedBox(height: SabSpacing.sm),
                         SabButton(

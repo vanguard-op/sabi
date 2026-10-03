@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../components/sab_button.dart';
 import '../../components/sab_text_field.dart';
+import '../../core/passkey/passkey_ceremony.dart';
 import '../../data/providers.dart';
 import '../../design_system/sab_art.dart';
 import '../../design_system/tokens.dart';
@@ -43,6 +44,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       if (!mounted) return;
       ref.read(sessionProvider).signIn();
       context.go(widget.from ?? '/home');
+    } on PasskeyUnavailable catch (error) {
+      if (!mounted) return;
+      // No passkey can run here. The relying-party case is a build setup
+      // problem, so name it and point at the recovery-code route already on
+      // screen instead of the generic rejection copy.
+      setState(() {
+        _error = error.reason == PasskeyUnavailableReason.domainNotAssociated
+            ? strings.passkeySetupUnavailableSignIn
+            : strings.passkeyFailed;
+      });
+    } on PasskeyCeremonyFailure catch (error) {
+      if (!mounted) return;
+      // A dismissed sheet is a quiet return to ready, not an error.
+      if (error.reason != PasskeyFailureReason.cancelled) {
+        setState(() => _error = strings.passkeyRetry);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = strings.passkeyFailed);
