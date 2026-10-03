@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider';
@@ -16,9 +17,35 @@ const AUDITOR: Staff = {
   role: 'compliance_privacy_officer',
 };
 
-/** Seeds the auth session mirror without going through the login form. */
+/**
+ * Confirm the auth session for a test. The cookie is the authority, so the
+ * provider asks the server; seeding storage alone would leave the operator
+ * unsigned and every role-gated view would render its forbidden state.
+ *
+ * Only the session endpoint is stubbed. Any other request is left to the test's
+ * own data layer (the mock gate), so a simulated data failure stays a data
+ * failure rather than being swallowed here.
+ */
 function seedStaff(staff: Staff | null) {
-  if (staff) sessionStorage.setItem('sabi.console.staff', JSON.stringify(staff));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (!url.includes('/staff/auth/session')) {
+        throw new Error(`unexpected network call in test: ${url}`);
+      }
+      if (!staff) {
+        return new Response(
+          JSON.stringify({ error: { code: 'unauthenticated' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ staff }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }),
+  );
 }
 
 interface Options extends Omit<RenderOptions, 'wrapper'> {

@@ -39,7 +39,17 @@ function installViewport(width: number) {
 
 function setStaff(role: StaffRole) {
   const staff: Staff = { staffId: 's1', email: 'a.okafor@sabi.ng', role };
-  sessionStorage.setItem('sabi.console.staff', JSON.stringify(staff));
+  // The cookie is the authority, so the session is confirmed against the
+  // server rather than read from storage. Stub the confirmation endpoint.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(JSON.stringify({ staff }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ),
+  );
 }
 
 function renderShell(width: number) {
@@ -105,9 +115,12 @@ describe('Sidebar icons', () => {
     );
   }
 
-  it('renders the branded icon set rather than bare unicode glyphs', () => {
+  it('renders the branded icon set rather than bare unicode glyphs', async () => {
     setStaff('administrator');
     const { container } = renderSidebar(false);
+    // The session is confirmed against the server, so the role-gated item
+    // appears only after that resolves.
+    await screen.findByRole('link', { name: /audit/i });
     expect(container.querySelectorAll('a.sidebar-item')).toHaveLength(4);
     expect(container.querySelectorAll('a.sidebar-item svg')).toHaveLength(4);
     expect(container.textContent).not.toMatch(/[⌂⌗◉⌸]/);

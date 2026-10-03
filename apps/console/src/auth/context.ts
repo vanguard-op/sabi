@@ -6,6 +6,8 @@ export interface AuthState {
   status: 'checking' | 'anonymous' | 'authenticated';
   login: (staff: Staff) => void;
   logout: () => Promise<void>;
+  /** Drop the local session and return to the anonymous state. */
+  clear: () => void;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);

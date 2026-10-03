@@ -46,3 +46,11 @@ class StaffLoginResponse(BaseModel):
 
     staff: StaffOut
     must_enrol_mfa: bool
+
+
+class StaffSessionResponse(BaseModel):
+    """The current operator identity, confirming the staff cookie is live."""
+
+    model_config = _CAMEL
+
+    staff: StaffOut

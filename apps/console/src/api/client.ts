@@ -19,6 +19,7 @@ import {
   type LoginResponse,
   type Provider,
   type ReviewRequest,
+  type Staff,
 } from './types';
 
 const BASE = '/v1';
@@ -58,14 +59,29 @@ async function request<T>(
 
   if (!response.ok) {
     const envelope = json as ApiErrorBody | undefined;
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
       envelope?.error?.code ?? 'unknown_error',
       envelope?.error?.message ?? 'The request failed.',
     );
+    // A 401 on any call means the staff cookie is gone or expired. Surface it to
+    // the auth layer so the console returns to login instead of showing a bare
+    // error on every page (the session is the authority, not the mirrored hint).
+    if (response.status === 401) onUnauthenticated?.();
+    throw error;
   }
 
   return json as T;
+}
+
+/**
+ * Called when any request is refused as unauthenticated. Set by the auth layer
+ * so a session that expires mid-use signs the operator out once, cleanly.
+ */
+let onUnauthenticated: (() => void) | undefined;
+
+export function setUnauthenticatedHandler(handler: (() => void) | undefined): void {
+  onUnauthenticated = handler;
 }
 
 export const api = {
@@ -75,6 +91,10 @@ export const api = {
   },
   logout(): Promise<void> {
     return request<void>('POST', '/staff/auth/logout');
+  },
+  /** Confirm the staff cookie and return the current operator identity. */
+  session(): Promise<Staff> {
+    return request<{ staff: Staff }>('GET', '/staff/auth/session').then((r) => r.staff);
   },
 
   // --- Provider registry: C-013–C-016 -------------------------------------

@@ -299,6 +299,13 @@ Request: —
 Response 204: —
 Errors: 401 (unauthenticated)
 
+### C-044: GET /v1/staff/auth/session
+Status: Implemented
+Auth: Staff session cookie (MFA-verified operator session)
+Request: —
+Response 200: staff: object (staffId: string, email: string, role: string)
+Errors: 401 (no live operator session, or the account no longer exists)
+
 ### C-041: GET /v1/staff/audit
 Status: Implemented
 Auth: Staff session cookie + MFA, role compliance_privacy_officer or administrator

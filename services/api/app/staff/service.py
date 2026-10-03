@@ -53,6 +53,11 @@ def find_by_email(db: Session, email: str) -> StaffAccount | None:
     ).scalar_one_or_none()
 
 
+def find_by_id(db: Session, staff_id: str) -> StaffAccount | None:
+    """Look an operator up by id, for a session that outlives the login call."""
+    return db.get(StaffAccount, staff_id)
+
+
 def authenticate(
     db: Session,
     settings: Settings,

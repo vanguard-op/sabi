@@ -28,7 +28,12 @@ from app.core.rate_limit import RateLimiter
 from app.core.sessions import SessionData, SessionKind, SessionManager
 from app.db.session import get_db
 from app.staff import service
-from app.staff.schemas import StaffLoginRequest, StaffLoginResponse, StaffOut
+from app.staff.schemas import (
+    StaffLoginRequest,
+    StaffLoginResponse,
+    StaffOut,
+    StaffSessionResponse,
+)
 
 router = APIRouter(tags=["staff"])
 
@@ -96,6 +101,29 @@ def staff_login(
     return StaffLoginResponse(
         staff=StaffOut(staff_id=account.id, email=account.email, role=account.role),
         must_enrol_mfa=must_enrol,
+    )
+
+
+@router.get("/staff/auth/session", response_model=StaffSessionResponse)
+def staff_session(db: DbDep, session: CurrentSessionDep) -> StaffSessionResponse:
+    """Confirm the operator session and return the current identity.
+
+    The console calls this on load: the HttpOnly cookie is the authority, so a
+    mirrored identity that outlives the cookie must not show an operator as
+    signed in (C-039).
+    """
+    staff_session = _require_staff_session(session)
+    account = service.find_by_id(db, staff_session.user_id)
+    if account is None:
+        # The account was removed while the session lived: treat as unauthorised
+        # rather than reporting an identity that no longer exists.
+        raise APIError(401, ErrorCode.UNAUTHENTICATED, "Sign in to continue.")
+    return StaffSessionResponse(
+        staff=StaffOut(
+            staff_id=account.id,
+            email=account.email,
+            role=account.role,
+        )
     )
 
 
