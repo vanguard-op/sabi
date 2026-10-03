@@ -46,7 +46,7 @@ def _request() -> ModelRequest:
     return ModelRequest(
         capability=capability,
         model_path=ModelPath.FLASH,
-        model_id="gemini-3-flash-preview",
+        model_id="gemini-3.1-flash-lite",
         prompt_id="intent_resolution",
         prompt_version="v1",
         system_instruction="system",
@@ -66,10 +66,10 @@ def test_generate_constrains_output_and_parses_json():
     provider = _provider(client=_FakeClient(models))
     response = provider.generate(_request())
     assert response.parsed == {"intent_type": "unknown", "confidence": 0.2}
-    assert response.model_id == "gemini-3-flash-preview"
+    assert response.model_id == "gemini-3.1-flash-lite"
     assert response.usage == ModelUsage(input_tokens=120, output_tokens=30)
     call = models.calls[0]
-    assert call["model"] == "gemini-3-flash-preview"
+    assert call["model"] == "gemini-3.1-flash-lite"
     config = call["config"]
     assert config["response_mime_type"] == "application/json"
     assert config["temperature"] == 0.0

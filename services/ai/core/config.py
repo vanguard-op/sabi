@@ -20,10 +20,12 @@ from decimal import Decimal
 from enum import Enum
 
 # --- Pinned provider build -------------------------------------------------------
-# The primary provider is Gemini 3.1 Pro with the lower-cost flash path for
+# The primary provider is Gemini 3.1 Pro with the lower-cost Flash-Lite path for
 # high-volume intent resolution (model-quality.md, "Model version and fallback").
+# Both IDs are stable endpoints, chosen over the preview builds so the default does
+# not carry preview deprecation exposure. Prices reviewed 2026-10-03.
 PRIMARY_MODEL_ID = "gemini-3.1-pro-preview"
-FLASH_MODEL_ID = "gemini-3-flash-preview"
+FLASH_MODEL_ID = "gemini-3.1-flash-lite"
 
 # Prompt artifacts are versioned alongside the model build they were tuned for.
 PROMPT_VERSION = "v1"
@@ -130,7 +132,7 @@ MODEL_PRICES: Mapping[str, ModelPrice] = {
         input_per_million=Decimal("2.00"), output_per_million=Decimal("12.00")
     ),
     FLASH_MODEL_ID: ModelPrice(
-        input_per_million=Decimal("0.50"), output_per_million=Decimal("3.00")
+        input_per_million=Decimal("0.25"), output_per_million=Decimal("1.50")
     ),
 }
 

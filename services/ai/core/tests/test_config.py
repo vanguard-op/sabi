@@ -16,7 +16,7 @@ from core.config import (
 
 def test_pinned_provider_build_is_fixed():
     assert PRIMARY_MODEL_ID == "gemini-3.1-pro-preview"
-    assert FLASH_MODEL_ID == "gemini-3-flash-preview"
+    assert FLASH_MODEL_ID == "gemini-3.1-flash-lite"
 
 
 def test_capability_paths_match_the_high_volume_split():

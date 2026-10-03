@@ -54,7 +54,7 @@ class FakeModelProvider(ModelProvider):
 def json_response(
     payload: Mapping[str, Any] | list[Any],
     *,
-    model_id: str = "gemini-3-flash-preview",
+    model_id: str = "gemini-3.1-flash-lite",
     input_tokens: int = 100,
     output_tokens: int = 50,
 ) -> ModelResponse:
@@ -71,7 +71,7 @@ def json_response(
     )
 
 
-def text_response(text: str, *, model_id: str = "gemini-3-flash-preview") -> ModelResponse:
+def text_response(text: str, *, model_id: str = "gemini-3.1-flash-lite") -> ModelResponse:
     """Build a provider response with unparseable text."""
 
     return ModelResponse(

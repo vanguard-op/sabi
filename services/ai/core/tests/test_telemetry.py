@@ -11,7 +11,7 @@ def test_cost_uses_the_pinned_list_price():
     cost = estimate_cost(
         FLASH_MODEL_ID, ModelUsage(input_tokens=1_000_000, output_tokens=1_000_000)
     )
-    assert cost == Decimal("3.50")
+    assert cost == Decimal("1.75")
 
 
 def test_unknown_model_is_priced_at_zero():
@@ -22,7 +22,7 @@ def test_task_cost_accumulates_calls_and_checks_the_ceiling():
     task = CostTracker().begin(Capability.INTENT_RESOLUTION, model_id=FLASH_MODEL_ID)
     task.record(ModelUsage(input_tokens=1_000_000, output_tokens=1_000_000))
     assert task.calls == 1
-    assert task.within_ceiling is False  # 3.50 USD exceeds the 0.02 ceiling
+    assert task.within_ceiling is False  # 1.75 USD exceeds the 0.02 ceiling
 
 
 def test_small_task_stays_within_ceiling():
