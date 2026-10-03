@@ -44,7 +44,14 @@ def test_app_boots_when_no_feature_router_has_landed(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         app_main.importlib,
         "import_module",
-        _importer(("intent.router", "ranking.router", "composition.router")),
+        _importer(
+            (
+                "intent.router",
+                "ranking.router",
+                "composition.router",
+                "payment_intent.router",
+            )
+        ),
     )
     app = app_main.create_app()
     assert not any(path.startswith("/v1") for path in app.openapi()["paths"])
@@ -55,7 +62,10 @@ def test_feature_router_is_mounted_under_v1(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(
         app_main.importlib,
         "import_module",
-        _importer(("ranking.router", "composition.router"), stub="intent"),
+        _importer(
+            ("ranking.router", "composition.router", "payment_intent.router"),
+            stub="intent",
+        ),
     )
     client = TestClient(app_main.create_app())
     response = client.get("/v1/agent/intents")

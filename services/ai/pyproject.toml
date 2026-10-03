@@ -37,7 +37,7 @@ dev = [
 # and health surface. Feature routers (intent, ranking, composition) are mounted
 # by app.main and picked up by this pattern as each package lands.
 where = ["."]
-include = ["app*", "core*", "intent*", "ranking*", "composition*"]
+include = ["app*", "core*", "intent*", "ranking*", "composition*", "payment_intent*"]
 
 [tool.pytest.ini_options]
 # Every AI feature package is collected: the model-serving foundation (core), the
@@ -46,7 +46,7 @@ include = ["app*", "core*", "intent*", "ranking*", "composition*"]
 # capability as its package lands. ``pythonpath`` makes the service root importable
 # regardless of the rootdir pytest infers, so collection is stable from the service
 # directory and from CI alike.
-testpaths = ["core/tests", "app/tests", "intent/tests", "ranking/tests", "composition/tests"]
+testpaths = ["core/tests", "app/tests", "intent/tests", "ranking/tests", "composition/tests", "payment_intent/tests"]
 pythonpath = ["."]
 addopts = "-q"
 
