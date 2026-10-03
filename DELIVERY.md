@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `d2b303a`. 13 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `d2b303a`. 14 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
