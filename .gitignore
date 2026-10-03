@@ -51,3 +51,8 @@ htmlcov/
 .idea/
 .vscode/
 .DS_Store
+
+# Console build output
+apps/console/dist/
+apps/console/.vite/
+apps/console/coverage/

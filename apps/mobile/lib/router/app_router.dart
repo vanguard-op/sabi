@@ -6,8 +6,12 @@ import '../components/navigation_shell.dart';
 import '../core/features.dart';
 import '../data/providers.dart';
 import '../features/account/account_screen.dart';
+import '../features/account/verification/verification_screen.dart';
+import '../features/case/case_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/payment/payment_confirmation_screen.dart';
 import '../features/placeholder/gated_screen.dart';
+import '../features/receipts/receipt_detail_screen.dart';
 import '../features/receipts/receipts_screen.dart';
 import '../features/sign_in/sign_in_screen.dart';
 import '../features/welcome/welcome_screen.dart';
@@ -68,19 +72,29 @@ GoRouter buildRouter(Ref ref) {
         builder: (context, state) => SabGatedScreen(
           feature: SabFeature.paymentAuthorization,
           title: state.pathParameters['serviceId'] ?? 'Payment',
+          builder: (context) => PaymentConfirmationScreen(
+            serviceId: state.pathParameters['serviceId'] ?? '',
+          ),
         ),
       ),
       GoRoute(
         path: SabRoutes.identityVerification,
-        builder: (context, state) => const SabGatedScreen(
+        builder: (context, state) => SabGatedScreen(
           feature: SabFeature.identityVerification,
           title: 'Identity',
+          builder: (context) => VerificationScreen(
+            fromPayment: state.uri.queryParameters['from'] == 'payment',
+          ),
         ),
       ),
       GoRoute(
         path: '/cases/:caseId',
-        builder: (context, state) =>
-            SabGatedScreen(feature: SabFeature.failureRecovery, title: 'Case'),
+        builder: (context, state) => SabGatedScreen(
+          feature: SabFeature.failureRecovery,
+          title: 'Case',
+          builder: (context) =>
+              CaseScreen(caseId: state.pathParameters['caseId'] ?? ''),
+        ),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -102,9 +116,12 @@ GoRouter buildRouter(Ref ref) {
                 routes: [
                   GoRoute(
                     path: ':receiptId',
-                    builder: (context, state) => const SabGatedScreen(
+                    builder: (context, state) => SabGatedScreen(
                       feature: SabFeature.receiptCapture,
                       title: 'Receipt',
+                      builder: (context) => ReceiptDetailScreen(
+                        receiptId: state.pathParameters['receiptId'] ?? '',
+                      ),
                     ),
                   ),
                 ],

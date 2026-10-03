@@ -39,6 +39,11 @@ class SabMoney {
   static String formatDate(DateTime value, {String locale = 'en'}) =>
       DateFormat.yMMMd(_intlLocale(locale)).format(value.toLocal());
 
+  /// Formats a month heading (e.g. "September 2026") in the active locale,
+  /// used to group receipts by month.
+  static String formatMonth(DateTime value, {String locale = 'en'}) =>
+      DateFormat.yMMMM(_intlLocale(locale)).format(value);
+
   static String _intlLocale(String locale) => switch (locale) {
     'pcm' || 'en' => 'en_NG',
     _ => locale,

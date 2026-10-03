@@ -35,7 +35,11 @@ router = APIRouter(tags=["registry"])
 
 ReviewAnalystSession = Annotated[
     SessionData,
-    Depends(require_operator_role([OperatorRole.PROVIDER_REVIEW_ANALYST])),
+    Depends(
+        require_operator_role(
+            [OperatorRole.PROVIDER_REVIEW_ANALYST, OperatorRole.ADMINISTRATOR]
+        )
+    ),
 ]
 InternalSession = Annotated[SessionData, Depends(current_user)]
 DbSession = Annotated[Session, Depends(get_db)]

@@ -340,6 +340,10 @@ abstract final class SabSizes {
   static const double iconLg = 32;
   static const double minTouchTarget = 44;
 
+  /// Opacity for a disabled control, matching the mobile input state and the
+  /// desktop `disabled-opacity` token (branding.md, "Accessibility").
+  static const double disabledOpacity = 0.5;
+
   /// Brand mark on Welcome.
   static const double artBrandMark = 96;
 

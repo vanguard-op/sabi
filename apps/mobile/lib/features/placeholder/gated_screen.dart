@@ -29,18 +29,21 @@ class SabGatedScreen extends ConsumerWidget {
     final strings = ref.watch(sabStringsProvider);
     final flags = ref.watch(featureFlagsProvider);
     final enabled = flags.isEnabled(feature);
+    // When the feature ships, the builder owns the whole screen — its own
+    // Scaffold, AppBar, and actions — so the gate does not add a second AppBar
+    // around it. While the phase is pending the gate supplies the neutral
+    // fallback screen with the route's title and a working back affordance.
+    if (enabled && builder != null) return builder!(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         leading: BackButton(onPressed: () => context.pop()),
       ),
-      body: enabled && builder != null
-          ? builder!(context)
-          : EmptyState(
-              title: strings.notYetTitle,
-              message: strings.notYetBody,
-              illustration: SabArtboard.emptyState,
-            ),
+      body: EmptyState(
+        title: strings.notYetTitle,
+        message: strings.notYetBody,
+        illustration: SabArtboard.emptyState,
+      ),
     );
   }
 }

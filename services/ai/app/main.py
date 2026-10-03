@@ -42,7 +42,7 @@ logger = logging.getLogger("sabi.ai")
 
 # Model-backed capabilities, per model-quality.md. Names match the package that
 # owns each router so discovery stays declarative.
-FEATURE_MODULES = ("intent", "ranking", "composition")
+FEATURE_MODULES = ("intent", "ranking", "composition", "payment_intent")
 
 
 def load_feature_router(module_name: str) -> APIRouter | None:

@@ -87,9 +87,25 @@ class SabButton extends StatelessWidget {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(SabRadii.md),
     );
+    // Resolve per state: a disabled control must not paint its enabled fill, or
+    // it reads as tappable when it is not (branding.md, "Component Tokens" and
+    // the Accessibility disabled treatment).
+    Color disabledFill(Color color) => switch (variant) {
+      SabButtonVariant.primary || SabButtonVariant.destructive =>
+        color.withValues(alpha: SabSizes.disabledOpacity),
+      _ => color,
+    };
     final style = ButtonStyle(
-      backgroundColor: WidgetStatePropertyAll(background),
-      foregroundColor: WidgetStatePropertyAll(foreground),
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? disabledFill(background)
+            : background,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? foreground.withValues(alpha: SabSizes.disabledOpacity)
+            : foreground,
+      ),
       minimumSize: const WidgetStatePropertyAll(Size(0, SabSizes.buttonHeight)),
       padding: const WidgetStatePropertyAll(SabSizes.buttonPadding),
       elevation: const WidgetStatePropertyAll(0),

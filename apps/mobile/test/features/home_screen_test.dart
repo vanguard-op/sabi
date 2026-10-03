@@ -49,6 +49,12 @@ class _Catalogue implements CatalogueRepository {
       noMatch: searchResults.isEmpty,
     );
   }
+
+  @override
+  Future<CatalogueService> serviceDetail(String serviceId) async {
+    // Home reads discovery only; the detail endpoint is not exercised here.
+    throw const ServiceNotFoundException();
+  }
 }
 
 IntentResult _lowConfidence(String question) => IntentResult(

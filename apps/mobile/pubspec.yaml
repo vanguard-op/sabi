@@ -16,6 +16,11 @@ dependencies:
   go_router: ^18.0.2
   intl: ^0.20.3
   rive: ^0.14.11
+  http: ^1.6.0
+  # Platform authenticator for the WebAuthn ceremony (D-028). The relying party
+  # stays self-hosted (C-001-C-004, D-004); the plugin only frames the request
+  # and response and runs the OS prompt.
+  passkeys: ^2.23.1
 
 dev_dependencies:
   flutter_test:

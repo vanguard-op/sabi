@@ -51,6 +51,16 @@ class SabStrings {
 
   String _t(String key) => _values[key] ?? _fallback[key] ?? key;
 
+  /// Fills `{name}` placeholders in a string with [values]. Used for copy that
+  /// names the user's query or a date, so the sentence stays translatable.
+  static String fill(String template, Map<String, String> values) {
+    var out = template;
+    for (final entry in values.entries) {
+      out = out.replaceAll('{${entry.key}}', entry.value);
+    }
+    return out;
+  }
+
   String get appName => _t('appName');
   String get tagline => _t('tagline');
   String get retry => _t('retry');
@@ -173,7 +183,69 @@ class SabStrings {
   String get receiptsTitle => _t('receiptsTitle');
   String get receiptsEmptyTitle => _t('receiptsEmptyTitle');
   String get receiptsEmptyBody => _t('receiptsEmptyBody');
+  String get receiptsEmptyAction => _t('receiptsEmptyAction');
   String get offlineReceipts => _t('offlineReceipts');
+  String get searchReceiptsHint => _t('searchReceiptsHint');
+  String get searchReceiptsLabel => _t('searchReceiptsLabel');
+  String get noResultsTitle => _t('noResultsTitle');
+  String get noResultsBody => _t('noResultsBody');
+  String get clearSearch => _t('clearSearch');
+  String get storageWarning => _t('storageWarning');
+  String get loadMore => _t('loadMore');
+
+  // Receipt detail
+  String get receiptDetailTitle => _t('receiptDetailTitle');
+  String get receiptPayeeLabel => _t('receiptPayeeLabel');
+  String get receiptAmountLabel => _t('receiptAmountLabel');
+  String get receiptReferenceLabel => _t('receiptReferenceLabel');
+  String get receiptDateLabel => _t('receiptDateLabel');
+  String get receiptOfficialIdLabel => _t('receiptOfficialIdLabel');
+  String get receiptVerifiedLine => _t('receiptVerifiedLine');
+  String get receiptUnverifiedLine => _t('receiptUnverifiedLine');
+  String get receiptAwaitingLine => _t('receiptAwaitingLine');
+  String get receiptStatusLabel => _t('receiptStatusLabel');
+  String get shareReceipt => _t('shareReceipt');
+  String get exportReceipt => _t('exportReceipt');
+  String get raiseDispute => _t('raiseDispute');
+  String get receiptNotFound => _t('receiptNotFound');
+  String get receiptShareReady => _t('receiptShareReady');
+  String get receiptExportReady => _t('receiptExportReady');
+  String get receiptDocumentPending => _t('receiptDocumentPending');
+  String get receiptDocumentFailed => _t('receiptDocumentFailed');
+  String get kindOfficialReceipt => _t('kindOfficialReceipt');
+  String get kindBillerConfirmation => _t('kindBillerConfirmation');
+  String get kindToken => _t('kindToken');
+
+  // Case
+  String get caseTitle => _t('caseTitle');
+  String get caseStatePending => _t('caseStatePending');
+  String get caseStateReconciling => _t('caseStateReconciling');
+  String get caseStateRefundInitiated => _t('caseStateRefundInitiated');
+  String get caseStartRefund => _t('caseStartRefund');
+  String get caseStateAwaitingBiller => _t('caseStateAwaitingBiller');
+  String get caseStateEscalated => _t('caseStateEscalated');
+  String get caseStateResolved => _t('caseStateResolved');
+  String get caseLastUpdate => _t('caseLastUpdate');
+  String get caseExpectedWindow => _t('caseExpectedWindow');
+  String get caseExpectedWindowValue => _t('caseExpectedWindowValue');
+  String get caseTimelineTitle => _t('caseTimelineTitle');
+  String get caseContactSupport => _t('caseContactSupport');
+  String get caseViewReceipt => _t('caseViewReceipt');
+  String get caseNotFound => _t('caseNotFound');
+  String get caseOffline => _t('caseOffline');
+  String get caseRefundBlocked => _t('caseRefundBlocked');
+  String get caseRefundSubmitted => _t('caseRefundSubmitted');
+  String get caseSupportBody => _t('caseSupportBody');
+  String get caseReferenceLabel => _t('caseReferenceLabel');
+  String get caseTypeFailedNoDelivery => _t('caseTypeFailedNoDelivery');
+  String get caseTypeDisputed => _t('caseTypeDisputed');
+  String get caseTypeRefund => _t('caseTypeRefund');
+  String get caseTypeReceiptMissing => _t('caseTypeReceiptMissing');
+  String get caseOpenedLabel => _t('caseOpenedLabel');
+  String get caseActorSystem => _t('caseActorSystem');
+  String get caseActorUser => _t('caseActorUser');
+  String get caseActorRail => _t('caseActorRail');
+  String get caseActorProvider => _t('caseActorProvider');
 
   // Confirmation summary / amount entry / fallback
   String get confirmTitle => _t('confirmTitle');
@@ -311,9 +383,73 @@ class SabStrings {
         'Some text is shown in English while we finish this language.',
     'receiptsTitle': 'Receipts',
     'receiptsEmptyTitle': 'No receipts yet',
-    'receiptsEmptyBody': 'Receipts from your payments will appear here.',
+    'receiptsEmptyBody':
+        'Receipts from your payments will appear here. Make a payment to keep the first one.',
+    'receiptsEmptyAction': 'Make a payment',
     'offlineReceipts':
         'Showing your saved receipts. New ones arrive when you reconnect.',
+    'searchReceiptsHint': 'Search by reference, agency, or date',
+    'searchReceiptsLabel': 'Search receipts',
+    'noResultsTitle': 'No matches',
+    'noResultsBody': 'Nothing matched “{query}”. Try a reference, an agency, or a date.',
+    'clearSearch': 'Clear search',
+    'storageWarning':
+        'We couldn’t save this receipt yet. Keep the transaction reference until it appears.',
+    'loadMore': 'Load more',
+    'receiptDetailTitle': 'Receipt',
+    'receiptPayeeLabel': 'Payee',
+    'receiptAmountLabel': 'Amount',
+    'receiptReferenceLabel': 'Reference',
+    'receiptDateLabel': 'Date',
+    'receiptOfficialIdLabel': 'Official receipt number',
+    'receiptVerifiedLine': 'Checked and confirmed against the source.',
+    'receiptUnverifiedLine': 'We couldn’t confirm this against the source.',
+    'receiptAwaitingLine': 'We’re still checking this with the source.',
+    'receiptStatusLabel': 'Receipt status',
+    'shareReceipt': 'Share receipt',
+    'exportReceipt': 'Export as document',
+    'raiseDispute': 'Raise a dispute',
+    'receiptNotFound': 'This receipt couldn’t be found.',
+    'receiptShareReady': 'Receipt is ready to share.',
+    'receiptExportReady': 'Receipt document is ready.',
+    'receiptDocumentPending':
+        'The official document isn’t ready yet. Try again shortly.',
+    'receiptDocumentFailed': 'We couldn’t prepare the document.',
+    'kindOfficialReceipt': 'Official receipt',
+    'kindBillerConfirmation': 'Biller confirmation',
+    'kindToken': 'Token',
+    'caseTitle': 'Case',
+    'caseStatePending': 'Pending',
+    'caseStateReconciling': 'Reconciling',
+    'caseStateRefundInitiated': 'Refund started',
+    'caseStartRefund': 'Start a refund',
+    'caseStateAwaitingBiller': 'Waiting on the biller',
+    'caseStateEscalated': 'Escalated',
+    'caseStateResolved': 'Resolved',
+    'caseLastUpdate': 'Last updated {date}',
+    'caseExpectedWindow': 'Expected resolution',
+    'caseExpectedWindowValue': 'Within 3 working days',
+    'caseTimelineTitle': 'What’s happened',
+    'caseContactSupport': 'Contact support',
+    'caseViewReceipt': 'View the receipt',
+    'caseNotFound': 'This case couldn’t be found.',
+    'caseOffline':
+        'You’re offline. This is the last known state; we’ll update it when you reconnect.',
+    'caseRefundBlocked':
+        'A refund for this reference is already in progress, so we didn’t send a second one.',
+    'caseRefundSubmitted': 'Refund started. We’ll keep this case updated.',
+    'caseSupportBody':
+        'Quote your case reference so support can pick it up straight away.',
+    'caseReferenceLabel': 'Case reference',
+    'caseTypeFailedNoDelivery': 'Debited, not delivered',
+    'caseTypeDisputed': 'Disputed',
+    'caseTypeRefund': 'Refund',
+    'caseTypeReceiptMissing': 'Receipt missing',
+    'caseOpenedLabel': 'Opened {date}',
+    'caseActorSystem': 'Sabi',
+    'caseActorUser': 'You',
+    'caseActorRail': 'Payment rail',
+    'caseActorProvider': 'Provider',
     'confirmTitle': 'Confirm',
     'amount': 'Amount',
     'payee': 'Payee',
@@ -360,6 +496,23 @@ class SabStrings {
     'linkChannel': 'Link',
     'channelNotLinked': 'Never link',
     'channelLinked': 'Don link',
+    'receiptsEmptyAction': 'Make a payment',
+    'searchReceiptsHint': 'Find by reference, agency, or date',
+    'searchReceiptsLabel': 'Find receipt',
+    'noResultsTitle': 'Nothing match',
+    'clearSearch': 'Clear am',
+    'loadMore': 'Load more',
+    'shareReceipt': 'Share receipt',
+    'exportReceipt': 'Export am',
+    'caseStatePending': 'Dey wait',
+    'caseStateReconciling': 'Dey check am',
+    'caseStateRefundInitiated': 'Refund don start',
+    'caseStateAwaitingBiller': 'Dey wait for biller',
+    'caseStateEscalated': 'Don escalate',
+    'caseStateResolved': 'Don resolve',
+    'caseContactSupport': 'Contact support',
+    'caseViewReceipt': 'See the receipt',
+    'caseOffline': 'You no get network. This na the last state we sabi.',
     'fallbackNote':
         'Some words still dey English while we finish this language.',
   };

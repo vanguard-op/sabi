@@ -118,7 +118,7 @@ Errors: 401 (unauthenticated), 403 (role or MFA missing), 404 (unknown capabilit
 
 ## Phase 2: The payment loop
 
-Planned and frozen; none implemented. Numbering continues from C-016. Amounts are integer minor units
+Numbering continues from C-016. Amounts are integer minor units
 (kobo). Money movements require an `Idempotency-Key` header.
 
 ### C-017: POST /v1/payments/authorise
@@ -144,28 +144,28 @@ Errors: 401 (unauthenticated), 429 (rate limited)
 PaymentSummary: paymentId: string, serviceId: string, amount: integer, currency: string, payee: string, status: string, channel: string, createdAt: string, updatedAt: string
 
 ### C-020: POST /v1/identity/verifications
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: method: string (nin|bvn), identifier: string
 Response 202: verificationId: string, status: string (pending|verified|failed|corrected)
 Errors: 400 (invalid identifier), 401 (unauthenticated), 409 (verification already in progress)
 
 ### C-021: GET /v1/identity/verifications/{verificationId}
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: verificationId: string, method: string, status: string, reason: string|null, verifiedAt: string|null
 Errors: 401 (unauthenticated), 404 (unknown verification)
 
 ### C-022: GET /v1/account/verification
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: kycStatus: string (unverified|pending|verified|rejected), method: string|null, canCorrect: boolean
 Errors: 401 (unauthenticated)
 
 ### C-023: GET /v1/receipts
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: q: string|null, cursor: string|null, limit: integer (default 20)
 Response 200: receipts: ReceiptSummary[], nextCursor: string|null
@@ -173,21 +173,21 @@ Errors: 401 (unauthenticated), 429 (rate limited)
 ReceiptSummary: receiptId: string, paymentId: string, reference: string, payee: string, amount: integer, currency: string, kind: string (official_e_receipt|biller_confirmation|token), status: string, issuedAt: string|null
 
 ### C-024: GET /v1/receipts/{receiptId}
-Status: Frozen
+Status: Implemented (revision 2)
 Auth: Session cookie (authenticated account owner)
 Request: —
-Response 200: receipt: Receipt, payment: PaymentSummary
+Response 200: receipt: Receipt (includes unverifiedReason: string|null), payment: PaymentSummary
 Errors: 401 (unauthenticated), 404 (unknown receipt)
 
 ### C-025: GET /v1/receipts/{receiptId}/document
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: documentRef: string, contentType: string, shareToken: string|null
 Errors: 401 (unauthenticated), 404 (unknown receipt), 409 (receipt awaiting the source document)
 
 ### C-026: GET /v1/cases
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: cursor: string|null, limit: integer (default 20), status: string|null
 Response 200: cases: CaseSummary[], nextCursor: string|null
@@ -195,35 +195,35 @@ Errors: 401 (unauthenticated), 429 (rate limited)
 CaseSummary: caseId: string, paymentId: string, type: string (failed_no_delivery|disputed|refund|receipt_missing), status: string (open|awaiting_provider|resolved|escalated|closed), openedAt: string, updatedAt: string
 
 ### C-027: GET /v1/cases/{caseId}
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: case: PaymentCase, payment: PaymentSummary, timeline: PaymentEvent[]
 Errors: 401 (unauthenticated), 404 (unknown case)
 
 ### C-028: POST /v1/cases/{caseId}/dispute
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: reason: string
 Response 201: caseId: string, status: string, openedAt: string
 Errors: 401 (unauthenticated), 404 (unknown case), 409 (a dispute already exists for this payment)
 
 ### C-029: POST /v1/payments/{paymentId}/refund
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: reason: string, Idempotency-Key header
 Response 202: paymentId: string, status: string (reversed|refunded), refundReference: string|null
-Errors: 401 (unauthenticated), 404 (unknown payment), 409 (duplicate refund for the reference), 422 (payment not refundable in its current state)
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (duplicate refund for the reference), 422 (payment not refundable in its current state), 503 (the rail did not settle the refund; retryable)
 
 ### C-030: POST /v1/payments/federal/prepare
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: serviceId: string, payerReference: string|null
 Response 200: serviceId: string, collectingBody: string, amount: integer|null, currency: string, requiresReference: boolean, instructions: string|null
 Errors: 400 (invalid service), 401 (unauthenticated), 409 (agency collection account changed; re-resolve), 422 (service not a federal collection)
 
 ### C-031: GET /v1/payments/federal/{paymentId}/receipt
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 202: status: string (awaiting_receipt), retryAfterSeconds: integer
@@ -231,51 +231,99 @@ Response 200: receiptId: string, receiptNumber: string, verificationStatus: stri
 Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment did not succeed)
 
 ### C-032: POST /v1/payments/federal/{paymentId}/reconcile
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: reason: string
 Response 202: caseId: string, status: string
 Errors: 401 (unauthenticated), 404 (unknown payment), 409 (reconciliation case already open)
 
 ### C-033: POST /v1/payments/bills/validate
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: serviceId: string, recipientIdentifier: string, amount: integer|null
-Response 200: valid: boolean, recipientIdentifier: string, knownAmount: integer|null, currency: string, range: object|null, reason: string|null
+Response 200: valid: boolean, recipientIdentifier: string, knownAmount: integer|null, currency: string, range: object|null (minimum: integer, maximum: integer; minor units), reason: string|null
 Errors: 400 (invalid identifier), 401 (unauthenticated), 404 (unknown service), 503 (biller offline; payment prevented)
 
 ### C-034: POST /v1/payments/bills
-Status: Frozen
+Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: serviceId: string, recipientIdentifier: string, amount: integer, currency: string (NGN), Idempotency-Key header
 Response 201: paymentId: string, status: string, token: string|null, receiptId: string|null
 Errors: 400 (invalid input), 401 (unauthenticated), 402 (insufficient funds), 409 (duplicate authorisation), 503 (biller offline)
 
 ### C-035: GET /v1/payments/bills/{paymentId}/token
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: token: string, receiptId: string
 Response 202: status: string (awaiting_token), retryAfterSeconds: integer
-Errors: 401 (unauthenticated), 404 (unknown payment)
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment failed; the shared error envelope's details carry status: "failed" and reason: string|null)
 
 ### C-036: POST /v1/channels/ussd/session
-Status: Frozen
+Status: Implemented
 Auth: Channel identity (MSISDN session, no app session)
 Request: sessionId: string, msisdn: string, input: string|null, step: string|null
 Response 200: prompt: string, step: string, done: boolean
 Errors: 400 (invalid session input), 409 (session already open elsewhere), 410 (session timed out; pending payment resumable)
 
 ### C-037: POST /v1/channels/ussd/authorise
-Status: Frozen
+Status: Implemented
 Auth: Channel identity (MSISDN session)
 Request: sessionId: string, confirmation: string, Idempotency-Key header
 Response 200: status: string (succeeded|pending|failed), reference: string|null
 Errors: 400 (invalid confirmation), 409 (duplicate authorisation), 410 (session timed out after authorisation; payment pending)
 
 ### C-038: GET /v1/channels/sms/status/{reference}
-Status: Frozen
-Auth: Channel identity (MSISDN session)
-Request: —
+Status: Frozen (revision 2)
+Auth: Channel identity, resolved server-side from the aggregator session or delivery report. The subscriber number is never taken from a client-supplied header: an inbound header is spoofable, so C-038 accepts the MSISDN-bound session established by C-036/C-037 or the aggregator's signed callback context, and an unrecognised caller gets 404.
+Request: sessionId: string|null (the MSISDN-bound session from C-036/C-037, when the caller holds one)
 Response 200: reference: string, status: string (queued|sent|delivered|failed), token: string|null
-Errors: 404 (unknown reference)
+Errors: 404 (unknown reference, or no bound session for the caller)
+
+## Phase 1.5: Operations Console
+
+Implemented. Numbering continues from C-038. These are the staff-auth and audit-read surfaces
+specified in `docs/Sabi/operations-console.md`.
+
+### C-039: POST /v1/staff/auth/login
+Status: Implemented
+Auth: None (public staff login; distinct from the end-user passkey flow)
+Request: email: string, password: string, totp: string
+Response 200: session: HttpOnly Secure SameSite cookie, staff: object (staffId: string, email: string, role: string), mustEnrolMfa: boolean
+Errors: 400 (invalid input), 401 (invalid credentials or TOTP), 403 (role not permitted), 423 (account locked after repeated failures), 429 (rate limited)
+
+### C-040: POST /v1/staff/auth/logout
+Status: Implemented
+Auth: Staff session cookie
+Request: —
+Response 204: —
+Errors: 401 (unauthenticated)
+
+### C-044: GET /v1/staff/auth/session
+Status: Implemented
+Auth: Staff session cookie (MFA-verified operator session)
+Request: —
+Response 200: staff: object (staffId: string, email: string, role: string)
+Errors: 401 (no live operator session, or the account no longer exists)
+
+### C-041: GET /v1/staff/audit
+Status: Implemented
+Auth: Staff session cookie + MFA, role compliance_privacy_officer or administrator
+Request: actor: string|null, role: string|null, target: string|null, action: string|null, from: string|null, to: string|null, cursor: string|null, limit: integer (default 20)
+Response 200: entries: AuditEntry[], nextCursor: string|null
+Errors: 401 (unauthenticated), 403 (role or MFA missing), 429 (rate limited)
+AuditEntry: auditId: string, actor: string, role: string, target: string, action: string, reason: string|null, occurredAt: string
+
+### C-042: POST /v1/staff/audit/findings/{findingsId}/close
+Status: Implemented
+Auth: Staff session cookie + MFA, role compliance_privacy_officer
+Request: resolution: string
+Response 200: findingsId: string, status: string (closed), closedAt: string
+Errors: 401 (unauthenticated), 403 (role or MFA missing), 404 (unknown finding), 409 (finding already closed)
+
+### C-043: POST /v1/staff/audit/export
+Status: Implemented
+Auth: Staff session cookie + MFA, role compliance_privacy_officer
+Request: from: string, to: string, format: string (csv|json)
+Response 202: exportId: string, status: string (queued)
+Errors: 401 (unauthenticated), 403 (role or MFA missing), 422 (range too large)

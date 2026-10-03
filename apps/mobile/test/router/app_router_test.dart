@@ -6,6 +6,7 @@ import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/features/account/account_screen.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
+import 'package:sabi_mobile/features/payment/payment_confirmation_screen.dart';
 import 'package:sabi_mobile/features/receipts/receipts_screen.dart';
 import 'package:sabi_mobile/features/welcome/welcome_screen.dart';
 import 'package:sabi_mobile/router/app_router.dart';
@@ -99,8 +100,9 @@ void main() {
     await tester.pumpAndSettle();
     containerOf(tester).read(routerProvider).go('/pay/svc_lagos_land_use');
     await tester.pumpAndSettle();
+    // The payment surface now renders above the shell rather than the gated
+    // placeholder, so the task-first push stays shell-free.
     expect(find.byType(BottomNavigationBar), findsNothing);
-    expect(find.text('Coming soon'), findsOneWidget);
-    expect(find.text('This part of Sabi isn’t available yet.'), findsOneWidget);
+    expect(find.byType(PaymentConfirmationScreen), findsOneWidget);
   });
 }

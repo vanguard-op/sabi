@@ -36,11 +36,47 @@ API_CONTRACT_PATHS = {
     "/v1/capabilities/{capabilityId}/review",
 }
 
+# The Phase 2 payment loop, all reached through the gateway. The payment
+# operations (C-017..C-019, C-029) are forwarded to the isolated payment module;
+# the rest are owned by the assembled API service.
+PHASE2_CONTRACT_PATHS = {
+    "/v1/payments/authorise",
+    "/v1/payments/{paymentId}/execute",
+    "/v1/payments",
+    "/v1/payments/{paymentId}/refund",
+    "/v1/identity/verifications",
+    "/v1/identity/verifications/{verificationId}",
+    "/v1/account/verification",
+    "/v1/receipts",
+    "/v1/receipts/{receiptId}",
+    "/v1/receipts/{receiptId}/document",
+    "/v1/cases",
+    "/v1/cases/{caseId}",
+    "/v1/cases/{caseId}/dispute",
+    "/v1/payments/federal/prepare",
+    "/v1/payments/federal/{paymentId}/receipt",
+    "/v1/payments/federal/{paymentId}/reconcile",
+    "/v1/payments/bills/validate",
+    "/v1/payments/bills",
+    "/v1/payments/bills/{paymentId}/token",
+    "/v1/channels/ussd/session",
+    "/v1/channels/ussd/authorise",
+    "/v1/channels/sms/status/{reference}",
+}
+
 
 def test_api_service_mounts_every_owned_contract_path(api_app) -> None:
     paths = set(api_app.openapi()["paths"])
     missing = API_CONTRACT_PATHS - paths
     assert not missing, f"API service is missing contract paths: {sorted(missing)}"
+
+
+def test_api_service_mounts_every_phase2_contract_path(api_app) -> None:
+    """The whole payment-loop contract set is mounted on the assembled service."""
+
+    paths = set(api_app.openapi()["paths"])
+    missing = PHASE2_CONTRACT_PATHS - paths
+    assert not missing, f"API service is missing Phase 2 contract paths: {sorted(missing)}"
 
 
 def test_unauthenticated_requests_use_the_shared_error_envelope(api_client) -> None:

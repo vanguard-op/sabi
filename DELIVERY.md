@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `e69b928`. 14 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `47fc660`. 14 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
@@ -13,7 +13,7 @@ risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; t
 | lead | DELIVERY.md, CONTRACTS.md, ASSETS.md, .delivery/**, packages/contracts/** | docs/** |
 | infra-engineer | infra/**, .github/**, docker-compose*.yml, Makefile, root config, .gitignore | docs/**, packages/contracts/** |
 | backend-engineer | services/api/**, services/payments/**, migrations/** | packages/contracts/**, docs/** |
-| frontend-engineer | apps/mobile/** | packages/contracts/**, docs/** |
+| frontend-engineer | apps/mobile/**, apps/console/** | packages/contracts/**, docs/** |
 | ai-engineer | services/ai/** | packages/contracts/**, docs/** |
 | visual-artist | assets/** | docs/** |
 | qa-engineer | tests/** | packages/contracts/**, docs/** |
@@ -25,11 +25,11 @@ concurrent tasks within an owner use the subdirectories named in their route.
 
 | Layer | Choice |
 |---|---|
-| Client | Flutter (Dart), Android + iOS, go_router, Riverpod, Dio, freezed/json_serializable, passkeys |
+| Client | Flutter (Dart), Android + iOS, go_router, Riverpod, `http`, hand-written JSON models, `passkeys` plugin (Corbado) for the WebAuthn ceremony |
 | Backend | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, Uvicorn |
 | Auth | Self-hosted WebAuthn (py_webauthn), Argon2id recovery secrets, session cookies |
 | Data | PostgreSQL 16 + pgvector (primary, isolated payment store, full-text search, retrieval) |
-| AI | Google Gemini 3.1 Pro (primary; exact provider ID pinned at Foundation); Gemini flash path for high-volume intent; google-genai SDK; evaluation harness |
+| AI | Gemini `gemini-3.1-pro-preview` (primary) and `gemini-3.1-flash-lite` (high-volume intent, D-026); google-genai SDK; evaluation harness |
 | Infrastructure | Docker Compose (dev), GitHub Actions (CI), Terraform (IaC) |
 | Hosting | AWS af-south-1 (Cape Town) — nearest managed Africa region to the Nigeria-primary intent; NDPA transfer assessment required |
 
@@ -49,7 +49,7 @@ docs/                 source of truth (git submodule)
 
 ## Contracts
 
-`CONTRACTS.md` — C-001 to C-016 frozen for Phase 1.
+`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044).
 
 ## Token map
 
@@ -85,7 +85,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 - No secrets in code or logs; configuration from a secret store.
 - Commit messages cite durable IDs (FEAT-###, C-###), never task IDs or `.delivery/` paths.
 - Branching: from Phase 1 feature work onward, engineers commit to `dev`; the lead merges `dev` into `main` at each phase gate.
-- Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix.
+- Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix. A nested module registers its dotted name in `MODULE_NAMES` (e.g. `identity.verification`).
 - AI feature modules are auto-discovered: expose `router: APIRouter` at `<feature>/router.py` (packages `intent`, `ranking`, `composition`) and declare paths without the `/v1` prefix.
 
 ## Behavior rules
@@ -105,41 +105,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022 |
-
-### Phase 1: Foundations
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-026 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
-| T-027 | FEAT-001 | frontend-engineer | Done | — |
-| T-028 | FEAT-003, FEAT-004, FEAT-011 | frontend-engineer | Done | C-009, C-010 |
-| T-029 | — | frontend-engineer | Done | — |
-| T-045 | — | visual-artist | Done | — |
-
-### Phase 2: The payment loop
-
-Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.md` route on disk and a frozen contract. Board status is the gate: no engineer starts until the status moves off `Backlog`, which waits on the dependencies below.
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-030 | FEAT-005 | backend-engineer | Backlog | C-017–C-019 |
-| T-031 | FEAT-002 | backend-engineer | Backlog | C-020–C-022 |
-| T-032 | FEAT-008 | backend-engineer | Backlog | C-023–C-025 |
-| T-033 | FEAT-009 | backend-engineer | Backlog | C-026–C-029 |
-| T-034 | FEAT-006 | backend-engineer | Backlog | C-030–C-032 |
-| T-035 | FEAT-007 | backend-engineer | Backlog | C-033–C-035 |
-| T-036 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
-| T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Backlog | C-017–C-019, C-030–C-035 |
-| T-038 | FEAT-008, FEAT-009 | frontend-engineer | Backlog | C-023–C-029 |
-| T-039 | FEAT-002 | frontend-engineer | Backlog | C-020–C-022 |
-| T-040 | FEAT-005, FEAT-009 | ai-engineer | Backlog | C-017, C-026–C-029 |
-| T-041 | FEAT-005 | backend-engineer | Backlog | C-017 |
-| T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Backlog | C-026–C-035 |
-| T-043 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
-| T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
-
-Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
+| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console |
+| Phase 2: The payment loop | 2026-10-03 | C-017–C-038 implemented and conformant (C-035 at revision 1); FEAT-002/005/006/007/008/009/010 accepted; QA gate passed on API 53 + AI 16 + mobile 255 integration tests with both services booting; MQ-001–MQ-003 live bars deferred under D-022 |
 
 ## Decisions log
 
@@ -172,6 +139,10 @@ Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2
 | D-025 | branding.md gains a Desktop and Staff Console Token Set; the console inherits the brand grammar and adds only desktop density, breakpoint, table, form, interaction, and shell tokens | Gives the Phase 1 console a sanctioned styling authority instead of ad-hoc reuse of the mobile tokens, while keeping it recognisably Sabi and bounded to what the Phase 1 views need | user |
 | D-026 | The default high-volume model path moves from `gemini-3-flash-preview` to `gemini-3.1-flash-lite`; list prices refreshed to the published rates | The flash-lite tier is stable rather than preview, cheaper ($0.25/$1.50 vs $0.50/$3.00 per million), and removes preview deprecation exposure from the default build | user |
 | D-027 | Payment features proceed against mock and sandbox rails with contracts C-017–C-038 frozen as written, swapped for the licensed partner later | Unblocks Phase 2 while D1–D3 remain unsecured; the isolated payment module and its port keep the rail swappable without touching callers | user |
+| D-028 | The client passkey ceremony uses the `passkeys` plugin (Corbado) | Verified publisher, Android + iOS, and explicit custom relying-party-server support matching the self-hosted py_webauthn backend; a hand-rolled platform channel is avoided | user |
+| D-029 | C-035 gains a failed-payment branch (`409` with the shared error envelope's `details` carrying `status: failed, reason`) and C-033's `range` is documented as `{minimum, maximum}` minor units | A failed bill has no token and must not poll `awaiting_token` forever; the 409 mirrors C-031's handling of a payment that did not succeed and keeps the repo's one error envelope. Both sides re-dispatched | lead |
+| D-030 | FEAT-008's "every completed payment" scope is the proof-bearing flows (federal C-031, bill C-034), not raw C-017/C-018 authorise-and-execute | `Receipt.kind` enumerates only `official_e_receipt`, `biller_confirmation`, `token`, so only the federal and bill flows carry a receipt; the generic loop has no proof to store. QA's gate observation is answered by the schema, no new capture work | lead |
+| D-031 | docs/Sabi/model-quality.md re-pinned to `gemini-3.1-flash-lite` (docs commit `770008f`) and the parent submodule pointer bumped in the same commit | The docs still named the preview flash model against D-026 and the implementation, which failed the phase gate on a stale assertion | lead |
 
 ## Definition of Done
 

@@ -194,6 +194,9 @@ class Receipt(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     receipt_number: Mapped[str | None] = mapped_column(String(128))
     verification_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    # Plain reason the receipt is unverified; null when verified or pending
+    # (schema.md, Receipt.unverifiedReason; FEAT-008).
+    unverified_reason: Mapped[str | None] = mapped_column(String(512))
     document_ref: Mapped[str] = mapped_column(String(512), nullable=False)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -332,3 +335,13 @@ class AuditLogRecord(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     entry_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+
+
+# --- Module-owned entities -------------------------------------------------------
+# Entities that live beside their domain module rather than in this file. They must
+# be imported here (or in migrations/*/env.py) so they register on ``Base.metadata``:
+# without this, an Alembic autogenerate run does not see their tables and a future
+# migration can silently drop them.
+from app.audit.models import AuditExport, ComplianceFinding  # noqa: E402,F401
+from app.federal.models import FederalCollection  # noqa: E402,F401
+from app.staff.models import StaffAccount  # noqa: E402,F401

@@ -28,7 +28,16 @@ def operator_has_access(
     session: SessionData,
     allowed_roles: Iterable[OperatorRole | str],
 ) -> bool:
-    """True only for an MFA-verified operator holding one of the given roles."""
+    """True only for an MFA-verified operator holding one of the given roles.
+
+    The administrator reaches every operator *surface* (operations.md, "Operator
+    roles and access control": "All operator surfaces and role assignments"), so
+    a read-only surface grant includes the role. It is not a blanket super-role:
+    operations-console.md scopes specific actions to a named role, such as the
+    audit export and finding close, which stay with the compliance and privacy
+    officer. Call sites therefore list the administrator explicitly where a
+    surface is admin-reachable and omit it where the action is role-scoped.
+    """
     if session.kind is not SessionKind.OPERATOR or not session.mfa_verified:
         return False
     allowed = {str(role) for role in allowed_roles}
