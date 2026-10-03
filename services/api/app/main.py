@@ -29,7 +29,7 @@ from app.core.rate_limit import (
 from app.core.sessions import InMemorySessionStore, RedisSessionStore, SessionManager
 from app.db.audit import DatabaseAuditLog
 from app.db.session import build_session_factory
-from app.payments.client import build_payment_client
+from app.payments.client import HttpPaymentModuleRefundPort, build_payment_client
 
 logger = logging.getLogger("sabi.app")
 
@@ -126,6 +126,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.audit_log = _build_audit_log(session_factory)
     app.state.agent_ai_client = build_agent_client()
     app.state.payment_module_client = build_payment_client(settings)
+    # The case workflow's refund boundary now resolves to the isolated payment
+    # module over the same hop the gateway's payment endpoints use (C-029).
+    app.state.cases_refund_port = HttpPaymentModuleRefundPort(app.state.payment_module_client)
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(CorrelationIdMiddleware)

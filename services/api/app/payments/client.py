@@ -14,10 +14,17 @@ behind this hop, so trusted context travels as headers, never in the client body
 - ``X-Sabi-Authorisation-Limit``: the user's set limit in kobo, when the gateway
   knows one. Absent means the module applies its configured default (FEAT-005).
 
+The gateway also forwards a refund (C-029) through the same hop. A refund acts on
+a payment the module already holds, so its context carries only the account owner;
+the module's refund body travels back unchanged. The port the case workflow
+consumes is :class:`HttpPaymentModuleRefundPort`, which adapts a module response
+to the cross-store ``RefundView``.
+
 The upstream module returns the same shared error envelope the API uses, so an
 upstream 4xx is re-raised with its code, message, and details intact. The details
 matter for C-017: an upstream 409 carries the existing ``paymentId`` and
-``railReference`` so a duplicate authorisation resolves to the first payment.
+``railReference`` so a duplicate authorisation resolves to the first payment. The
+same pass-through covers C-029's duplicate-refund 409.
 
 A transport failure, a timeout, or an unexpected status means the module cannot
 be reached at all; that is reported as ``payment_unavailable`` (503) rather than
@@ -35,6 +42,7 @@ from typing import Any, Protocol, runtime_checkable
 import httpx
 
 from app.core.errors import APIError, ErrorCode
+from app.payments_port import RefundView
 
 logger = logging.getLogger("sabi.payments")
 
@@ -105,7 +113,7 @@ class ForwardContext:
 
 @runtime_checkable
 class PaymentModuleClient(Protocol):
-    """The three payment operations the gateway forwards (C-017..C-019)."""
+    """The payment operations the gateway forwards (C-017..C-019, C-029)."""
 
     def authorise(
         self, *, context: ForwardContext, body: dict[str, Any], idempotency_key: str | None
@@ -122,6 +130,15 @@ class PaymentModuleClient(Protocol):
 
     def list_payments(
         self, *, context: ForwardContext, cursor: str | None, limit: int, status: str | None
+    ) -> dict[str, Any]: ...
+
+    def refund(
+        self,
+        *,
+        context: ForwardContext,
+        payment_id: str,
+        body: dict[str, Any],
+        idempotency_key: str,
     ) -> dict[str, Any]: ...
 
 
@@ -166,6 +183,18 @@ class HttpPaymentModuleClient:
         if status:
             params["status"] = status
         return self._get("/v1/payments", params=params, headers=self._headers(context))
+
+    def refund(
+        self,
+        *,
+        context: ForwardContext,
+        payment_id: str,
+        body: dict[str, Any],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        headers = self._headers(context)
+        headers["Idempotency-Key"] = idempotency_key
+        return self._post(f"/v1/payments/{payment_id}/refund", json=body, headers=headers)
 
     @staticmethod
     def _headers(context: ForwardContext) -> dict[str, str]:
@@ -259,3 +288,42 @@ def _upstream_error(response: httpx.Response) -> APIError:
 
 def build_payment_client(settings: Any) -> HttpPaymentModuleClient:
     return HttpPaymentModuleClient(PaymentEndpoint.from_settings(settings))
+
+
+class HttpPaymentModuleRefundPort:
+    """The case workflow's refund boundary, backed by the payment module hop.
+
+    The case service consumes the cross-store :class:`RefundPort`; this adapter
+    forwards to the module's C-029 endpoint through the same client the gateway
+    uses, so a refund and a gateway-originated call share one hop and one
+    transport. The owner is the only trusted context a refund needs, and the
+    idempotency key travels as the contract header. The module's body supplies
+    the status and reference; a payload without a usable status is treated as an
+    unreachable module, never fabricated into a settled refund.
+    """
+
+    def __init__(self, client: PaymentModuleClient) -> None:
+        self._client = client
+
+    def refund(
+        self,
+        *,
+        user_id: str,
+        payment_id: str,
+        reason: str,
+        idempotency_key: str,
+    ) -> RefundView:
+        payload = self._client.refund(
+            context=ForwardContext(user_id=user_id),
+            payment_id=payment_id,
+            body={"reason": reason},
+            idempotency_key=idempotency_key,
+        )
+        status = payload.get("status")
+        if not isinstance(status, str) or not status:
+            raise PaymentModuleUnavailable()
+        reference = payload.get("refundReference")
+        return RefundView(
+            status=status,
+            refund_reference=reference if isinstance(reference, str) and reference else None,
+        )
