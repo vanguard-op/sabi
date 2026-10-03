@@ -1,1 +1,6 @@
 #include "Generated.xcconfig"
+
+// Passkey relying party id, expanded into the associated-domain entitlement on
+// Runner.entitlements. Must equal the backend's `webauthn_rp_id`. Replace
+// `localhost` with the production RP domain before a store build.
+WEBAUTHN_RP_ID=localhost

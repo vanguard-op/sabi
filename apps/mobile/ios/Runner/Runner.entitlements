@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Passkey relying party (FEAT-001, D-004, D-028).
+
+	     The value is the backend's `webauthn_rp_id`, injected as the
+	     WEBAUTHN_RP_ID build setting in Flutter/Debug.xcconfig and
+	     Flutter/Release.xcconfig. It must name the exact domain the relying
+	     party serves: an RP ID that does not match the app's associated domain
+	     makes every ceremony fail with a domain-not-associated error.
+
+	     The RP host must also serve
+	     https://<webauthn_rp_id>/.well-known/apple-app-site-association with
+	     `webcredentials.apps` listing <TeamID>.ng.sabi.sabiMobile. Debug adds
+	     `?mode=developer` so an unverified localhost domain works on the
+	     simulator; release builds must point at the real RP domain. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:$(WEBAUTHN_RP_ID)</string>
+	</array>
+</dict>
+</plist>

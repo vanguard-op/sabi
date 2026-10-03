@@ -1,1 +1,7 @@
 #include "Generated.xcconfig"
+
+// Passkey relying party id, expanded into the associated-domain entitlement on
+// Runner.entitlements. Must equal the backend's `webauthn_rp_id` (default
+// localhost). Developer mode lets the simulator associate an unverified
+// domain; release builds must use the real RP domain served with an AASA file.
+WEBAUTHN_RP_ID=localhost?mode=developer
