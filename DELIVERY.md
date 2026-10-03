@@ -85,7 +85,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 - No secrets in code or logs; configuration from a secret store.
 - Commit messages cite durable IDs (FEAT-###, C-###), never task IDs or `.delivery/` paths.
 - Branching: from Phase 1 feature work onward, engineers commit to `dev`; the lead merges `dev` into `main` at each phase gate.
-- Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix.
+- Backend domain modules are auto-discovered: expose `router: APIRouter` at `app/<module>/router.py` and declare paths without the `/v1` prefix. A nested module registers its dotted name in `MODULE_NAMES` (e.g. `identity.verification`).
 - AI feature modules are auto-discovered: expose `router: APIRouter` at `<feature>/router.py` (packages `intent`, `ranking`, `composition`) and declare paths without the `/v1` prefix.
 
 ## Behavior rules
@@ -105,17 +105,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022 |
-
-### Phase 1: Foundations
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-026 | FEAT-001, FEAT-004, FEAT-011 | frontend-engineer | Done | — |
-| T-027 | FEAT-001 | frontend-engineer | Done | — |
-| T-028 | FEAT-003, FEAT-004, FEAT-011 | frontend-engineer | Done | C-009, C-010 |
-| T-029 | — | frontend-engineer | Done | — |
-| T-045 | — | visual-artist | Done | — |
+| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026 (system bars), T-027 (recovery checkbox), T-028 (conversation persistence), T-029 (native icon and splash), T-045 (transparent brand mark) verified and merged |
 
 ### Phase 2: The payment loop
 
