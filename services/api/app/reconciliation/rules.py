@@ -140,9 +140,7 @@ def correlate(
         # A federal deduction or wrong account is escalated on the spot; a
         # domestic amount disagreement waits on the provider.
         escalate = payment.federal
-        exceptions.append(
-            _exception(payment, ExceptionType.DISPUTED, reason, escalate=escalate)
-        )
+        exceptions.append(_exception(payment, ExceptionType.DISPUTED, reason, escalate=escalate))
 
     # A statement line Sabi has no payment for: a missing stored receipt when a
     # receipt source supplies it, otherwise an unrecognised collection.

@@ -29,12 +29,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.cases import repository as cases_repository
-from app.cases.ports import PaymentLookup, RefundPort
 from app.cases.schemas import SUPPORT_OPERATIONS_ROLE
 from app.cases.service import REFUNDABLE_PAYMENT_STATES, TERMINAL_REFUND_STATES
 from app.core.audit import AuditLog
 from app.core.time import utcnow
 from app.db.models import PaymentCase
+from app.payments_port import PaymentLookup, RefundPort
 from app.reconciliation.ports import Notifier, NullNotifier
 
 REFUND_JOB_ACTOR = "system:reconciliation"
