@@ -22,13 +22,14 @@ Identity is personal data: an MSISDN is never logged or echoed back in a prompt.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
 from fastapi import Request
 
-from app.core.errors import APIError, ErrorCode
+from app.channels.sessions import InMemoryUssdSessionStore, UssdSessionStore
+from app.core.errors import APIError
 
 # A channel capability that is present but whose backing dependency is absent is
 # a system condition, reported like the payment store boundary does.
@@ -173,6 +174,10 @@ class InMemoryChannelPaymentPort:
         self._by_key: dict[str, PaymentOutcome] = {}
         self._pending: dict[tuple[str, str], PaymentOutcome] = {}
 
+    def set_outcome(self, outcome: PaymentOutcome) -> None:
+        """Set the outcome returned by the next authorisation."""
+        self._outcome = outcome
+
     def set_pending(self, *, user_id: str, msisdn: str, outcome: PaymentOutcome | None) -> None:
         """Record (or clear) a pending payment for the account and channel."""
         key = (user_id, msisdn)
@@ -259,6 +264,25 @@ def get_sms_delivery(request: Request) -> SmsDeliveryPort:
     return port
 
 
+def get_ussd_session_store(request: Request) -> UssdSessionStore:
+    """Return the session store, falling back to a process-local one.
+
+    A deployment binds a shared store on ``app.state.channels_sessions`` so a
+    session survives more than one worker; the fallback keeps the monolith
+    booting before that wiring lands, exactly as the other ports do.
+    """
+
+    store = getattr(request.app.state, "channels_sessions", None)
+    if store is None:
+        return _FALLBACK_SESSION_STORE
+    return store
+
+
+# One process-local store for the fallback so a session opened in one request is
+# visible to the next; the per-request getter would otherwise drop it.
+_FALLBACK_SESSION_STORE = InMemoryUssdSessionStore()
+
+
 __all__ = [
     "CHANNEL_UNAVAILABLE",
     "ChannelIdentity",
@@ -276,4 +300,5 @@ __all__ = [
     "get_channel_identity",
     "get_channel_payments",
     "get_sms_delivery",
+    "get_ussd_session_store",
 ]

@@ -27,11 +27,8 @@ from datetime import datetime, timedelta
 from typing import Protocol
 
 from app.channels.schemas import (
-    STEP_CONFIRM,
-    STEP_DETAILS,
     STEP_MENU,
     STEP_RESULT,
-    STEP_SERVICE,
 )
 from app.core.ids import new_id
 from app.core.time import utcnow
@@ -132,7 +129,6 @@ def resume_session(
     (FEAT-010, alternate path B).
     """
 
-    now = clock()
     resumed = open_session(
         session_id=session_id,
         msisdn=previous.msisdn,
@@ -159,7 +155,12 @@ def is_expired(session: UssdSession, *, clock: Callable[[], datetime] = utcnow) 
     return session.expires_at <= clock()
 
 
-def touch(session: UssdSession, *, timeout_seconds: int, clock: Callable[[], datetime] = utcnow) -> None:
+def touch(
+    session: UssdSession,
+    *,
+    timeout_seconds: int,
+    clock: Callable[[], datetime] = utcnow,
+) -> None:
     """Extend the session on activity without exceeding one lifetime from open."""
 
     now = clock()
