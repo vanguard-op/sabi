@@ -24,7 +24,7 @@ former per-slot `.riv` copies have been removed; nothing is duplicated per slot.
 
 | Slot | Ledger file | Delivered | Rive artboard |
 |---|---|---|---|
-| A-001 | `assets/sabi.riv` (artboard) | `assets/sabi.riv` + `brand-mark/master.png` | `BrandMark` |
+| A-001 | `assets/sabi.riv` (artboard) | `assets/sabi.riv` + `brand-mark/master.png` + `brand-mark/transparent.png` | `BrandMark` |
 | A-002 | `app-icon/app-icon.png` | `app-icon/app-icon.png` (1024×1024) | `AppIcon` |
 | A-003 | `splash/splash.png` | `splash/splash.png` (1440×2560) | `Splash` |
 | A-004 | `assets/sabi.riv` (artboard) | `assets/sabi.riv` + `illustrations/empty-state.png` | `EmptyState` |
@@ -112,9 +112,10 @@ device). Both fonts are SIL OFL 1.1 — see `OFL.txt` in each directory. Source:
 ## Known constraints
 
 - **Raster previews are opaque.** The CLI screenshot renders onto a fixed `#1D1D1D` clear; it cannot
-  write alpha. `brand-mark/master.png`, the illustration/animation `.png`s and the raw icon captures
-  are previews only. The icon previews under `icons/` were keyed to transparency from the raw
-  capture; true transparency lives in the `.riv` (the artboards carry no background fill).
+  write alpha. The illustration and animation `.png`s are previews only. The icon previews under
+  `icons/` and the **brand-mark master and transparent** PNGs were keyed to transparency from the raw
+  capture (the fill's green channel recovery, A = (green−29)/99 against the known clear, then
+  un-premultiplied); true transparency lives in the `.riv` (the artboards carry no background fill).
 - **App icon is full-bleed.** For the same reason, `app-icon.png` is a full square of app field ink
   with the white mark; the 22% squircle container is kept in the geometry for masked use. Platform
   icon masks supply the rounded corners.

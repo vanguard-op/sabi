@@ -8,7 +8,8 @@ none exist, so every slot is sourced new.
 
 | Slot | File | Family / Variant | Status |
 |---|---|---|---|
-| A-001 | assets/sabi.riv (artboard BrandMark) | Brand mark / master | Done |
+| A-001 | assets/brand-mark/master.png (+ assets/sabi.riv artboard `BrandMark`) | Brand mark / master | Done |
+| A-012 | assets/brand-mark/transparent.png (+ assets/sabi.riv artboard `BrandMark`) | Brand mark / transparent | Done |
 | A-002 | assets/app-icon/app-icon.png | Brand mark / app-icon | Done |
 | A-003 | assets/splash/splash.png | Brand mark / splash | Done |
 | A-004 | assets/sabi.riv (artboard EmptyState) | Empty-state illustration / single | Done |
@@ -68,7 +69,8 @@ bubble. Transparent background. Square 1:1.
 **Variants**
 | Variant | Delta (by role) | Size |
 |---|---|---|
-| master | None (canonical) | 1024 |
+| master | None (canonical); transparent ground, real alpha | 1024 |
+| transparent | fill → ink #12805C on transparent; same art as master, delivered for consumers that name the form explicitly (branding.md "Required mark forms") | 1024 |
 | one-colour | fill → ink #12805C, no other colour | 1024 |
 | knockout | fill → knockout #FFFFFF on transparent | 1024 |
 | dark | fill → ink dark #3FA981 on transparent | 1024 |
@@ -80,6 +82,17 @@ bubble. Transparent background. Square 1:1.
 
 **Open questions**
 - Lockup variants need the wordmark set in a real typeface; the generator must not draw the letters.
+
+**Alpha delivery (master / transparent)**
+The master and transparent variants are rendered from the `BrandMark` artboard in `assets/sabi.riv`
+with the Rive CLI (`rive . --screenshot=... --artboard=BrandMark --viewport=1024x1024`), which
+composites onto its fixed `#1D1D1D` clear and cannot write alpha. Alpha is then recovered from that
+known clear colour — the fill's green channel separates most strongly from `#1D1D1D`, so
+`A = (O_green - 29) / 99` with the source colour un-premultiplied back out — the same keying method
+already used for the icon previews. `assets/brand-mark/master.png` and
+`assets/brand-mark/transparent.png` therefore carry a real 8-bit alpha channel (corner α = 0, solid
+fill α = 255, antialiased edges soft) and no baked background field. The `.riv` artboard itself
+carries no background fill, so it is transparent by construction.
 
 ## Empty-state illustration — generation prompt
 
