@@ -76,6 +76,7 @@ def receipts(app, client, db_session_factory, session_manager):
         document_ref: str = "https://store.example/receipts/abc.pdf",
         receipt_number: str | None = "FTeR-2026-0001",
         verification_status: str = "verified",
+        unverified_reason: str | None = None,
         issued_at: datetime | None = FIXED_NOW,
     ) -> Receipt:
         lookup.add(payment)
@@ -88,6 +89,7 @@ def receipts(app, client, db_session_factory, session_manager):
                 document_ref=document_ref,
                 receipt_number=receipt_number,
                 verification_status=verification_status,
+                unverified_reason=unverified_reason,
                 issued_at=issued_at,
             )
             db.commit()
@@ -300,11 +302,57 @@ def test_detail_returns_the_receipt_and_its_payment(receipts) -> None:
     assert body["receipt"]["paymentId"] == payment.payment_id
     assert body["receipt"]["receiptNumber"] == "FTeR-2026-0001"
     assert body["receipt"]["verificationStatus"] == "verified"
+    assert body["receipt"]["unverifiedReason"] is None
     assert body["receipt"]["documentRef"] == "https://store.example/receipts/abc.pdf"
     assert body["payment"]["paymentId"] == payment.payment_id
     assert body["payment"]["payee"] == "Onitsha South LGA"
     assert body["payment"]["amount"] == 25_000
     assert body["payment"]["status"] == "succeeded"
+
+
+def test_detail_reports_the_reason_an_unverified_receipt_is_unverified(receipts) -> None:
+    payment = _payment()
+    receipt = receipts.add_receipt(
+        payment=payment,
+        verification_status="unverified",
+        unverified_reason="The source could not confirm this identifier.",
+    )
+    receipts.sign_in()
+
+    response = receipts.client.get(f"/v1/receipts/{receipt.id}")
+
+    assert response.status_code == 200
+    assert response.json()["receipt"]["verificationStatus"] == "unverified"
+    assert (
+        response.json()["receipt"]["unverifiedReason"]
+        == "The source could not confirm this identifier."
+    )
+
+
+def test_detail_omits_the_reason_when_the_receipt_is_verified(receipts) -> None:
+    receipt = receipts.add_receipt(payment=_payment(), verification_status="verified")
+    receipts.sign_in()
+
+    response = receipts.client.get(f"/v1/receipts/{receipt.id}")
+
+    assert response.status_code == 200
+    assert response.json()["receipt"]["unverifiedReason"] is None
+
+
+def test_detail_omits_the_reason_while_the_receipt_is_pending(receipts) -> None:
+    receipt = receipts.add_receipt(
+        payment=_payment(),
+        verification_status="pending",
+        document_ref="",
+        receipt_number=None,
+    )
+    receipts.sign_in()
+
+    response = receipts.client.get(f"/v1/receipts/{receipt.id}")
+
+    assert response.status_code == 200
+    assert response.json()["receipt"]["verificationStatus"] == "pending"
+    assert response.json()["receipt"]["unverifiedReason"] is None
 
 
 def test_detail_unknown_receipt_is_404(receipts) -> None:

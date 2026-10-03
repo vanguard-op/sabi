@@ -24,7 +24,7 @@ from app.core.sessions import SessionData
 from app.db.session import get_db
 from app.receipts import service
 from app.receipts.deps import get_payment_lookup
-from app.receipts.payments import PaymentLookup
+from app.payments_port import PaymentLookup
 from app.receipts.schemas import (
     ReceiptDetailResponse,
     ReceiptDocumentResponse,

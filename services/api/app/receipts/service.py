@@ -24,7 +24,7 @@ from app.core.errors import APIError, ErrorCode
 from app.core.time import to_rfc3339
 from app.db.models import Receipt
 from app.receipts import repository
-from app.receipts.payments import PaymentLookup, PaymentView
+from app.payments_port import PaymentLookup, PaymentView
 from app.receipts.schemas import (
     PaymentSummary,
     ReceiptDetailResponse,
@@ -69,6 +69,7 @@ def capture_receipt(
     document_ref: str = AWAITING_DOCUMENT_REF,
     receipt_number: str | None = None,
     verification_status: str = "pending",
+    unverified_reason: str | None = None,
     issued_at: datetime | None = None,
 ) -> Receipt:
     """Store a receipt for a completed payment, or return the existing one.
@@ -79,6 +80,10 @@ def capture_receipt(
     duplicating it, which keeps the 100% coverage target from double-counting
     (FEAT-008). The receipt is linked to the obligation by its payment id, the
     only cross-store join.
+
+    ``unverified_reason`` carries the plain reason the source could not confirm
+    the receipt; it is stored only alongside an ``unverified`` status, so a
+    verified or pending receipt never shows a stale reason (FEAT-008).
     """
     existing = _find_by_payment_and_kind(db, payment_id, kind, user_id=user_id)
     if existing is not None:
@@ -90,6 +95,7 @@ def capture_receipt(
         kind=kind,
         receipt_number=receipt_number,
         verification_status=verification_status,
+        unverified_reason=unverified_reason,
         document_ref=document_ref,
         issued_at=issued_at,
     )
@@ -297,6 +303,7 @@ def _receipt_out(receipt: Receipt) -> ReceiptOut:
         kind=receipt.kind,
         receipt_number=receipt.receipt_number,
         verification_status=receipt.verification_status,
+        unverified_reason=receipt.unverified_reason,
         document_ref=receipt.document_ref,
         issued_at=to_rfc3339(receipt.issued_at) if receipt.issued_at else None,
         created_at=to_rfc3339(receipt.created_at),

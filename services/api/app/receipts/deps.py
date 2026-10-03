@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from app.receipts.payments import PaymentLookup, UnavailablePaymentLookup
+from app.payments_port import PaymentLookup, UnavailablePaymentLookup
 
 
 def get_payment_lookup(request: Request) -> PaymentLookup:

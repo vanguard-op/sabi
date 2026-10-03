@@ -18,7 +18,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.cases import repository
-from app.cases.ports import (
+from app.payments_port import (
     PaymentEventView,
     PaymentLookup,
     PaymentView,

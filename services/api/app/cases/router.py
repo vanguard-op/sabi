@@ -18,12 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, get_rate_limiter
 from app.cases import service
-from app.cases.ports import (
-    PaymentLookup,
-    RefundPort,
-    get_payment_lookup,
-    get_refund_port,
-)
+from app.cases.ports import get_payment_lookup, get_refund_port
+from app.payments_port import PaymentLookup, RefundPort
 from app.cases.schemas import (
     CaseDetailResponse,
     CaseListResponse,

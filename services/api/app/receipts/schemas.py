@@ -37,6 +37,7 @@ class ReceiptOut(BaseModel):
     kind: str
     receipt_number: str | None = Field(default=None, alias="receiptNumber")
     verification_status: str = Field(alias="verificationStatus")
+    unverified_reason: str | None = Field(default=None, alias="unverifiedReason")
     document_ref: str = Field(alias="documentRef")
     issued_at: str | None = Field(default=None, alias="issuedAt")
     created_at: str = Field(alias="createdAt")

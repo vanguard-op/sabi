@@ -194,6 +194,9 @@ class Receipt(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     receipt_number: Mapped[str | None] = mapped_column(String(128))
     verification_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    # Plain reason the receipt is unverified; null when verified or pending
+    # (schema.md, Receipt.unverifiedReason; FEAT-008).
+    unverified_reason: Mapped[str | None] = mapped_column(String(512))
     document_ref: Mapped[str] = mapped_column(String(512), nullable=False)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
