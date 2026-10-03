@@ -13,7 +13,7 @@ risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; t
 | lead | DELIVERY.md, CONTRACTS.md, ASSETS.md, .delivery/**, packages/contracts/** | docs/** |
 | infra-engineer | infra/**, .github/**, docker-compose*.yml, Makefile, root config, .gitignore | docs/**, packages/contracts/** |
 | backend-engineer | services/api/**, services/payments/**, migrations/** | packages/contracts/**, docs/** |
-| frontend-engineer | apps/mobile/** | packages/contracts/**, docs/** |
+| frontend-engineer | apps/mobile/**, apps/console/** | packages/contracts/**, docs/** |
 | ai-engineer | services/ai/** | packages/contracts/**, docs/** |
 | visual-artist | assets/** | docs/** |
 | qa-engineer | tests/** | packages/contracts/**, docs/** |
@@ -25,11 +25,11 @@ concurrent tasks within an owner use the subdirectories named in their route.
 
 | Layer | Choice |
 |---|---|
-| Client | Flutter (Dart), Android + iOS, go_router, Riverpod, Dio, freezed/json_serializable, passkeys |
+| Client | Flutter (Dart), Android + iOS, go_router, Riverpod, `http`, hand-written JSON models, `passkeys` plugin (Corbado) for the WebAuthn ceremony |
 | Backend | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, Uvicorn |
 | Auth | Self-hosted WebAuthn (py_webauthn), Argon2id recovery secrets, session cookies |
 | Data | PostgreSQL 16 + pgvector (primary, isolated payment store, full-text search, retrieval) |
-| AI | Google Gemini 3.1 Pro (primary; exact provider ID pinned at Foundation); Gemini flash path for high-volume intent; google-genai SDK; evaluation harness |
+| AI | Gemini `gemini-3.1-pro-preview` (primary) and `gemini-3.1-flash-lite` (high-volume intent, D-026); google-genai SDK; evaluation harness |
 | Infrastructure | Docker Compose (dev), GitHub Actions (CI), Terraform (IaC) |
 | Hosting | AWS af-south-1 (Cape Town) — nearest managed Africa region to the Nigeria-primary intent; NDPA transfer assessment required |
 
@@ -49,7 +49,7 @@ docs/                 source of truth (git submodule)
 
 ## Contracts
 
-`CONTRACTS.md` — C-001 to C-016 frozen for Phase 1.
+`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044).
 
 ## Token map
 
@@ -105,11 +105,11 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026 (system bars), T-027 (recovery checkbox), T-028 (conversation persistence), T-029 (native icon and splash), T-045 (transparent brand mark) verified and merged |
+| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console (T-049–T-051, T-054, T-057–T-059) |
 
 ### Phase 2: The payment loop
 
-Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.md` route on disk and a frozen contract. Board status is the gate: no engineer starts until the status moves off `Backlog`, which waits on the dependencies below.
+Active. The payment loop, receipts, cases, identity verification, federal and bill flows, channels, and the Operations Console back end are built; the mobile client is wired to the gateway behind the `USE_LIVE_REPOSITORIES` build flag (T-060). The board's `Backlog` status is the dispatch gate. D1–D3 remain unsecured; the phase proceeds on mock/sandbox rails under D-027.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
@@ -120,36 +120,26 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-034 | FEAT-006 | backend-engineer | Done | C-030–C-032 |
 | T-035 | FEAT-007 | backend-engineer | Done | C-033–C-035 |
 | T-036 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
-| T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | In Progress | C-017–C-019, C-030–C-035 |
-| T-038 | FEAT-008, FEAT-009 | frontend-engineer | In Progress | C-023–C-029 |
-| T-039 | FEAT-002 | frontend-engineer | In Progress | C-020–C-022 |
-| T-040 | FEAT-005, FEAT-009 | ai-engineer | Backlog | C-017, C-026–C-029 |
+| T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Done | C-017–C-019, C-030–C-035 |
+| T-038 | FEAT-008, FEAT-009 | frontend-engineer | Done | C-023–C-029 |
+| T-039 | FEAT-002 | frontend-engineer | Done | C-020–C-022 |
+| T-040 | FEAT-005, FEAT-009 | ai-engineer | In Progress | C-017, C-026–C-029 |
 | T-041 | FEAT-005 | backend-engineer | Done | C-017 |
 | T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Done | C-026–C-035 |
 | T-043 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
 | T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
-
-### Operations Console and contract gaps
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
 | T-046 | FEAT-008 | backend-engineer | Done | C-024 |
 | T-047 | — | backend-engineer | Done | — |
-| T-048 | FEAT-009 | backend-engineer | Backlog | C-029 |
-| T-049 | — | backend-engineer | Done | C-039, C-040 |
-| T-050 | — | backend-engineer | Done | C-041–C-043 |
-| T-051 | — | frontend-engineer | In Progress | C-013–C-016, C-039–C-043 |
-| T-052 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
+| T-048 | FEAT-009 | backend-engineer | In Progress | C-029 |
+| T-052 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
 | T-053 | FEAT-006 | backend-engineer | Done | C-030 |
-| T-054 | — | backend-engineer | Done | C-039, C-041–C-043 |
 | T-055 | FEAT-005 | backend-engineer | Done | C-017–C-019 |
 | T-056 | FEAT-010 | backend-engineer | Done | C-038 |
-| T-057 | — | backend-engineer | Done | C-039 |
-| T-058 | — | frontend-engineer | Done | — |
-| T-059 | — | frontend-engineer | Done | C-039, C-044 |
 | T-060 | FEAT-001, FEAT-003, FEAT-004, FEAT-005, FEAT-008, FEAT-009 | frontend-engineer | Done | C-001–C-043 |
-
-Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
+| T-061 | FEAT-009 | backend-engineer | In Progress | — |
+| T-062 | FEAT-004, FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | In Progress | C-011, C-035 (revision 1) |
+| T-063 | FEAT-001 | frontend-engineer | In Progress | C-001–C-005 |
+| T-064 | FEAT-007 | backend-engineer | In Progress | C-035 (revision 1) |
 
 ## Decisions log
 
@@ -182,6 +172,8 @@ Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2
 | D-025 | branding.md gains a Desktop and Staff Console Token Set; the console inherits the brand grammar and adds only desktop density, breakpoint, table, form, interaction, and shell tokens | Gives the Phase 1 console a sanctioned styling authority instead of ad-hoc reuse of the mobile tokens, while keeping it recognisably Sabi and bounded to what the Phase 1 views need | user |
 | D-026 | The default high-volume model path moves from `gemini-3-flash-preview` to `gemini-3.1-flash-lite`; list prices refreshed to the published rates | The flash-lite tier is stable rather than preview, cheaper ($0.25/$1.50 vs $0.50/$3.00 per million), and removes preview deprecation exposure from the default build | user |
 | D-027 | Payment features proceed against mock and sandbox rails with contracts C-017–C-038 frozen as written, swapped for the licensed partner later | Unblocks Phase 2 while D1–D3 remain unsecured; the isolated payment module and its port keep the rail swappable without touching callers | user |
+| D-028 | The client passkey ceremony uses the `passkeys` plugin (Corbado) | Verified publisher, Android + iOS, and explicit custom relying-party-server support matching the self-hosted py_webauthn backend; a hand-rolled platform channel is avoided | user |
+| D-029 | C-035 gains a failed-payment branch (`409: status: failed, reason`) and C-033's `range` is documented as `{minimum, maximum}` minor units | A failed bill has no token and must not poll `awaiting_token` forever; the 409 mirrors C-031's handling of a payment that did not succeed. Both sides re-dispatched | lead |
 
 ## Definition of Done
 

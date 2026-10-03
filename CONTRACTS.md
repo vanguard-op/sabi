@@ -241,7 +241,7 @@ Errors: 401 (unauthenticated), 404 (unknown payment), 409 (reconciliation case a
 Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: serviceId: string, recipientIdentifier: string, amount: integer|null
-Response 200: valid: boolean, recipientIdentifier: string, knownAmount: integer|null, currency: string, range: object|null, reason: string|null
+Response 200: valid: boolean, recipientIdentifier: string, knownAmount: integer|null, currency: string, range: object|null (minimum: integer, maximum: integer; minor units), reason: string|null
 Errors: 400 (invalid identifier), 401 (unauthenticated), 404 (unknown service), 503 (biller offline; payment prevented)
 
 ### C-034: POST /v1/payments/bills
@@ -252,12 +252,13 @@ Response 201: paymentId: string, status: string, token: string|null, receiptId: 
 Errors: 400 (invalid input), 401 (unauthenticated), 402 (insufficient funds), 409 (duplicate authorisation), 503 (biller offline)
 
 ### C-035: GET /v1/payments/bills/{paymentId}/token
-Status: Implemented
+Status: Frozen (revision 1)
 Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: token: string, receiptId: string
 Response 202: status: string (awaiting_token), retryAfterSeconds: integer
-Errors: 401 (unauthenticated), 404 (unknown payment)
+Response 409: status: string (failed), reason: string|null
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment failed; no token will be issued)
 
 ### C-036: POST /v1/channels/ussd/session
 Status: Implemented
