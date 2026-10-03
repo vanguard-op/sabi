@@ -33,9 +33,12 @@ from app.reconciliation.ports import (
 )
 
 NOW = datetime(2026, 10, 6, 9, 0, tzinfo=UTC)
-# SQLite hands back naive datetimes for timezone-aware columns, so the pure
-# window arithmetic only compares like with like when the clock is naive too.
-# Postgres returns aware timestamps and the production caller passes utcnow().
+# SQLite hands back naive datetimes for timezone-aware columns, so the case
+# fixtures below seed a naive ``opened_at``. The window arithmetic normalises a
+# naive value (and a naive clock) to UTC, so the job accepts an aware or a naive
+# ``now`` against either kind of ``opened_at``; these tests pin the naive clock
+# to exercise that normalisation. Postgres returns aware timestamps and the
+# production caller passes utcnow().
 NAIVE_NOW = NOW.replace(tzinfo=None)
 WINDOW_START = NAIVE_NOW - timedelta(days=1)
 WINDOW_END = NAIVE_NOW

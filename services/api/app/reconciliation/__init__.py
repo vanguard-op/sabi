@@ -2,8 +2,10 @@
 
 This package is a job and service layer, not an HTTP surface: it has no router
 and is reached by the scheduler (``app.reconciliation.jobs.run_scheduled_jobs``)
-and by other modules, so it is deliberately absent from ``MODULE_NAMES`` in the
-app factory. It reads the primary store's case table to keep an exception cased
+and by other modules. It is listed in ``MODULE_NAMES`` in the app factory but
+declared routerless through ``ROUTERLESS_MODULES``, so the module inventory
+matches the landed packages while the guard skips this one's absent router by
+declaration. It reads the primary store's case table to keep an exception cased
 once and crosses to the isolated payment module only through the shared port in
 :mod:`app.payments_port`.
 
