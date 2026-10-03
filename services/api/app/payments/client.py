@@ -42,6 +42,7 @@ from typing import Any, Protocol, runtime_checkable
 import httpx
 
 from app.core.errors import APIError, ErrorCode
+from app.core.identity import IdentityTokenProvider
 from app.payments_port import RefundView
 
 logger = logging.getLogger("sabi.payments")
@@ -145,11 +146,21 @@ class PaymentModuleClient(Protocol):
 class HttpPaymentModuleClient:
     """Forwards to the payment module over HTTP with a single pooled client."""
 
-    def __init__(self, endpoint: PaymentEndpoint) -> None:
+    def __init__(
+        self,
+        endpoint: PaymentEndpoint,
+        *,
+        identity_provider: IdentityTokenProvider | None = None,
+    ) -> None:
         self._client = httpx.Client(
             base_url=endpoint.base_url,
             timeout=endpoint.timeout_seconds,
         )
+        # The payment module is a private Cloud Run service; the audience is its
+        # origin. Local and test transports bind no provider and keep the plain
+        # HTTP hop unchanged.
+        self._audience = str(httpx.URL(endpoint.base_url))
+        self._identity_provider = identity_provider
 
     def close(self) -> None:
         self._client.close()
@@ -207,9 +218,22 @@ class HttpPaymentModuleClient:
             headers["X-Sabi-Authorisation-Limit"] = str(context.authorisation_limit)
         return headers
 
+    def _auth_headers(self) -> dict[str, str]:
+        """Attach an identity token for the private origin, when configured.
+
+        The value is a credential: it travels on the request only and is never
+        logged. No provider means local or test transport, and the hop stays a
+        plain unauthenticated HTTP call.
+        """
+        if self._identity_provider is None:
+            return {}
+        return {"Authorization": f"Bearer {self._identity_provider.token(self._audience)}"}
+
     def _post(self, path: str, *, json: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
         try:
-            response = self._client.post(path, json=json, headers=headers)
+            response = self._client.post(
+                path, json=json, headers={**headers, **self._auth_headers()}
+            )
         except httpx.HTTPError:
             # Never surface the underlying transport detail; it can carry the
             # service address. The client gets one retryable message.
@@ -219,7 +243,9 @@ class HttpPaymentModuleClient:
 
     def _get(self, path: str, *, params: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
         try:
-            response = self._client.get(path, params=params, headers=headers)
+            response = self._client.get(
+                path, params=params, headers={**headers, **self._auth_headers()}
+            )
         except httpx.HTTPError:
             logger.warning("payment module call failed", extra={"path": path})
             raise PaymentModuleUnavailable() from None
@@ -286,8 +312,12 @@ def _upstream_error(response: httpx.Response) -> APIError:
     return APIError(status, code, message, details=details)
 
 
-def build_payment_client(settings: Any) -> HttpPaymentModuleClient:
-    return HttpPaymentModuleClient(PaymentEndpoint.from_settings(settings))
+def build_payment_client(
+    settings: Any, *, identity_provider: IdentityTokenProvider | None = None
+) -> HttpPaymentModuleClient:
+    return HttpPaymentModuleClient(
+        PaymentEndpoint.from_settings(settings), identity_provider=identity_provider
+    )
 
 
 class HttpPaymentModuleRefundPort:

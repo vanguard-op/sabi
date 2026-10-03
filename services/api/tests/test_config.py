@@ -61,3 +61,97 @@ def test_payment_store_separate_database_is_allowed() -> None:
         payments_database_url="postgresql+psycopg://sabi:secret@localhost:5432/sabi_payments",
     )
     assert settings.database_url != settings.payments_database_url
+
+
+# --------------------------------------------------------------------------- #
+# Store selection per environment
+# --------------------------------------------------------------------------- #
+def test_development_defaults_to_in_memory_stores() -> None:
+    settings = Settings(_env_file=None)
+    assert settings.resolved_session_store_backend == "memory"
+    assert settings.resolved_rate_limit_store_backend == "memory"
+
+
+def test_hosted_staging_runs_in_memory_when_no_cache_is_configured() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="staging",
+        session_secret="a-real-session-secret",
+        recovery_code_pepper="a-real-pepper",
+        cache_url="",
+    )
+    assert settings.resolved_session_store_backend == "memory"
+    assert settings.resolved_rate_limit_store_backend == "memory"
+
+
+def test_staging_with_a_cache_resolves_to_redis() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="staging",
+        session_secret="a-real-session-secret",
+        recovery_code_pepper="a-real-pepper",
+        cache_url="redis://cache.internal:6379/0",
+    )
+    assert settings.resolved_session_store_backend == "redis"
+    assert settings.resolved_rate_limit_store_backend == "redis"
+
+
+def test_explicit_memory_backend_is_honoured_over_a_configured_cache() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="staging",
+        session_secret="a-real-session-secret",
+        recovery_code_pepper="a-real-pepper",
+        cache_url="redis://cache.internal:6379/0",
+        session_store_backend="memory",
+        rate_limit_store_backend="memory",
+    )
+    assert settings.resolved_session_store_backend == "memory"
+    assert settings.resolved_rate_limit_store_backend == "memory"
+
+
+def test_production_requires_redis() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        session_secret="a-real-session-secret",
+        recovery_code_pepper="a-real-pepper",
+        cache_url="redis://cache.internal:6379/0",
+    )
+    assert settings.resolved_session_store_backend == "redis"
+    assert settings.resolved_rate_limit_store_backend == "redis"
+
+
+def test_production_refuses_an_explicit_memory_store() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            environment="production",
+            session_secret="a-real-session-secret",
+            recovery_code_pepper="a-real-pepper",
+            cache_url="redis://cache.internal:6379/0",
+            session_store_backend="memory",
+        )
+
+
+def test_production_refuses_a_missing_cache() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            environment="production",
+            session_secret="a-real-session-secret",
+            recovery_code_pepper="a-real-pepper",
+            cache_url="",
+        )
+
+
+def test_redis_selection_without_a_cache_url_fails() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            environment="staging",
+            session_secret="a-real-session-secret",
+            recovery_code_pepper="a-real-pepper",
+            cache_url="",
+            session_store_backend="redis",
+        )

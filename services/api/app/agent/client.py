@@ -25,6 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 import httpx
 
 from app.core.errors import APIError, ErrorCode
+from app.core.identity import IdentityTokenProvider
 
 logger = logging.getLogger("sabi.agent")
 
@@ -75,11 +76,18 @@ class AgentAIClient(Protocol):
 class HttpAgentAIClient:
     """Forwards to the AI service over HTTP with a single pooled client."""
 
-    def __init__(self, endpoint: AIEndpoint) -> None:
+    def __init__(
+        self, endpoint: AIEndpoint, *, identity_provider: IdentityTokenProvider | None = None
+    ) -> None:
         self._client = httpx.Client(
             base_url=endpoint.base_url,
             timeout=endpoint.timeout_seconds,
         )
+        # The audience is the endpoint origin. Cloud Run's private AI service
+        # only answers a call carrying a Google identity token for that origin;
+        # local and test transports pass no provider and keep the plain HTTP hop.
+        self._audience = str(httpx.URL(endpoint.base_url))
+        self._identity_provider = identity_provider
 
     def close(self) -> None:
         self._client.close()
@@ -93,9 +101,20 @@ class HttpAgentAIClient:
     def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
         return self._post("/v1/agent/surfaces", json={"task": task, "context": context})
 
+    def _auth_headers(self) -> dict[str, str]:
+        """Attach an identity token for the private origin, when configured.
+
+        The value is a credential: it is attached to the request only and never
+        logged. When no provider is bound the hop is left unauthenticated, which
+        is correct for local and test transports.
+        """
+        if self._identity_provider is None:
+            return {}
+        return {"Authorization": f"Bearer {self._identity_provider.token(self._audience)}"}
+
     def _post(self, path: str, *, json: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = self._client.post(path, json=json)
+            response = self._client.post(path, json=json, headers=self._auth_headers())
         except httpx.HTTPError:
             # Never surface the underlying transport detail; it can carry the
             # service address. The client gets one retryable message.
@@ -167,5 +186,9 @@ def _upstream_error(response: httpx.Response) -> APIError:
     return APIError(status, code, message)
 
 
-def build_agent_client(endpoint: AIEndpoint | None = None) -> HttpAgentAIClient:
-    return HttpAgentAIClient(endpoint or AIEndpoint.from_env())
+def build_agent_client(
+    endpoint: AIEndpoint | None = None,
+    *,
+    identity_provider: IdentityTokenProvider | None = None,
+) -> HttpAgentAIClient:
+    return HttpAgentAIClient(endpoint or AIEndpoint.from_env(), identity_provider=identity_provider)

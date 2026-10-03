@@ -8,6 +8,7 @@ production.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
@@ -46,10 +47,26 @@ class Settings(BaseSettings):
     )
     cache_url: str = "redis://localhost:6379/0"
 
+    # Store selection for sessions and rate-limit counters, decoupled from the
+    # environment name so staging can run without a cache. "auto" keeps the
+    # development in-memory default and requires Redis once a hosted environment
+    # has a cache URL; "memory" forces the in-process stores; "redis" requires a
+    # reachable cache and fails the boot if it cannot connect rather than
+    # silently degrading to memory. A hosted environment with no cache URL and
+    # no explicit choice fails the validator rather than guessing.
+    session_store_backend: Literal["auto", "memory", "redis"] = "auto"
+    rate_limit_store_backend: Literal["auto", "memory", "redis"] = "auto"
+
     # In-process boundary to the isolated payment module. It can be lifted to a
     # network hop without touching callers (architecture.md, payment module).
     payments_base_url: str = "http://localhost:8002"
     payments_request_timeout_seconds: float = 5.0
+
+    # Private AI service origin. Unlike the payment hop, the AI base URL is read
+    # from the environment by the client itself; it is declared here so store
+    # and deployment validation can reason about whether a hosted gateway is
+    # configured to reach its private service.
+    ai_base_url: str = ""
 
     # WebAuthn relying party (FEAT-001). The private key never leaves the device;
     # only the public credential is stored (schema.md, AuthCredential).
@@ -129,7 +146,86 @@ class Settings(BaseSettings):
                 if not raw or raw == DEV_PLACEHOLDER:
                     raise ValueError(f"{name} must be set from the secret store")
         self._assert_payment_isolation()
+        self._assert_store_selection()
         return self
+
+    @property
+    def resolved_session_store_backend(self) -> Literal["memory", "redis"]:
+        """The session store the app will build. ``auto`` is not a store."""
+        return self._resolve_store_backend("session", self.session_store_backend)
+
+    @property
+    def resolved_rate_limit_store_backend(self) -> Literal["memory", "redis"]:
+        """The rate-limit store the app will build. ``auto`` is not a store."""
+        return self._resolve_store_backend("rate-limit", self.rate_limit_store_backend)
+
+    def _resolve_store_backend(
+        self, label: str, configured: Literal["auto", "memory", "redis"]
+    ) -> Literal["memory", "redis"]:
+        if configured != "auto":
+            return configured
+        if self.cache_configured and (self.environment != "development" or self.is_hosted):
+            return "redis"
+        return "memory"
+
+    @property
+    def is_hosted(self) -> bool:
+        """Whether the app is running on Cloud Run rather than a local process.
+
+        Cloud Run always sets ``K_SERVICE``; its presence means the private
+        service hops carry a Google-signed identity token. This is deliberately
+        narrower than "not development" so a plain staging container or a test
+        process keeps its unauthenticated HTTP transport.
+        """
+        return bool(os.environ.get("K_SERVICE"))
+
+    @property
+    def cache_configured(self) -> bool:
+        return bool(self.cache_url.strip())
+
+    def _assert_store_selection(self) -> None:
+        """A hosted or production environment may never default to memory.
+
+        Development may run in memory; staging may run in memory when no cache
+        is provided (D-032); production must have a cache and must select Redis,
+        so a missing cache fails the boot instead of silently degrading
+        sessions and rate limits to a single process.
+        """
+        resolved_session = self.resolved_session_store_backend
+        resolved_rate = self.resolved_rate_limit_store_backend
+
+        if self.is_production:
+            for label, resolved in (
+                ("session_store_backend", resolved_session),
+                ("rate_limit_store_backend", resolved_rate),
+            ):
+                if resolved != "redis":
+                    raise ValueError(
+                        f"{label} must resolve to redis in production; an in-memory store "
+                        "does not survive a restart or scale past one instance"
+                    )
+            if not self.cache_configured:
+                raise ValueError("cache_url must be set in production")
+
+        if self.is_hosted and not self.cache_configured:
+            # Staging (or production) on Cloud Run with no cache at all: the
+            # stores must be an explicit in-memory choice, never an accident.
+            for label, configured in (
+                ("session_store_backend", self.session_store_backend),
+                ("rate_limit_store_backend", self.rate_limit_store_backend),
+            ):
+                if configured == "auto":
+                    raise ValueError(
+                        f"{label} must be set explicitly when no cache_url is configured "
+                        "in a hosted environment"
+                    )
+
+        if (
+            not self.is_production
+            and (resolved_session == "redis" or resolved_rate == "redis")
+            and not self.cache_configured
+        ):
+            raise ValueError("cache_url must be set when a redis store is selected")
 
     def _assert_payment_isolation(self) -> None:
         """The payment store must not be the primary database (architecture.md)."""
