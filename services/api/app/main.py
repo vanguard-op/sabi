@@ -36,7 +36,7 @@ logger = logging.getLogger("sabi.app")
 # skipped so the monolith boots at Foundation and picks the router up when the
 # module directory appears. Dotted names are nested packages with their own
 # router, such as identity verification under the identity module.
-MODULE_NAMES = ("identity", "identity.verification", "catalogue", "registry", "agent")
+MODULE_NAMES = ("identity", "identity.verification", "catalogue", "registry", "agent", "receipts", "cases")
 
 
 def _build_session_store(settings: Settings):
@@ -61,11 +61,19 @@ def _include_module_routers(app: FastAPI) -> None:
         try:
             module = importlib.import_module(module_path)
         except ModuleNotFoundError as exc:
-            if exc.name in (module_path, f"app.{name}"):
+            # Only a missing router module or its parent package is "not landed
+            # yet". A ModuleNotFoundError raised from inside an installed
+            # dependency must surface, not be swallowed as an absent module.
+            missing_self = exc.name == module_path
+            missing_parent = exc.name in {f"app.{name}", "app", "app." + name.split(".")[0]}
+            if missing_self or missing_parent:
                 logger.debug("module router not present yet", extra={"app_module": name})
                 continue
             raise
-        app.include_router(module.router, prefix="/v1")
+        router = getattr(module, "router", None)
+        if router is None:
+            raise RuntimeError(f"{module_path} defines no `router` (MODULE_NAMES contract)")
+        app.include_router(router, prefix="/v1")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
