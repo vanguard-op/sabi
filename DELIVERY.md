@@ -141,7 +141,7 @@ Active. The payment loop, receipts, cases, identity verification, federal and bi
 | T-064 | FEAT-007 | backend-engineer | Done | C-035 (revision 1) |
 | T-065 | FEAT-001 | backend-engineer | Done | C-002 |
 | T-066 | FEAT-001 | frontend-engineer | Done | C-004, C-005 |
-| T-052 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
+| T-052 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
 | T-067 | FEAT-009 | backend-engineer | Done | C-029 |
 
 ## Decisions log
