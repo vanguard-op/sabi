@@ -1,0 +1,18 @@
+# Launcher icon generation (android + iOS).
+# Source: assets/app-icon.png — the mark inside its rounded-square ink field.
+# assets/native/adaptive-foreground.png is the knockout mark composed for the
+# adaptive icon safe zone; it is a generator input, not a runtime asset.
+# Run: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app-icon.png"
+  remove_alpha_ios: true
+
+  # Android adaptive icon: ink field + knockout mark foreground. The foreground
+  # asset is already composed for the 66% safe zone, so no extra inset.
+  adaptive_icon_background: "#12805C"
+  adaptive_icon_foreground: "assets/native/adaptive-foreground.png"
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: "assets/native/adaptive-foreground.png"
+  min_sdk_android: 21

@@ -1,0 +1,24 @@
+# Native launch screen generation (android + iOS).
+# The mark sits on the warm off-white surface; dark mode uses the dark surface.
+# The mark images are transparent so the surface colour shows through and the
+# light/dark backgrounds are driven by color/color_dark, not baked in.
+# Source mark: assets/app-icon.png (the mark in its ink container) and
+# assets/splash/splash.png (the composed light reference). Both mark files are
+# generator inputs, not runtime assets.
+# Run: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#FAF8F4"
+  color_dark: "#17181A"
+  image: assets/native/splash-mark.png
+  image_dark: assets/native/splash-mark-dark.png
+  ios_content_mode: center
+  android_gravity: center
+  fullscreen: true
+
+  # Android 12+ draws the logo directly on the surface; use the same mark pair so
+  # it reads the same as the composited splash (ink on light, knockout on dark).
+  android_12:
+    image: assets/native/splash-mark.png
+    image_dark: assets/native/splash-mark-dark.png
+    color: "#FAF8F4"
+    color_dark: "#17181A"
