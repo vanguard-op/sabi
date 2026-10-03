@@ -282,26 +282,25 @@ Errors: 404 (unknown reference)
 
 ## Phase 1.5: Operations Console
 
-Planned and frozen; none implemented. Numbering continues from C-038. These are the staff-auth and
-audit-read surfaces specified as interface requirements in
-`docs/Sabi/operations-console.md`; they were unnumbered until now.
+Implemented. Numbering continues from C-038. These are the staff-auth and audit-read surfaces
+specified in `docs/Sabi/operations-console.md`.
 
 ### C-039: POST /v1/staff/auth/login
-Status: Frozen
+Status: Implemented
 Auth: None (public staff login; distinct from the end-user passkey flow)
 Request: email: string, password: string, totp: string
 Response 200: session: HttpOnly Secure SameSite cookie, staff: object (staffId: string, email: string, role: string), mustEnrolMfa: boolean
 Errors: 400 (invalid input), 401 (invalid credentials or TOTP), 403 (role not permitted), 423 (account locked after repeated failures), 429 (rate limited)
 
 ### C-040: POST /v1/staff/auth/logout
-Status: Frozen
+Status: Implemented
 Auth: Staff session cookie
 Request: —
 Response 204: —
 Errors: 401 (unauthenticated)
 
 ### C-041: GET /v1/staff/audit
-Status: Frozen
+Status: Implemented
 Auth: Staff session cookie + MFA, role compliance_privacy_officer or administrator
 Request: actor: string|null, role: string|null, target: string|null, action: string|null, from: string|null, to: string|null, cursor: string|null, limit: integer (default 20)
 Response 200: entries: AuditEntry[], nextCursor: string|null
@@ -309,14 +308,14 @@ Errors: 401 (unauthenticated), 403 (role or MFA missing), 429 (rate limited)
 AuditEntry: auditId: string, actor: string, role: string, target: string, action: string, reason: string|null, occurredAt: string
 
 ### C-042: POST /v1/staff/audit/findings/{findingsId}/close
-Status: Frozen
+Status: Implemented
 Auth: Staff session cookie + MFA, role compliance_privacy_officer
 Request: resolution: string
 Response 200: findingsId: string, status: string (closed), closedAt: string
 Errors: 401 (unauthenticated), 403 (role or MFA missing), 404 (unknown finding), 409 (finding already closed)
 
 ### C-043: POST /v1/staff/audit/export
-Status: Frozen
+Status: Implemented
 Auth: Staff session cookie + MFA, role compliance_privacy_officer
 Request: from: string, to: string, format: string (csv|json)
 Response 202: exportId: string, status: string (queued)
