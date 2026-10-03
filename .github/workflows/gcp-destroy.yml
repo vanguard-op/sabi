@@ -1,0 +1,77 @@
+# Sabi GCP staging lifecycle: `destroy`.
+#
+# Manual by design (D-033). Destroys the whole Terraform stack but leaves the
+# state bucket (gs://sabi-hq-tfstate) so the environment can be rebuilt, then
+# reports the residual cost.
+#
+# Set the same repository variables as `gcp-up`. Auth is Workload Identity
+# Federation (NFR-024).
+
+name: gcp-destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm tearing down the staging stack.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: gcp-lifecycle
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_VERSION: "1.16.5"
+  TF_DIR: infra/terraform-gcp
+
+jobs:
+  destroy:
+    name: terraform destroy
+    if: inputs.confirm == 'destroy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: gcp-staging
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
+          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
+
+      - name: Terraform destroy
+        # The state bucket is not part of this stack, so destroy leaves it. The
+        # image tag is irrelevant to destroy but required to build the plan.
+        env:
+          TF_VAR_container_image_tag: "latest"
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
+          terraform -chdir="${TF_DIR}" destroy -input=false -auto-approve \
+            -var-file=envs/staging/terraform.tfvars
+
+      - name: Report the residual cost
+        run: |
+          {
+            echo "## Sabi staging destroyed"
+            echo
+            echo "The Terraform stack is gone. The state bucket \`gs://sabi-hq-tfstate\` is retained so the environment can be rebuilt."
+            echo
+            echo "Residual cost is the state bucket only, roughly \$0.05/mo (D-033). Run \`gcp-up\` to rebuild."
+          } >> "$GITHUB_STEP_SUMMARY"

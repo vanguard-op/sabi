@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in. `make gcp-init ENV=staging` uses it.
+#
+# State lives in gs://sabi-hq-tfstate (us-central1, versioning on, uniform
+# access — D-034). The bucket survives `destroy`, so the environment can be
+# rebuilt (D-033).
+bucket = "sabi-hq-tfstate"
+prefix = "sabi/staging"

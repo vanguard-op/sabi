@@ -81,6 +81,12 @@ jobs:
       - name: Terraform validate
         run: make tf-validate
 
+      - name: GCP Terraform format
+        run: make gcp-fmt
+
+      - name: GCP Terraform validate
+        run: make gcp-validate
+
       - name: Makefile targets
         run: make help
 

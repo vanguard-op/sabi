@@ -1,0 +1,45 @@
+# nginx config for the Operations Console. Rendered at container start from
+# `infra/docker/console-nginx.conf.template`; `${SABI_API_ORIGIN}` is substituted
+# from the environment (set as a build arg in console.Dockerfile).
+#
+# The console is a single-page app served on port 8080. It reaches the API
+# gateway same-origin through `/v1`, so the staff HttpOnly session cookie rides
+# along without CORS. Everything else falls back to index.html for the router.
+
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Security headers for the staff surface (NFR-022, NFR-026). HSTS is set by
+    # Cloud Run's TLS terminator; these are the browser-side hardening headers.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Health probe for the Cloud Run startup probe; never proxied upstream.
+    location = /health {
+        access_log off;
+        return 200 "ok";
+        default_type text/plain;
+    }
+
+    # Proxy the API gateway. The path prefix is preserved: the backend contract
+    # base is /v1.
+    location /v1/ {
+        proxy_pass ${SABI_API_ORIGIN};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # The HttpOnly staff session cookie must pass through unchanged.
+        proxy_pass_request_headers on;
+    }
+
+    # SPA fallback: any unknown path renders index.html for the client router.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

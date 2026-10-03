@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars (gitignored). `make gcp-plan ENV=staging` uses it.
+# Staging: pre-release validation and stakeholder review (architecture.md,
+# Environments); GCP us-central1 (D-032).
+
+project_id  = "sabi-hq"
+environment = "staging"
+region      = "us-central1"
+
+# Cloud SQL Enterprise edition, shared-core tier: HDD storage is only available
+# on the general purpose shared/dedicated core machine series, and the route
+# requires HDD.
+db_tier              = "db-f1-micro"
+db_allocated_storage = 10
+db_disk_type         = "PD_HDD"
+
+# Private services scale to zero while stopped; the `up` workflow raises the API
+# minimum when it deploys (D-033).
+api_min_instances   = 0
+api_max_instances   = 4
+ai_max_instances    = 3
+payments_max_instances = 3
+console_max_instances  = 2
