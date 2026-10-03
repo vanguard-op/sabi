@@ -3,12 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sabi_mobile/core/connectivity.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
+import 'package:sabi_mobile/data/repositories.dart';
 import 'package:sabi_mobile/features/payment/data/mock_payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/providers.dart';
 import 'package:sabi_mobile/features/payment/models/payment.dart';
 import 'package:sabi_mobile/features/payment/payment_controller.dart';
 import 'package:sabi_mobile/models/account.dart';
+import 'package:sabi_mobile/models/payment_case.dart';
 import 'package:sabi_mobile/models/service_summary.dart';
 
 /// The controller is the payment state machine; these tests drive it directly
@@ -53,13 +55,40 @@ ProviderContainer _container({
   return container;
 }
 
+/// A cases repository whose refund always succeeds, so the FEAT-009 refund path
+/// can be exercised from the payment surface without a case seed.
+class _RefundCases implements CasesRepository {
+  @override
+  Future<RefundResult> refund({
+    required String paymentId,
+    required String reason,
+    required String idempotencyKey,
+  }) async => RefundResult(
+    paymentId: paymentId,
+    status: 'reversed',
+    refundReference: 'rfnd_$paymentId',
+  );
+
+  @override
+  Future<CasePage> list({String? status, String? cursor, int limit = 20}) async =>
+      const CasePage(cases: []);
+
+  @override
+  Future<CaseDetail> detail(String caseId) async => throw UnimplementedError();
+
+  @override
+  Future<CaseSummary> dispute({
+    required String caseId,
+    required String reason,
+  }) async => throw UnimplementedError();
+}
+
 void main() {
   test(
     'a standard obligation with a known amount is ready immediately',
     () async {
       final container = _container();
       final id = 'svc_test';
-      container.read(paymentObligationProvider(id));
       final notifier = container.read(paymentControllerProvider(id).notifier);
       await notifier.resolve();
       expect(
@@ -77,7 +106,7 @@ void main() {
         paymentRepositoryProvider.overrideWith(
           (ref) => MockPaymentRepository(latency: Duration.zero),
         ),
-        paymentObligationProvider(id).overrideWithValue(obligation),
+        paymentObligationProvider(id).overrideWith((ref) => obligation),
       ],
     );
     addTearDown(scoped.dispose);
@@ -221,7 +250,7 @@ void main() {
               kycStatus: VerificationStatus.unverified,
             ),
           ),
-          paymentObligationProvider(id).overrideWithValue(obligation),
+          paymentObligationProvider(id).overrideWith((ref) => obligation),
         ],
       );
       addTearDown(scoped.dispose);
@@ -247,7 +276,7 @@ void main() {
           (ref) => MockFederalRepository(latency: Duration.zero),
         ),
         paymentObligationProvider(id)
-            .overrideWithValue(_obligation(kind: PaymentKind.federal, id: id)),
+            .overrideWith((ref) => _obligation(kind: PaymentKind.federal, id: id)),
       ],
     );
     addTearDown(scoped.dispose);
@@ -279,7 +308,7 @@ void main() {
           ),
         ),
         paymentObligationProvider(id)
-            .overrideWithValue(_obligation(kind: PaymentKind.federal, id: id)),
+            .overrideWith((ref) => _obligation(kind: PaymentKind.federal, id: id)),
       ],
     );
     addTearDown(scoped.dispose);
@@ -306,7 +335,7 @@ void main() {
           ),
         ),
         paymentObligationProvider(id)
-            .overrideWithValue(_obligation(kind: PaymentKind.federal, id: id)),
+            .overrideWith((ref) => _obligation(kind: PaymentKind.federal, id: id)),
       ],
     );
     addTearDown(scoped.dispose);
@@ -360,8 +389,8 @@ void main() {
           (ref) =>
               MockBillRepository(latency: Duration.zero, knownAmount: 200000),
         ),
-        paymentObligationProvider(id).overrideWithValue(
-          _obligation(kind: PaymentKind.bill, amount: null, id: id),
+        paymentObligationProvider(id).overrideWith(
+          (ref) => _obligation(kind: PaymentKind.bill, amount: null, id: id),
         ),
       ],
     );
@@ -394,8 +423,8 @@ void main() {
               knownAmount: 200000,
             ),
           ),
-          paymentObligationProvider(id).overrideWithValue(
-            _obligation(kind: PaymentKind.bill, amount: 200000, id: id),
+          paymentObligationProvider(id).overrideWith(
+            (ref) => _obligation(kind: PaymentKind.bill, amount: 200000, id: id),
           ),
         ],
       );
@@ -420,8 +449,8 @@ void main() {
           (ref) =>
               MockBillRepository(latency: Duration.zero, knownAmount: 200000),
         ),
-        paymentObligationProvider(id).overrideWithValue(
-          _obligation(kind: PaymentKind.bill, amount: 200000, id: id),
+        paymentObligationProvider(id).overrideWith(
+          (ref) => _obligation(kind: PaymentKind.bill, amount: 200000, id: id),
         ),
       ],
     );
@@ -434,4 +463,47 @@ void main() {
     expect(state.phase, PaymentPhase.settled);
     expect(state.billToken?.token, isNotNull);
   });
+
+  test(
+    'a failed bill token is a failure with a refund path, never awaiting',
+    () async {
+      final id = 'svc_bill';
+      final scoped = ProviderContainer(
+        overrides: [
+          paymentRepositoryProvider.overrideWith(
+            (ref) => MockPaymentRepository(latency: Duration.zero),
+          ),
+          billRepositoryProvider.overrideWith(
+            (ref) => MockBillRepository(
+              latency: Duration.zero,
+              knownAmount: 200000,
+              tokenFailed: true,
+              tokenFailureReason: 'The meter was rejected.',
+            ),
+          ),
+          casesRepositoryProvider.overrideWith((ref) => _RefundCases()),
+          paymentObligationProvider(id).overrideWith(
+            (ref) => _obligation(kind: PaymentKind.bill, amount: 200000, id: id),
+          ),
+        ],
+      );
+      addTearDown(scoped.dispose);
+      final notifier = scoped.read(paymentControllerProvider(id).notifier);
+      await notifier.resolve();
+      await notifier.setRecipient('07012345678');
+      await notifier.submit();
+
+      final failed = scoped.read(paymentControllerProvider(id));
+      expect(failed.phase, PaymentPhase.failure);
+      expect(failed.refundAvailable, isTrue);
+      expect(failed.failure, contains('meter'));
+      // The 409 is never an awaiting token.
+      expect(failed.billToken, isNull);
+
+      await notifier.requestRefund();
+      final refunded = scoped.read(paymentControllerProvider(id));
+      expect(refunded.phase, PaymentPhase.refundRequested);
+      expect(refunded.refundReference, isNotNull);
+    },
+  );
 }

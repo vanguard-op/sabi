@@ -117,6 +117,16 @@ class BillTokenNotFoundException extends PaymentException {
   ]);
 }
 
+/// C-035 409 (revision 1): the payment failed and no token will ever be issued.
+/// The surface states the failure and offers the FEAT-009 refund path; it must
+/// never keep polling as if the token were merely awaiting.
+class BillTokenFailedException extends PaymentException {
+  const BillTokenFailedException([
+    super.message =
+        'The biller did not complete this payment, so no token was issued. You can request a refund.',
+  ]);
+}
+
 /// A rail call that timed out with an unknown outcome. The payment is pending
 /// and must be reconciled, never retried blindly (FEAT-005, edge case).
 class RailTimeoutException extends PaymentException {

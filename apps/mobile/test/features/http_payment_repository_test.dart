@@ -184,6 +184,52 @@ void main() {
       expect(token.isAwaiting, isTrue);
     });
 
+    test('a 200 token carries the token and its receipt', () async {
+      final repo = HttpBillRepository(
+        _api(200, {'token': 'TOKEN-1', 'receiptId': 'rcp_1'}),
+      );
+      final token = await repo.token('pay_1');
+      expect(token.isAwaiting, isFalse);
+      expect(token.token, 'TOKEN-1');
+      expect(token.receiptId, 'rcp_1');
+    });
+
+    test('a 409 token is a failed payment, never an awaiting hold', () async {
+      final repo = HttpBillRepository(
+        _api(409, {
+          'error': {
+            'code': 'payment_failed',
+            'message': 'The biller rejected it.',
+            'details': {'status': 'failed', 'reason': 'The meter was rejected.'},
+          },
+        }),
+      );
+      try {
+        await repo.token('pay_1');
+        fail('expected a failed-token exception');
+      } on BillTokenFailedException catch (e) {
+        expect(e.message, contains('The meter was rejected.'));
+      }
+    });
+
+    test('a 409 token without a reason uses the surface wording', () async {
+      final repo = HttpBillRepository(
+        _api(409, {
+          'error': {'code': 'payment_failed', 'message': 'Failed.'},
+        }),
+      );
+      expect(
+        () => repo.token('pay_1'),
+        throwsA(
+          isA<BillTokenFailedException>().having(
+            (e) => e.message,
+            'message',
+            contains('no token was issued'),
+          ),
+        ),
+      );
+    });
+
     test('a 404 token is unknown', () {
       final repo = HttpBillRepository(_api(404, {
         'error': {'code': 'not_found', 'message': 'Unknown.'},

@@ -266,6 +266,10 @@ class HttpBillRepository implements BillRepository {
         '/payments/bills/$paymentId/token',
       );
       return BillToken.fromJson(response.body);
+    } on ApiConflict catch (e) {
+      // C-035 409 (revision 1): the payment failed and no token will be issued.
+      // Surface the reason and hand off to the refund path, never a poll.
+      throw BillTokenFailedException(_conflictReason(e) ?? _tokenFailedDefault);
     } on ApiException catch (e) {
       throw switch (e.statusCode) {
         404 => const BillTokenNotFoundException(),
@@ -274,6 +278,21 @@ class HttpBillRepository implements BillRepository {
     } on ApiUnreachable {
       rethrow;
     }
+  }
+
+  static const String _tokenFailedDefault =
+      'The biller did not complete this payment, so no token was issued. You can request a refund.';
+
+  /// The C-035 409 body carries a plain `reason`; the gateway wraps it in the
+  /// shared error envelope's `details`. Read there, and fall back to the
+  /// surface's own wording rather than a generic conflict message.
+  static String? _conflictReason(ApiConflict e) {
+    final details = e.details;
+    if (details is Map) {
+      final reason = details['reason'];
+      if (reason is String && reason.trim().isNotEmpty) return reason.trim();
+    }
+    return null;
   }
 
   /// C-033: a `503` is the biller offline and blocks payment before any debit.

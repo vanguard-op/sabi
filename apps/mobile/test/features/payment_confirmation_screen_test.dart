@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sabi_mobile/core/connectivity.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
+import 'package:sabi_mobile/data/repositories.dart';
 import 'package:sabi_mobile/features/payment/data/mock_payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/providers.dart';
@@ -11,6 +12,7 @@ import 'package:sabi_mobile/features/payment/models/payment.dart';
 import 'package:sabi_mobile/features/payment/payment_confirmation_screen.dart';
 import 'package:sabi_mobile/features/payment/payment_strings.dart';
 import 'package:sabi_mobile/models/account.dart';
+import 'package:sabi_mobile/models/payment_case.dart';
 import 'package:sabi_mobile/models/service_summary.dart';
 
 import '../helpers.dart';
@@ -40,7 +42,7 @@ List<Override> _overrides({
   bool online = true,
 }) => [
   paymentObligationProvider(_serviceId)
-      .overrideWithValue(obligation ?? _obligation()),
+      .overrideWith((ref) => obligation ?? _obligation()),
   paymentRepositoryProvider.overrideWith(
     (ref) => payments ?? MockPaymentRepository(latency: Duration.zero),
   ),
@@ -60,6 +62,33 @@ List<Override> _overrides({
 class _OfflineConnectivity extends ConnectivityController {
   @override
   bool build() => false;
+}
+
+/// A cases repository whose refund always succeeds (FEAT-009, C-029).
+class _RefundCases implements CasesRepository {
+  @override
+  Future<RefundResult> refund({
+    required String paymentId,
+    required String reason,
+    required String idempotencyKey,
+  }) async => RefundResult(
+    paymentId: paymentId,
+    status: 'reversed',
+    refundReference: 'rfnd_$paymentId',
+  );
+
+  @override
+  Future<CasePage> list({String? status, String? cursor, int limit = 20}) async =>
+      const CasePage(cases: []);
+
+  @override
+  Future<CaseDetail> detail(String caseId) async => throw UnimplementedError();
+
+  @override
+  Future<CaseSummary> dispute({
+    required String caseId,
+    required String reason,
+  }) async => throw UnimplementedError();
 }
 
 Future<void> _pump(
@@ -294,5 +323,40 @@ void main() {
     await tester.tap(find.text(payment.changeAmount));
     await tester.pumpAndSettle();
     expect(find.text('Enter amount'), findsOneWidget);
+  });
+
+  testWidgets('a failed bill token shows the failure and the refund path', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      overrides: [
+        ..._overrides(
+          obligation: _obligation(kind: PaymentKind.bill, amount: 200000),
+          bills: MockBillRepository(
+            latency: Duration.zero,
+            knownAmount: 200000,
+            tokenFailed: true,
+            tokenFailureReason: 'The meter was rejected.',
+          ),
+        ),
+        casesRepositoryProvider.overrideWith((ref) => _RefundCases()),
+      ],
+    );
+    final payment = PaymentStrings.english;
+    await tester.enterText(find.byType(TextField), '07012345678');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(payment.authorisePayment));
+    await tester.pumpAndSettle();
+    // The 409 is a failure, not an awaiting token, and the recovery is a
+    // refund (C-035 revision 1; FEAT-009).
+    expect(find.text(payment.billTokenFailedTitle), findsOneWidget);
+    expect(find.text(payment.awaitingTokenTitle), findsNothing);
+    expect(find.text(payment.startRefund), findsOneWidget);
+
+    await tester.tap(find.text(payment.startRefund));
+    await tester.pumpAndSettle();
+    expect(find.text(payment.refundStartedTitle), findsOneWidget);
   });
 }

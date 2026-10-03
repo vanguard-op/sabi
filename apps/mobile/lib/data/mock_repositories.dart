@@ -100,6 +100,7 @@ class MockCatalogueRepository implements CatalogueRepository {
 
   Duration latency;
   bool failNext = false;
+  bool failNextDetail = false;
 
   static const _landUse = ServiceSummary(
     serviceId: 'svc_lagos_land_use',
@@ -109,6 +110,72 @@ class MockCatalogueRepository implements CatalogueRepository {
     knownAmount: 2500000,
     confidence: 0.94,
   );
+
+  /// The service detail seed (C-011). Mirrors the sandbox obligations the
+  /// payment surface opens, plus one merchant, and carries the `type` that
+  /// selects the flow.
+  static const Map<String, CatalogueService> _services = {
+    'svc_lagos_land_use': CatalogueService(
+      id: 'svc_lagos_land_use',
+      type: 'government',
+      name: 'Land Use Charge',
+      collectingBody: 'Lagos State Government',
+      category: 'Government',
+      knownAmount: 2500000,
+    ),
+    'svc_onitsha_council': CatalogueService(
+      id: 'svc_onitsha_council',
+      type: 'government',
+      name: 'Council levy',
+      collectingBody: 'Onitsha North LGA',
+      category: 'Government',
+      knownAmount: 500000,
+    ),
+    'svc_firs_tax': CatalogueService(
+      id: 'svc_firs_tax',
+      type: 'government',
+      name: 'Company income tax',
+      collectingBody: 'Federal Inland Revenue Service',
+      category: 'Government',
+      knownAmount: 12500000,
+    ),
+    'svc_ikeja_electric': CatalogueService(
+      id: 'svc_ikeja_electric',
+      type: 'biller',
+      name: 'Electricity token',
+      collectingBody: 'Ikeja Electric',
+      category: 'Biller',
+    ),
+    'svc_ekedc': CatalogueService(
+      id: 'svc_ekedc',
+      type: 'biller',
+      name: 'Electricity token',
+      collectingBody: 'Eko Electricity (EKEDC)',
+      category: 'Biller',
+    ),
+    'svc_mtn_airtime': CatalogueService(
+      id: 'svc_mtn_airtime',
+      type: 'biller',
+      name: 'Airtime top-up',
+      collectingBody: 'MTN Nigeria',
+      category: 'Biller',
+      knownAmount: 200000,
+    ),
+    'svc_water_board': CatalogueService(
+      id: 'svc_water_board',
+      type: 'biller',
+      name: 'Water bill',
+      collectingBody: 'Lagos Water Corporation',
+      category: 'Biller',
+    ),
+    'svc_market_merchant': CatalogueService(
+      id: 'svc_market_merchant',
+      type: 'merchant',
+      name: 'Market purchase',
+      collectingBody: 'Balogun Market Traders',
+      category: 'Merchant',
+    ),
+  };
 
   @override
   Future<IntentResult> resolveIntent({
@@ -220,6 +287,21 @@ class MockCatalogueRepository implements CatalogueRepository {
       results: result.candidates,
       noMatch: result.candidates.isEmpty,
     );
+  }
+
+  @override
+  Future<CatalogueService> serviceDetail(String serviceId) async {
+    await Future<void>.delayed(latency);
+    if (failNextDetail) {
+      failNextDetail = false;
+      throw const InvalidCredentialException();
+    }
+    final found = _services[serviceId];
+    // The sandbox resolves unknown ids to the generic land-use obligation for
+    // deep links, but C-011 is explicit: a detail lookup for an unknown service
+    // is a 404. The payment surface never guesses a service into existence.
+    if (found == null) throw const ServiceNotFoundException();
+    return found;
   }
 }
 

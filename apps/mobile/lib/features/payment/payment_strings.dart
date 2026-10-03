@@ -74,6 +74,13 @@ class PaymentStrings {
   String get reconcileBody => _t('reconcileBody');
   String get openReconciliation => _t('openReconciliation');
 
+  // Failed bill payment and its refund recovery (C-035 revision 1; FEAT-009)
+  String get billTokenFailedTitle => _t('billTokenFailedTitle');
+  String get startRefund => _t('startRefund');
+  String get refundStarting => _t('refundStarting');
+  String get refundStartedTitle => _t('refundStartedTitle');
+  String get refundStartedBody => _t('refundStartedBody');
+
   // Bills (FEAT-007)
   String get billTitle => _t('billTitle');
   String get recipientLabel => _t('recipientLabel');
@@ -142,6 +149,11 @@ class PaymentStrings {
     'reconcileTitle': 'Payment not reflected at the agency',
     'reconcileBody': 'The rail confirmed but the agency record doesn’t show it yet. Open a reconciliation with your reference.',
     'openReconciliation': 'Open a reconciliation',
+    'billTokenFailedTitle': 'No token was issued',
+    'startRefund': 'Start a refund',
+    'refundStarting': 'Starting your refund…',
+    'refundStartedTitle': 'Refund started',
+    'refundStartedBody': 'We’ve asked the rail to reverse this payment. We’ll update you on your preferred channel.',
     'billTitle': 'Pay this bill',
     'recipientLabel': 'Meter or phone number',
     'recipientHint': 'Enter the number you’re paying',

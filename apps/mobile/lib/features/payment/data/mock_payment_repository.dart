@@ -255,6 +255,8 @@ class MockBillRepository implements BillRepository {
     this.knownAmount,
     this.range,
     this.tokenAwaiting = false,
+    this.tokenFailed = false,
+    this.tokenFailureReason,
     this.amountValid = true,
   });
 
@@ -271,6 +273,14 @@ class MockBillRepository implements BillRepository {
 
   /// The token has not returned yet, so payment holds open (C-035 202).
   bool tokenAwaiting;
+
+  /// The payment failed after the debit, so the token endpoint rejects it
+  /// (C-035 409). The surface must show a failure and the refund path, never an
+  /// awaiting state.
+  bool tokenFailed;
+
+  /// The biller's plain reason for the failed token, when it gives one.
+  String? tokenFailureReason;
 
   /// Whether a recipient resolves; false drives the wrong-identifier branch.
   bool amountValid;
@@ -324,7 +334,9 @@ class MockBillRepository implements BillRepository {
       paymentId: 'bill_0001',
       status: PaymentState.succeeded,
       // A prepaid bill returns a token; an airtime or postpaid bill does not.
-      token: tokenAwaiting ? null : 'TOKEN-1234-5678-9012',
+      // A failed token has no token at all, so the client must fetch it and
+      // meet the 409 rather than settle immediately.
+      token: (tokenAwaiting || tokenFailed) ? null : 'TOKEN-1234-5678-9012',
       receiptId: 'rcp_bill_0001',
     );
   }
@@ -333,6 +345,12 @@ class MockBillRepository implements BillRepository {
   Future<BillToken> token(String paymentId) async {
     await Future<void>.delayed(latency);
     tokenPolls++;
+    if (tokenFailed) {
+      throw BillTokenFailedException(
+        tokenFailureReason ??
+            'The biller did not complete this payment, so no token was issued. You can request a refund.',
+      );
+    }
     if (tokenAwaiting) {
       return const BillToken(status: 'awaiting_token', retryAfterSeconds: 3);
     }

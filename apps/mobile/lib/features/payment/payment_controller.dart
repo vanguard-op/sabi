@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api_exception.dart';
 import '../../core/connectivity.dart';
 import '../../data/providers.dart';
+import '../../data/repositories.dart';
 import '../../models/account.dart';
+import '../../models/service_summary.dart';
 import 'data/payment_repository.dart';
 import 'data/providers.dart';
 import 'models/payment.dart';
@@ -54,6 +57,13 @@ enum PaymentPhase {
   /// Succeeded, waiting for the prepaid token (bill).
   awaitingToken,
 
+  /// The biller failed the payment after the debit; a refund is in flight
+  /// (C-035 revision 1, FEAT-009).
+  refunding,
+
+  /// The refund has been accepted and is being tracked (FEAT-009).
+  refundRequested,
+
   /// Settled, with the proof stored.
   settled,
 
@@ -83,6 +93,9 @@ class PaymentConfirmationState {
     this.federalReceipt,
     this.billToken,
     this.duplicatePaymentId,
+    this.refundAvailable = false,
+    this.refundStatus,
+    this.refundReference,
   });
 
   final PaymentObligation obligation;
@@ -116,6 +129,14 @@ class PaymentConfirmationState {
   /// The existing payment id when a duplicate authorisation resumes a payment.
   final String? duplicatePaymentId;
 
+  /// Whether this failure can be recovered by a refund: set when the biller
+  /// failed after the debit and no token will be issued (C-035 revision 1).
+  final bool refundAvailable;
+
+  /// The refund status once the rail accepts it (`reversed` or `refunded`).
+  final String? refundStatus;
+  final String? refundReference;
+
   int? get effectiveAmount => amount ?? obligation.knownAmount;
   bool get isVariable => effectiveAmount == null;
   bool get isFederal => obligation.kind == PaymentKind.federal;
@@ -124,10 +145,12 @@ class PaymentConfirmationState {
   /// True while the surface must lock its fields (authorising, reconciling).
   bool get isLocked =>
       phase == PaymentPhase.authorising ||
+      phase == PaymentPhase.refunding ||
       phase == PaymentPhase.reconciling ||
       phase == PaymentPhase.secondConfirmation;
 
   PaymentConfirmationState copyWith({
+    PaymentObligation? obligation,
     PaymentPhase? phase,
     int? amount,
     String? reference,
@@ -141,9 +164,13 @@ class PaymentConfirmationState {
     String? railReference,
     FederalReceipt? federalReceipt,
     BillToken? billToken,
+    bool clearBillToken = false,
     String? duplicatePaymentId,
+    bool? refundAvailable,
+    String? refundStatus,
+    String? refundReference,
   }) => PaymentConfirmationState(
-    obligation: obligation,
+    obligation: obligation ?? this.obligation,
     phase: phase ?? this.phase,
     amount: amount ?? this.amount,
     reference: reference ?? this.reference,
@@ -156,8 +183,11 @@ class PaymentConfirmationState {
     paymentId: paymentId ?? this.paymentId,
     railReference: railReference ?? this.railReference,
     federalReceipt: federalReceipt ?? this.federalReceipt,
-    billToken: billToken ?? this.billToken,
+    billToken: clearBillToken ? null : (billToken ?? this.billToken),
     duplicatePaymentId: duplicatePaymentId ?? this.duplicatePaymentId,
+    refundAvailable: refundAvailable ?? this.refundAvailable,
+    refundStatus: refundStatus ?? this.refundStatus,
+    refundReference: refundReference ?? this.refundReference,
   );
 }
 
@@ -176,11 +206,19 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
 
   @override
   PaymentConfirmationState build() {
-    final obligation = ref.watch(paymentObligationProvider(serviceId));
-    // The screen kicks off resolution from its own lifecycle; keeping [build]
-    // synchronous means a controller that is disposed before the first frame
-    // never leaves an unawaited resolve touching disposed state.
-    return PaymentConfirmationState(obligation: obligation);
+    // The screen kicks off resolution from its own lifecycle; a placeholder
+    // obligation lets the surface paint its skeleton before the catalogue (live)
+    // or the sandbox (mock) answers. [resolve] replaces it with the real one.
+    return PaymentConfirmationState(
+      obligation: PaymentObligation(
+        service: ServiceSummary(
+          serviceId: serviceId,
+          name: '',
+          collectingBody: '',
+          category: '',
+        ),
+      ),
+    );
   }
 
   PaymentRepository get _payments => ref.read(paymentRepositoryProvider);
@@ -189,9 +227,42 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
 
   /// Resolves the obligation for its flow: federal collects its collection
   /// facts, a bill needs a recipient before it can be validated, and a standard
-  /// obligation is ready as soon as it has an amount.
+  /// obligation is ready as soon as it has an amount. In the live build the
+  /// obligation is fetched from the catalogue (C-011); the mock build resolves
+  /// it from the sandbox.
   Future<void> resolve() async {
     _set(state.copyWith(phase: PaymentPhase.resolving, failure: null));
+    // Resolve the obligation first so the summary still has its amount and
+    // payee when the device is offline: the sandbox answer is immediate, and a
+    // live fetch that cannot reach the gateway becomes the offline state.
+    try {
+      final obligation = await ref.read(
+        paymentObligationProvider(serviceId).future,
+      );
+      if (!ref.mounted) return;
+      _set(state.copyWith(obligation: obligation));
+    } on ServiceNotFoundException {
+      // C-011 404: the catalogue does not cover this service. State it and
+      // offer a retry rather than fabricating an obligation.
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.error,
+          failure: 'We couldn’t find this service. Try again from Home.',
+        ),
+      );
+      return;
+    } on ApiUnreachable {
+      _set(state.copyWith(phase: PaymentPhase.offline));
+      return;
+    } catch (_) {
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.error,
+          failure: 'Something went wrong. Try again.',
+        ),
+      );
+      return;
+    }
     if (!ref.read(connectivityProvider)) {
       _set(state.copyWith(phase: PaymentPhase.offline));
       return;
@@ -230,6 +301,8 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
       );
     } on PaymentException catch (e) {
       _set(state.copyWith(phase: _phaseFor(e), failure: e.message));
+    } on ApiUnreachable {
+      _set(state.copyWith(phase: PaymentPhase.offline));
     } catch (_) {
       _set(
         state.copyWith(
@@ -559,6 +632,17 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
         return;
       }
       _set(state.copyWith(phase: PaymentPhase.settled, billToken: token));
+    } on BillTokenFailedException catch (e) {
+      // C-035 409 (revision 1): the payment failed after the debit and no token
+      // will issue. Show the failure and offer the refund, never a poll.
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.failure,
+          failure: e.message,
+          refundAvailable: true,
+          clearBillToken: true,
+        ),
+      );
     } on PaymentException catch (e) {
       _set(state.copyWith(phase: PaymentPhase.error, failure: e.message));
     } catch (_) {
@@ -566,6 +650,55 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
         state.copyWith(
           phase: PaymentPhase.error,
           failure: 'Your payment settled, but we couldn’t fetch the token. Try again.',
+        ),
+      );
+    }
+  }
+
+  /// Starts the FEAT-009 refund for a payment the biller failed after debiting
+  /// it (C-029). The idempotency key makes a retry the same refund, never a
+  /// second one.
+  Future<void> requestRefund() async {
+    final paymentId = state.paymentId;
+    if (paymentId == null) return;
+    if (state.phase == PaymentPhase.refunding) return;
+    if (!ref.read(connectivityProvider)) {
+      _set(state.copyWith(phase: PaymentPhase.offline));
+      return;
+    }
+    _set(state.copyWith(phase: PaymentPhase.refunding, failure: null));
+    try {
+      final result = await ref.read(casesRepositoryProvider).refund(
+        paymentId: paymentId,
+        reason: 'The biller did not issue a token for this payment.',
+        idempotencyKey: 'refund_$paymentId',
+      );
+      if (!ref.mounted) return;
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.refundRequested,
+          refundStatus: result.status,
+          refundReference: result.refundReference,
+        ),
+      );
+    } on DuplicateRefundException {
+      // A refund for this reference already exists; treat it as requested and
+      // do not start a second one (FEAT-009, duplicate-refund edge case).
+      _set(state.copyWith(phase: PaymentPhase.refundRequested));
+    } on RefundNotAllowedException {
+      // C-029 422: the payment's current state does not allow a refund. State
+      // it plainly so the user knows the recovery is not available here.
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.failure,
+          failure: 'This payment can’t be refunded right now.',
+        ),
+      );
+    } catch (_) {
+      _set(
+        state.copyWith(
+          phase: PaymentPhase.error,
+          failure: 'We couldn’t start the refund. Try again.',
         ),
       );
     }
@@ -620,6 +753,7 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
     MandateMismatchException() => PaymentPhase.failure,
     RailTimeoutException() => PaymentPhase.reconciling,
     BillTokenNotFoundException() => PaymentPhase.failure,
+    BillTokenFailedException() => PaymentPhase.failure,
     SecondConfirmationRequiredException() => PaymentPhase.secondConfirmation,
     DuplicateAuthorisationException() => PaymentPhase.authorising,
     PaymentServerException() => PaymentPhase.error,

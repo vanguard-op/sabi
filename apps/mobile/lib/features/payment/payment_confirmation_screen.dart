@@ -292,6 +292,45 @@ class _PaymentConfirmationScreenState
           onPressed: () => _controller.reResolve(),
         ),
       );
+    } else if (state.phase == PaymentPhase.refunding) {
+      actions.add(
+        SabButton(
+          label: payment.refundStarting,
+          expand: true,
+          loading: true,
+          onPressed: null,
+        ),
+      );
+    } else if (state.phase == PaymentPhase.refundRequested) {
+      actions.add(
+        SabButton(
+          label: payment.doneLabel,
+          expand: true,
+          onPressed: () => context.pop(),
+        ),
+      );
+    } else if (state.phase == PaymentPhase.failure &&
+        state.refundAvailable &&
+        state.paymentId != null) {
+      // The biller failed the payment after the debit and no token will
+      // issue: the recovery is a refund, not another authorisation
+      // (C-035 revision 1; FEAT-009).
+      actions.add(
+        SabButton(
+          label: payment.startRefund,
+          expand: true,
+          onPressed: _controller.requestRefund,
+        ),
+      );
+      actions.add(const SizedBox(height: SabSpacing.sm));
+      actions.add(
+        SabButton(
+          label: strings.back,
+          variant: SabButtonVariant.ghost,
+          expand: true,
+          onPressed: () => context.pop(),
+        ),
+      );
     } else {
       // The primary action varies with the flow's current requirement.
       final needsAmount = state.effectiveAmount == null;
@@ -569,15 +608,6 @@ class _BillPanel extends StatelessWidget {
               label: payment.recipientLabel,
               value: state.recipient ?? '',
             ),
-            if (validation != null && validation.valid) ...[
-              const SizedBox(height: SabSpacing.sm),
-              Text(
-                payment.tokenStored,
-                style: SabTypography.bodySmall.copyWith(
-                  color: colors.textSecondary,
-                ),
-              ),
-            ],
           ],
           if (state.phase == PaymentPhase.failure &&
               validation != null &&
@@ -760,7 +790,9 @@ class _StateNotice extends ConsumerWidget {
       PaymentPhase.failure => (
         SabIcons.statusFailed,
         colors.error500,
-        payment.failureTitle,
+        state.refundAvailable
+            ? payment.billTokenFailedTitle
+            : payment.failureTitle,
         state.failure ?? strings.somethingWrong,
         SabStatus.failed,
       ),
@@ -769,6 +801,20 @@ class _StateNotice extends ConsumerWidget {
         colors.warning500,
         payment.reconcilingTitle,
         payment.reconcilingBody,
+        SabStatus.pending,
+      ),
+      PaymentPhase.refunding => (
+        SabIcons.statusPending,
+        colors.warning500,
+        payment.refundStarting,
+        null,
+        SabStatus.pending,
+      ),
+      PaymentPhase.refundRequested => (
+        SabIcons.statusPending,
+        colors.info500,
+        payment.refundStartedTitle,
+        payment.refundStartedBody,
         SabStatus.pending,
       ),
       PaymentPhase.awaitingReceipt => (

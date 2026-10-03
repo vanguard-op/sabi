@@ -69,6 +69,27 @@ class HttpCatalogueRepository implements CatalogueRepository {
       throw ApiServerFailure(e.message);
     }
   }
+
+  @override
+  Future<CatalogueService> serviceDetail(String serviceId) async {
+    try {
+      final body = await _api.get('/catalogue/services/$serviceId');
+      final service = body['service'];
+      if (service is! Map) {
+        throw const ApiServerFailure('The service could not be loaded.');
+      }
+      return CatalogueService.fromJson(service.cast<String, dynamic>());
+    } on ApiNotFound {
+      // C-011 404: the catalogue has no such service.
+      throw const ServiceNotFoundException();
+    } on ApiUnauthenticated {
+      rethrow;
+    } on ApiUnreachable {
+      rethrow;
+    } on ApiException catch (e) {
+      throw ApiServerFailure(e.message);
+    }
+  }
 }
 
 /// Live account record (FEAT-001, FEAT-015; C-007, C-008).

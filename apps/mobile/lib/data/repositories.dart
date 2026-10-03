@@ -72,7 +72,87 @@ class CatalogueSearchResult {
   final bool noMatch;
 }
 
+/// A full catalogue service (CONTRACTS.md C-011 `Service`; schema.md "Service").
+///
+/// Carries the fields discovery's [ServiceSummary] does not: the service `type`
+/// that selects the payment flow, the aliases, and the provider and capability
+/// links. Amounts are integer minor units (kobo).
+@immutable
+class CatalogueService {
+  const CatalogueService({
+    required this.id,
+    required this.type,
+    required this.name,
+    required this.collectingBody,
+    required this.category,
+    this.aliases = const [],
+    this.providerId,
+    this.capabilityId,
+    this.knownAmount,
+    this.currency = 'NGN',
+    this.status = 'active',
+    this.refreshedAt,
+    this.createdAt,
+  });
+
+  final String id;
+
+  /// `government`, `biller`, or `merchant`. Selects the payment flow.
+  final String type;
+  final String name;
+  final String collectingBody;
+  final String category;
+  final List<String> aliases;
+  final String? providerId;
+  final String? capabilityId;
+
+  /// Minor units (kobo), or null when the amount is confirmed at payment.
+  final int? knownAmount;
+  final String currency;
+
+  /// `active`, `unavailable`, or `retired`.
+  final String status;
+  final DateTime? refreshedAt;
+  final DateTime? createdAt;
+
+  bool get hasKnownAmount => knownAmount != null;
+
+  factory CatalogueService.fromJson(Map<String, dynamic> json) =>
+      CatalogueService(
+        id: (json['id'] ?? json['serviceId'] ?? '').toString(),
+        type: (json['type'] ?? '').toString(),
+        name: (json['name'] ?? '').toString(),
+        collectingBody: (json['collectingBody'] ?? '').toString(),
+        category: (json['category'] ?? '').toString(),
+        aliases: (json['aliases'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toList(growable: false),
+        providerId: json['providerId']?.toString(),
+        capabilityId: json['capabilityId']?.toString(),
+        knownAmount: (json['knownAmount'] as num?)?.toInt(),
+        currency: (json['currency'] ?? 'NGN').toString(),
+        status: (json['status'] ?? 'active').toString(),
+        refreshedAt: _parseOptionalTime(json['refreshedAt']),
+        createdAt: _parseOptionalTime(json['createdAt']),
+      );
+}
+
+DateTime? _parseOptionalTime(Object? raw) {
+  final text = raw?.toString();
+  if (text == null || text.isEmpty) return null;
+  return DateTime.tryParse(text)?.toUtc();
+}
+
+/// A `404` from the service-detail endpoint: the service is unknown (C-011).
+class ServiceNotFoundException implements Exception {
+  const ServiceNotFoundException();
+}
+
 /// Intent resolution and service discovery (FEAT-003, FEAT-004; C-009, C-010).
+///
+/// Service detail (C-011) backs the payment surface: the confirmation resolves
+/// the service it is about to pay from the catalogue rather than a hardcoded
+/// sandbox entry.
 abstract class CatalogueRepository {
   Future<IntentResult> resolveIntent({
     required String text,
@@ -80,6 +160,10 @@ abstract class CatalogueRepository {
   });
 
   Future<CatalogueSearchResult> search(String query);
+
+  /// Fetches one service by id (C-011). Throws [ServiceNotFoundException] when
+  /// the catalogue has no such service.
+  Future<CatalogueService> serviceDetail(String serviceId);
 }
 
 /// The account record (FEAT-001, FEAT-015; C-008).
