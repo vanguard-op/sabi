@@ -10,6 +10,11 @@ import '../models/receipt.dart';
 import '../models/receipt_summary.dart';
 import '../models/service_summary.dart';
 
+/// Thrown when a credential or recovery code is not accepted (C-002/C-004/C-005).
+class InvalidCredentialException implements Exception {
+  const InvalidCredentialException();
+}
+
 /// The account plus the one-time recovery code shown after registration
 /// (CONTRACTS.md C-002). The code is single-use.
 @immutable

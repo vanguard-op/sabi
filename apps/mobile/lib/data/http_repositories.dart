@@ -1,12 +1,14 @@
-import '../../../core/api_client.dart';
-import '../../../core/api_exception.dart';
-import '../../../l10n/sab_strings.dart';
-import '../../../models/account.dart';
-import '../../../models/channel_link.dart';
-import '../../../models/intent_result.dart';
-import '../../../models/payment_method.dart';
-import '../../../models/receipt.dart';
-import '../../../models/service_summary.dart';
+import '../core/api_client.dart';
+import '../core/api_exception.dart';
+import '../l10n/sab_strings.dart';
+import '../models/account.dart';
+import '../models/channel_link.dart';
+import '../models/intent_result.dart';
+import '../models/payment_case.dart';
+import '../models/payment_method.dart';
+import '../models/receipt.dart';
+import '../models/receipt_summary.dart';
+import '../models/service_summary.dart';
 import 'repositories.dart';
 
 /// Live catalogue and intent resolution against the gateway (FEAT-003,
@@ -342,19 +344,20 @@ class HttpCasesRepository implements CasesRepository {
         headers: {'Idempotency-Key': idempotencyKey},
       );
       return RefundResult.fromJson(body);
-    } on ApiConflict {
-      // C-029 409: a refund for this reference already exists.
-      throw const DuplicateRefundException();
-    } on ApiException catch (e) when (e.statusCode == 422) {
-      // C-029 422: the payment is not refundable in its current state.
-      throw const RefundNotAllowedException();
     } on ApiNotFound {
       throw const CaseNotFoundException();
     } on ApiUnauthenticated {
       rethrow;
     } on ApiUnreachable {
       rethrow;
+    } on ApiConflict {
+      // C-029 409: a refund for this reference already exists.
+      throw const DuplicateRefundException();
     } on ApiException catch (e) {
+      if (e.statusCode == 422) {
+        // C-029 422: the payment is not refundable in its current state.
+        throw const RefundNotAllowedException();
+      }
       throw ApiServerFailure(e.message);
     }
   }

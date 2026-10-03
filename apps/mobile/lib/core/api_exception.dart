@@ -85,3 +85,16 @@ class ApiUnreachable implements Exception {
   @override
   String toString() => 'ApiUnreachable';
 }
+
+/// A gateway error the caller can retry; distinct from a transport failure so
+/// the screen shows an inline retry rather than the offline banner. Shared by
+/// every live repository so none imports another just for this type.
+class ApiServerFailure implements Exception {
+  const ApiServerFailure(this.message);
+
+  /// Plain-language reason, already scrubbed server-side.
+  final String message;
+
+  @override
+  String toString() => message;
+}

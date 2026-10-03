@@ -9,11 +9,6 @@ import '../models/receipt_summary.dart';
 import '../models/service_summary.dart';
 import 'repositories.dart';
 
-/// Thrown when a credential or recovery code is not accepted.
-class InvalidCredentialException implements Exception {
-  const InvalidCredentialException();
-}
-
 const Duration _defaultLatency = Duration(milliseconds: 350);
 
 /// Mock authentication for the foundation build. A device without a passkey is

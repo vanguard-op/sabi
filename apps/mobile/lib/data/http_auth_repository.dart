@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import '../../../core/api_client.dart';
-import '../../../core/api_exception.dart';
-import '../../../l10n/sab_strings.dart';
-import '../../../models/account.dart';
-import '../../payment/models/payment_errors.dart';
+import '../core/api_client.dart';
+import '../core/api_exception.dart';
+import '../l10n/sab_strings.dart';
+import '../models/account.dart';
 import 'repositories.dart';
 
 /// Live authentication against the gateway (FEAT-001; C-001–C-007).
@@ -105,17 +104,6 @@ class HttpAuthRepository implements AuthRepository {
 /// onboarding falls back to the recovery-code path.
 class PasskeyUnavailable implements Exception {
   const PasskeyUnavailable();
-}
-
-/// A gateway error the caller can retry; distinct from a transport failure so
-/// the screen can show an inline retry rather than the offline banner.
-class ApiServerFailure implements Exception {
-  const ApiServerFailure(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }
 
 /// Serialises a WebAuthn credential for a future passkey channel. Kept here so

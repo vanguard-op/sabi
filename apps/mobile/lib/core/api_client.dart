@@ -19,12 +19,29 @@ import 'api_exception.dart';
 /// - Maps the shared error envelope to [ApiException] and treats a transport
 ///   failure as [ApiUnreachable].
 class SabApiClient {
-  SabApiClient({required ApiConfig config, http.Client? httpClient})
+  SabApiClient({
+    required ApiConfig config,
+    http.Client? httpClient,
+    this.onUnauthenticated,
+    this.onUnreachable,
+  })
+    // A named parameter cannot be private, so the config is copied to the
+    // private field rather than promoted to a public one.
+    // ignore: prefer_initializing_formals
     : _config = config,
       _http = httpClient ?? http.Client();
 
   final ApiConfig _config;
   final http.Client _http;
+
+  /// Called once when the gateway rejects the session cookie, before
+  /// [ApiUnauthenticated] is thrown. The client raises the shared
+  /// Re-authorisation flow; it does not know about Riverpod itself.
+  final void Function()? onUnauthenticated;
+
+  /// Called once when the gateway cannot be reached at all, before
+  /// [ApiUnreachable] is thrown, so the surface can flip to its offline states.
+  final void Function()? onUnreachable;
 
   Uri _uri(String path, [Map<String, String?> query = const {}]) {
     final cleaned = path.startsWith('/') ? path.substring(1) : path;
@@ -42,15 +59,22 @@ class SabApiClient {
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, String?> query = const {},
-  }) => _send('GET', path, query: query);
+  }) => _send('GET', path, query: query).then((r) => r.body);
 
   Future<Map<String, dynamic>> post(
     String path, {
     Object? body,
     Map<String, String>? headers,
-  }) => _send('POST', path, body: body, headers: headers);
+  }) => _send('POST', path, body: body, headers: headers).then((r) => r.body);
 
-  Future<Map<String, dynamic>> _send(
+  /// Like [get] but keeps the status code, for the endpoints where a `202` is a
+  /// distinct, valid state rather than a success body (C-031 FTeR, C-035 token).
+  Future<ApiResponse> getWithStatus(
+    String path, {
+    Map<String, String?> query = const {},
+  }) => _send('GET', path, query: query);
+
+  Future<ApiResponse> _send(
     String method,
     String path, {
     Map<String, String?> query = const {},
@@ -73,19 +97,22 @@ class SabApiClient {
           .timeout(const Duration(seconds: 20));
       response = await http.Response.fromStream(streamed);
     } on TimeoutException catch (error) {
+      onUnreachable?.call();
       throw ApiUnreachable(error);
     } on http.ClientException catch (error) {
+      onUnreachable?.call();
       throw ApiUnreachable(error);
     } on Exception catch (error) {
       // dart:io SocketException is not a ClientException; catch it generically
       // rather than let a transport failure escape as an unhandled exception.
+      onUnreachable?.call();
       throw ApiUnreachable(error);
     }
 
     return _decode(response);
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
+  ApiResponse _decode(http.Response response) {
     final status = response.statusCode;
     Map<String, dynamic>? decoded;
     if (response.body.isNotEmpty) {
@@ -98,7 +125,10 @@ class SabApiClient {
     }
 
     if (status >= 200 && status < 300) {
-      return decoded ?? const <String, dynamic>{};
+      return ApiResponse(
+        statusCode: status,
+        body: decoded ?? const <String, dynamic>{},
+      );
     }
 
     final envelope = decoded?['error'];
@@ -111,6 +141,10 @@ class SabApiClient {
     final details = envelope is Map ? envelope['details'] : null;
 
     if (status == 401) {
+      // The session cookie is absent or rejected: raise the shared
+      // Re-authorisation flow rather than a bare error (user-flow
+      // "Authentication Gate").
+      onUnauthenticated?.call();
       throw ApiUnauthenticated(code: code, message: rawMessage, details: details);
     }
     if (status == 403) {
@@ -145,4 +179,13 @@ class SabApiClient {
   };
 
   void close() => _http.close();
+}
+
+/// A 2xx response with its status kept, so a caller can tell an accepted `202`
+/// from a `200` with a body (C-031, C-035).
+class ApiResponse {
+  const ApiResponse({required this.statusCode, required this.body});
+
+  final int statusCode;
+  final Map<String, dynamic> body;
 }
