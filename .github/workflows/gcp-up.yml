@@ -26,9 +26,9 @@ on:
         required: false
         type: string
       api_min_instances:
-        description: "Minimum API instances (0 keeps idle cost near zero)."
+        description: "Minimum API instances (0 keeps idle cost near zero; the default)."
         required: false
-        default: "1"
+        default: "0"
         type: string
 
 permissions:
