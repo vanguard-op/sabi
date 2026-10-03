@@ -22,9 +22,9 @@ from app.api.deps import current_user, get_rate_limiter
 from app.core.rate_limit import RateLimiter
 from app.core.sessions import SessionData
 from app.db.session import get_db
+from app.payments_port import PaymentLookup
 from app.receipts import service
 from app.receipts.deps import get_payment_lookup
-from app.payments_port import PaymentLookup
 from app.receipts.schemas import (
     ReceiptDetailResponse,
     ReceiptDocumentResponse,

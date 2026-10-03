@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from app.api.deps import current_user, get_rate_limiter
 from app.cases import service
 from app.cases.ports import get_payment_lookup, get_refund_port
-from app.payments_port import PaymentLookup, RefundPort
 from app.cases.schemas import (
     CaseDetailResponse,
     CaseListResponse,
@@ -31,6 +30,7 @@ from app.cases.schemas import (
 from app.core.rate_limit import RateLimiter
 from app.core.sessions import SessionData
 from app.db.session import get_db
+from app.payments_port import PaymentLookup, RefundPort
 
 router = APIRouter(tags=["cases"])
 

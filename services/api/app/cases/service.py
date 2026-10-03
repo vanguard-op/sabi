@@ -18,13 +18,6 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.cases import repository
-from app.payments_port import (
-    PaymentEventView,
-    PaymentLookup,
-    PaymentView,
-    RefundPort,
-    RefundView,
-)
 from app.cases.schemas import (
     CASE_STATUSES,
     SUPPORT_OPERATIONS_ROLE,
@@ -39,6 +32,13 @@ from app.cases.schemas import (
 )
 from app.core.errors import APIError, ErrorCode
 from app.core.time import to_rfc3339
+from app.payments_port import (
+    PaymentEventView,
+    PaymentLookup,
+    PaymentView,
+    RefundPort,
+    RefundView,
+)
 
 # Only a settled payment can be reversed or refunded (payment state machine).
 REFUNDABLE_PAYMENT_STATES = frozenset({"succeeded"})

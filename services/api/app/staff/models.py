@@ -17,7 +17,7 @@ from datetime import datetime
 from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, CreatedAtMixin, TimestampedMixin, UUIDPrimaryKeyMixin
+from app.db.base import Base, TimestampedMixin, UUIDPrimaryKeyMixin
 
 # Marked so the privacy registry can locate the fields that carry personal data.
 PERSONAL = {"personal_data": True}

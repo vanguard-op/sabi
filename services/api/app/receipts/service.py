@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 from app.core.errors import APIError, ErrorCode
 from app.core.time import to_rfc3339
 from app.db.models import Receipt
-from app.receipts import repository
 from app.payments_port import PaymentLookup, PaymentView
+from app.receipts import repository
 from app.receipts.schemas import (
     PaymentSummary,
     ReceiptDetailResponse,

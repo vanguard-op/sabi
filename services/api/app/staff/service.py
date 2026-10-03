@@ -76,7 +76,9 @@ def authenticate(
         raise _invalid_credentials()
 
     if account.status == "disabled":
-        audit.append("staff.login_failed", actor_id=account.id, target=account.id, reason="disabled")
+        audit.append(
+            "staff.login_failed", actor_id=account.id, target=account.id, reason="disabled"
+        )
         raise _not_permitted()
 
     if account.locked_until is not None and account.locked_until > now:
