@@ -7,4 +7,6 @@ resource "google_artifact_registry_repository" "images" {
   format        = "DOCKER"
   description   = "Sabi staging service images (api, ai, payments, console)."
   labels        = local.labels
+
+  depends_on = [google_project_service.required]
 }

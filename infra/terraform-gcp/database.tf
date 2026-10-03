@@ -18,6 +18,8 @@ resource "google_sql_database_instance" "main" {
   # instance instead (D-033).
   deletion_protection = false
 
+
+
   settings {
     # Enterprise edition: HDD storage is only available on the general purpose
     # shared/dedicated core machine series. Postgres 16 otherwise defaults to
@@ -57,7 +59,11 @@ resource "google_sql_database_instance" "main" {
     }
   }
 
-  depends_on = [google_service_networking_connection.private_services]
+  # The SQL Admin API and the private-services peering must be live first.
+  depends_on = [
+    google_project_service.required,
+    google_service_networking_connection.private_services,
+  ]
 }
 
 # Primary store: users, credentials, catalogue, providers, capabilities, cases,

@@ -6,6 +6,10 @@ resource "google_compute_network" "main" {
   name                    = local.prefix
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
+
+  # The compute and service-networking APIs must be live before the network and
+  # its peering are created (services.tf).
+  depends_on = [google_project_service.required]
 }
 
 # Serverless subnet used by the Cloud Run direct VPC egress interfaces. The
