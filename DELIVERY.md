@@ -120,7 +120,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-071 | FEAT-007 | frontend-engineer | Done | C-033 |
 | T-072 | FEAT-001 | frontend-engineer | Done | C-002, C-004 |
 | T-073 | — | infra-engineer | Done | — |
-| T-074 | FEAT-003, FEAT-005 | backend-engineer | In Progress | — |
+| T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
+| T-075 | — | infra-engineer | In Progress | — |
 
 ## Decisions log
 
