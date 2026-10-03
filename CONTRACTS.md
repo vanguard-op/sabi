@@ -213,7 +213,7 @@ Status: Implemented
 Auth: Session cookie (authenticated account owner)
 Request: reason: string, Idempotency-Key header
 Response 202: paymentId: string, status: string (reversed|refunded), refundReference: string|null
-Errors: 401 (unauthenticated), 404 (unknown payment), 409 (duplicate refund for the reference), 422 (payment not refundable in its current state)
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (duplicate refund for the reference), 422 (payment not refundable in its current state), 503 (the rail did not settle the refund; retryable)
 
 ### C-030: POST /v1/payments/federal/prepare
 Status: Implemented
@@ -257,8 +257,7 @@ Auth: Session cookie (authenticated account owner)
 Request: —
 Response 200: token: string, receiptId: string
 Response 202: status: string (awaiting_token), retryAfterSeconds: integer
-Response 409: status: string (failed), reason: string|null
-Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment failed; no token will be issued)
+Errors: 401 (unauthenticated), 404 (unknown payment), 409 (payment failed; the shared error envelope's details carry status: "failed" and reason: string|null)
 
 ### C-036: POST /v1/channels/ussd/session
 Status: Implemented

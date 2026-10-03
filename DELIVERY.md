@@ -130,18 +130,19 @@ Active. The payment loop, receipts, cases, identity verification, federal and bi
 | T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
 | T-046 | FEAT-008 | backend-engineer | Done | C-024 |
 | T-047 | — | backend-engineer | Done | — |
-| T-048 | FEAT-009 | backend-engineer | In Progress | C-029 |
+| T-048 | FEAT-009 | backend-engineer | Done | C-029 |
 | T-052 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
 | T-053 | FEAT-006 | backend-engineer | Done | C-030 |
 | T-055 | FEAT-005 | backend-engineer | Done | C-017–C-019 |
 | T-056 | FEAT-010 | backend-engineer | Done | C-038 |
 | T-060 | FEAT-001, FEAT-003, FEAT-004, FEAT-005, FEAT-008, FEAT-009 | frontend-engineer | Done | C-001–C-043 |
 | T-061 | FEAT-009 | backend-engineer | Done | — |
-| T-062 | FEAT-004, FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | In Progress | C-011, C-035 (revision 1) |
+| T-062 | FEAT-004, FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Done | C-011, C-035 (revision 1) |
 | T-063 | FEAT-001 | frontend-engineer | Done | C-001–C-005 |
 | T-064 | FEAT-007 | backend-engineer | In Progress | C-035 (revision 1) |
 | T-065 | FEAT-001 | backend-engineer | In Progress | C-002 |
 | T-066 | FEAT-001 | frontend-engineer | In Progress | C-004, C-005 |
+| T-067 | FEAT-009 | backend-engineer | In Progress | C-029 |
 
 ## Decisions log
 
