@@ -38,9 +38,13 @@ export function canReviewAudit(role: StaffRole | undefined): boolean {
 }
 
 export function canExportAudit(role: StaffRole | undefined): boolean {
-  return role === 'compliance_privacy_officer' || role === 'administrator';
+  // C-043 and operations-console.md scope export to the compliance role: a bulk
+  // export is itself a privileged action, so the administrator does not inherit
+  // it even though it reaches every operator surface.
+  return role === 'compliance_privacy_officer';
 }
 
 export function canCloseFinding(role: StaffRole | undefined): boolean {
-  return role === 'compliance_privacy_officer' || role === 'administrator';
+  // C-042 is likewise scoped to the compliance role and names no administrator.
+  return role === 'compliance_privacy_officer';
 }
