@@ -350,12 +350,8 @@ def test_gateway_sends_reference_through_the_adapter_and_reports_it(
             json={"sessionId": "s-1", "confirmation": "1"},
             headers={"Idempotency-Key": "idem-agg"},
         )
-        status = client.get(
-            "/v1/channels/sms/status/rail-1",
-            headers={"X-Channel-Msisdn": MSISDN},
-        )
-    # C-038's header is a Sabi-internal scoping credential; the aggregator's own
-    # mechanism is the callback payload parsed above, so this confirms the port
-    # the adapter supplies answers the contract's delivery read.
+        status = client.get("/v1/channels/sms/status/rail-1?sessionId=s-1")
+    # C-038 resolves the subscriber from the session bound at C-036, so the
+    # adapter's delivery read is authorised without any client-supplied number.
     assert status.status_code == 200
     assert status.json()["reference"] == "rail-1"

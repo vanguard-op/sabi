@@ -4,20 +4,21 @@ Paths are declared without the ``/v1`` prefix; the app factory mounts the router
 under it (DELIVERY.md, conventions). These endpoints authenticate the channel
 identity, not an app session: the USSD/SMS aggregator supplies the subscriber's
 MSISDN, and no end-user cookie is involved. On C-036 and C-037 the MSISDN is part
-of the session (``msisdn`` on the open call; the bound session thereafter). C-038
-has no request body, so the subscriber arrives in the ``X-Channel-Msisdn`` header,
-which is the channel-identity credential and is never logged or echoed.
+of the session (``msisdn`` on the open call; the bound session thereafter).
 
-A missing MSISDN on C-038 is reported as an unknown reference rather than a
-distinct error: the contract's only failure for that surface is 404, and
-ownership of another number's message must not be inferable from the response.
+C-038 takes no client-supplied identity. The subscriber is resolved server-side
+from the MSISDN-bound session established by C-036/C-037: the caller presents
+the ``sessionId`` it already holds, and the number comes from the stored session,
+never from a header a client could set. A caller with no bound session for the
+reference gets the same 404 as an unknown reference, so ownership of another
+subscriber's message is not inferable from the response.
 """
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 
 from app.api.deps import get_settings
 from app.channels import service
@@ -98,9 +99,15 @@ def ussd_authorise(
 def sms_status(
     reference: str,
     sms: SmsBoundary,
-    msisdn: str | None = Header(default=None, alias="X-Channel-Msisdn"),
+    store: SessionStore,
+    session_id: str | None = Query(default=None, alias="sessionId"),
 ) -> SmsStatusResponse:
-    # A channel identity that is absent cannot prove ownership of any message, so
-    # it resolves as unknown rather than revealing that the reference exists.
-    result = service.sms_status(sms=sms, msisdn=msisdn or "", reference=reference)
+    # The subscriber is the number bound to the held session, resolved from the
+    # server-side store. A caller with no such session cannot prove ownership of
+    # any message, so it resolves as unknown rather than revealing that the
+    # reference exists (C-038 revision 2). Never read a client header here: an
+    # inbound header is attacker-controlled (NFR-020, NFR-025).
+    session = store.get(session_id) if session_id else None
+    msisdn = session.msisdn if session is not None else ""
+    result = service.sms_status(sms=sms, msisdn=msisdn, reference=reference)
     return SmsStatusResponse.model_validate(result)

@@ -392,6 +392,17 @@ def test_authorise_unlinked_session_is_rejected(
 
 
 # --- C-038: SMS status ------------------------------------------------------
+#
+# Revision 2: the subscriber is resolved server-side from the MSISDN-bound
+# session established by C-036. The caller presents the sessionId it holds; the
+# number comes from the store, never from a client-supplied header. These tests
+# open a real session through C-036 to establish that binding.
+
+
+def _bind_session(client: TestClient, *, msisdn: str = MSISDN, session_id: str = SESSION) -> None:
+    """Open a C-036 session so its MSISDN is bound server-side."""
+
+    _open(client, msisdn=msisdn, session_id=session_id)
 
 
 def test_sms_status_returns_own_message(client: TestClient, sms: InMemorySmsDeliveryPort) -> None:
@@ -404,10 +415,8 @@ def test_sms_status_returns_own_message(client: TestClient, sms: InMemorySmsDeli
             token=None,
         )
     )
-    response = client.get(
-        "/v1/channels/sms/status/ref-1",
-        headers={"X-Channel-Msisdn": MSISDN},
-    )
+    _bind_session(client)
+    response = client.get(f"/v1/channels/sms/status/ref-1?sessionId={SESSION}")
     assert response.status_code == 200
     assert response.json() == {"reference": "ref-1", "status": "delivered", "token": None}
 
@@ -424,10 +433,8 @@ def test_sms_status_returns_token_when_present(
             token="4567-8901",
         )
     )
-    response = client.get(
-        "/v1/channels/sms/status/ref-token",
-        headers={"X-Channel-Msisdn": MSISDN},
-    )
+    _bind_session(client)
+    response = client.get(f"/v1/channels/sms/status/ref-token?sessionId={SESSION}")
     assert response.status_code == 200
     assert response.json()["token"] == "4567-8901"
 
@@ -436,22 +443,43 @@ def test_sms_status_hides_another_subscribers_message(
     client: TestClient, sms: InMemorySmsDeliveryPort
 ) -> None:
     sms.send(message=SmsMessage(reference="ref-2", msisdn="+2348011111111", body="Private."))
+    _bind_session(client)
+    response = client.get(f"/v1/channels/sms/status/ref-2?sessionId={SESSION}")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_sms_status_unknown_reference(client: TestClient) -> None:
+    _bind_session(client)
+    response = client.get(f"/v1/channels/sms/status/nope?sessionId={SESSION}")
+    assert response.status_code == 404
+
+
+def test_sms_status_without_a_bound_session_is_unknown(client: TestClient) -> None:
+    response = client.get("/v1/channels/sms/status/ref-1")
+    assert response.status_code == 404
+
+
+def test_sms_status_ignores_a_client_supplied_msisdn_header(
+    client: TestClient, sms: InMemorySmsDeliveryPort
+) -> None:
+    # The forged header names the true subscriber, but identity is bound to the
+    # session, so a caller with no session cannot read the message (NFR-020).
+    sms.send(message=SmsMessage(reference="ref-3", msisdn=MSISDN, body="Private."))
     response = client.get(
-        "/v1/channels/sms/status/ref-2",
+        "/v1/channels/sms/status/ref-3",
         headers={"X-Channel-Msisdn": MSISDN},
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
 
 
-def test_sms_status_unknown_reference(client: TestClient) -> None:
-    response = client.get(
-        "/v1/channels/sms/status/nope",
-        headers={"X-Channel-Msisdn": MSISDN},
-    )
-    assert response.status_code == 404
-
-
-def test_sms_status_without_channel_identity_is_unknown(client: TestClient) -> None:
-    response = client.get("/v1/channels/sms/status/ref-1")
+def test_sms_status_rejects_another_subscribers_session(
+    client: TestClient, sms: InMemorySmsDeliveryPort
+) -> None:
+    # The message belongs to MSISDN, but the caller holds a session bound to a
+    # different number, so it resolves as unknown rather than leaking status.
+    sms.send(message=SmsMessage(reference="ref-4", msisdn=MSISDN, body="Private."))
+    _bind_session(client, msisdn="+2348099999999", session_id="other-session")
+    response = client.get("/v1/channels/sms/status/ref-4?sessionId=other-session")
     assert response.status_code == 404
