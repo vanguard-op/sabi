@@ -3,9 +3,19 @@
 # Manual by design (D-033). Bringing the staging environment up costs money, so
 # this workflow never runs on push: an operator dispatches it explicitly.
 #
-# It authenticates to GCP, builds and pushes the four images, applies the
-# Terraform stack, runs the Alembic migrations inside the VPC, and prints the
-# mapped URLs and the DNS records to add at Namecheap.
+# It authenticates to GCP, applies the Terraform stack once to create the
+# platform (Artifact Registry, Secret Manager, Cloud SQL, network, and service
+# accounts), builds and pushes the four images into the now-existing registry,
+# applies a second time to deploy the built tag, runs the Alembic migrations
+# inside the VPC, and prints the mapped URLs and the DNS records to add at
+# Namecheap.
+#
+# The apply runs twice on purpose: the first `up` run pushed to
+# `us-central1-docker.pkg.dev/sabi-hq/sabi` before `terraform apply` had created
+# that Artifact Registry repository, so the push failed with
+# `Repository "sabi" not found`. The registry — and every other platform
+# resource — must exist before any push. See the two apply steps for the
+# ordering detail and the transient placeholder-revision note.
 #
 # Auth is Workload Identity Federation (NFR-024): no long-lived service-account
 # key is committed. Set these repository variables:
@@ -70,6 +80,51 @@ jobs:
           fi
           echo "image_tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
+          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
+
+      - name: Terraform apply (bootstrap the platform)
+        # First of two applies. Creates the Artifact Registry repository the
+        # build step pushes to, plus Secret Manager, Cloud SQL, the network, and
+        # the service accounts. The Cloud Run services are created here too, but
+        # on a first run their image does not exist yet, so the first revision
+        # cannot start (a transient image-pull failure); it is replaced by the
+        # second apply once the images are pushed.
+        #
+        # `latest` is the bootstrap tag so the second apply — which uses the
+        # built tag — always differs and therefore rolls a fresh revision. The
+        # API minimum is held at zero while the revision is unhealthy; the
+        # second apply raises it. On a re-run of an environment already up, the
+        # bootstrap revisions may briefly serve the previously pushed `latest`
+        # images, which the second apply then replaces with the built tag.
+        env:
+          TF_VAR_container_image_tag: latest
+          TF_VAR_api_min_instances: "0"
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
+          terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
+            -var-file=envs/staging/terraform.tfvars
+
+      - name: Write the secret Terraform cannot generate
+        # The model provider key is written to Secret Manager here, never to the
+        # repo or Terraform state (NFR-024). Terraform created the container in
+        # the bootstrap apply, so the version can be added before the deploying
+        # apply mounts it.
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ secrets.GEMINI_API_KEY }}' \
+            | gcloud secrets versions add "sabi-staging-gemini-api-key" \
+                --project="${{ vars.GCP_PROJECT_ID }}" --data-file=-
+
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
@@ -95,33 +150,16 @@ jobs:
             docker push "${REGISTRY}/${svc}:latest"
           done
 
-      - name: Write the secret Terraform cannot generate
-        # The model provider key is written to Secret Manager here, never to the
-        # repo or Terraform state (NFR-024). Terraform created the container.
-        run: |
-          set -euo pipefail
-          printf '%s' '${{ secrets.GEMINI_API_KEY }}' \
-            | gcloud secrets versions add "sabi-staging-gemini-api-key" \
-                --project="${{ vars.GCP_PROJECT_ID }}" --data-file=-
-
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
-
-      - name: Terraform init
-        run: |
-          set -euo pipefail
-          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
-          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
-
-      - name: Terraform apply
+      - name: Terraform apply (deploy the built images)
+        # Second of two applies. The registry now holds the images just pushed,
+        # so this rolls the Cloud Run revisions onto the built tag and raises the
+        # API minimum. The bootstrap apply's placeholder revisions are replaced
+        # here. It is a no-op on the platform resources created by the bootstrap.
         env:
           TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
         run: |
           set -euo pipefail
-          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
           terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
             -var-file=envs/staging/terraform.tfvars
 
