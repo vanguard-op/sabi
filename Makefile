@@ -9,6 +9,8 @@ SHELL := /bin/bash
 
 ENV ?= dev
 TF_DIR := infra/terraform
+GCP_TF_DIR := infra/terraform-gcp
+GCP_ENV ?= staging
 
 # Resolve a Python tool from a service's virtualenv when one is present, and from
 # PATH otherwise (which is how CI runs after `pip install`). This keeps local and
@@ -23,7 +25,8 @@ venv_activate = $(if $(wildcard $(1)/.venv/bin/python),PATH="$(CURDIR)/$(1)/.ven
         backend-dev backend-serve ai-dev ai-serve mobile-dev mobile-build \
         test test-backend test-ai test-mobile test-integration test-model-quality \
         lint lint-backend lint-ai lint-mobile format format-backend format-ai check \
-        tf-init tf-fmt tf-validate tf-plan tf-apply tf-destroy
+        tf-init tf-fmt tf-validate tf-plan tf-apply tf-destroy \
+        gcp-init gcp-fmt gcp-validate gcp-plan gcp-apply gcp-up gcp-stop gcp-destroy
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -151,3 +154,34 @@ tf-apply: ## Apply ENV (default dev)
 
 tf-destroy: ## Destroy ENV (default dev)
 	terraform -chdir=$(TF_DIR) destroy -var-file=envs/$(ENV)/terraform.tfvars
+
+# --- GCP staging (infra/terraform-gcp) ---
+# The hosted staging environment of D-032/D-033. The three lifecycle workflows
+# are manual by design and are wrapped here so the same commands run locally and
+# in CI. Never run a paid gcp-apply without the operator's explicit go-ahead.
+# Real values live outside the repo; copy the *.example files next to them.
+
+gcp-init: ## Initialise the GCP Terraform stack for GCP_ENV (default staging)
+	terraform -chdir=$(GCP_TF_DIR) init -backend-config=envs/$(GCP_ENV)/backend.hcl
+
+gcp-fmt: ## Check the GCP Terraform formatting
+	terraform -chdir=$(GCP_TF_DIR) fmt -check -recursive
+
+gcp-validate: ## Validate the GCP Terraform without a backend or credentials
+	terraform -chdir=$(GCP_TF_DIR) init -backend=false -input=false
+	terraform -chdir=$(GCP_TF_DIR) validate
+
+gcp-plan: ## Plan the GCP stack for GCP_ENV (default staging)
+	terraform -chdir=$(GCP_TF_DIR) plan -var-file=envs/$(GCP_ENV)/terraform.tfvars
+
+gcp-apply: ## Apply the GCP stack (paid; requires explicit go-ahead)
+	terraform -chdir=$(GCP_TF_DIR) apply -var-file=envs/$(GCP_ENV)/terraform.tfvars
+
+gcp-up: ## Bring the GCP staging environment up (dispatches the gcp-up workflow)
+	gh workflow run gcp-up.yml
+
+gcp-stop: ## Scale Cloud Run to zero and stop Cloud SQL (dispatches gcp-stop.yml)
+	gh workflow run gcp-stop.yml
+
+gcp-destroy: ## Destroy the GCP staging stack, retaining the state bucket
+	gh workflow run gcp-destroy.yml -f confirm=destroy

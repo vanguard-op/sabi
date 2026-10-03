@@ -1,0 +1,158 @@
+# Sabi GCP staging lifecycle: `up`.
+#
+# Manual by design (D-033). Bringing the staging environment up costs money, so
+# this workflow never runs on push: an operator dispatches it explicitly.
+#
+# It authenticates to GCP, builds and pushes the four images, applies the
+# Terraform stack, runs the Alembic migrations inside the VPC, and prints the
+# mapped URLs and the DNS records to add at Namecheap.
+#
+# Auth is Workload Identity Federation (NFR-024): no long-lived service-account
+# key is committed. Set these repository variables:
+#   GCP_PROJECT_ID            sabi-hq
+#   GCP_REGION                us-central1
+#   GCP_WIF_PROVIDER          projects/<num>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   GCP_SERVICE_ACCOUNT       the deployer service account email
+# and this repository secret for the one value only a human can supply:
+#   GEMINI_API_KEY            the model provider key
+
+name: gcp-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to build and deploy (defaults to the short commit SHA)."
+        required: false
+        type: string
+      api_min_instances:
+        description: "Minimum API instances (0 keeps idle cost near zero)."
+        required: false
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # required for Workload Identity Federation
+
+concurrency:
+  group: gcp-up
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_VERSION: "1.16.5"
+  TF_DIR: infra/terraform-gcp
+
+jobs:
+  up:
+    name: build, apply, migrate, deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: gcp-staging
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Resolve the deploy tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            tag="${{ inputs.image_tag }}"
+          else
+            tag="${GITHUB_SHA::12}"
+          fi
+          echo "image_tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Build and push the four images
+        env:
+          REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/sabi
+          TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          docker build -f infra/docker/api.Dockerfile \
+            -t "${REGISTRY}/api:${TAG}" -t "${REGISTRY}/api:latest" .
+          docker build -f infra/docker/ai.Dockerfile \
+            -t "${REGISTRY}/ai:${TAG}" -t "${REGISTRY}/ai:latest" .
+          docker build -f infra/docker/payments.Dockerfile \
+            -t "${REGISTRY}/payments:${TAG}" -t "${REGISTRY}/payments:latest" .
+          docker build -f infra/docker/console.Dockerfile \
+            --build-arg SABI_API_ORIGIN="https://api.sabi.${{ vars.GCP_DOMAIN_ROOT || 'ahmadkhidir.com' }}" \
+            -t "${REGISTRY}/console:${TAG}" -t "${REGISTRY}/console:latest" .
+          for svc in api ai payments console; do
+            docker push "${REGISTRY}/${svc}:${TAG}"
+            docker push "${REGISTRY}/${svc}:latest"
+          done
+
+      - name: Write the secret Terraform cannot generate
+        # The model provider key is written to Secret Manager here, never to the
+        # repo or Terraform state (NFR-024). Terraform created the container.
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ secrets.GEMINI_API_KEY }}' \
+            | gcloud secrets versions add "sabi-staging-gemini-api-key" \
+                --project="${{ vars.GCP_PROJECT_ID }}" --data-file=-
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
+          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
+
+      - name: Terraform apply
+        env:
+          TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
+          TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
+          terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
+            -var-file=envs/staging/terraform.tfvars
+
+      - name: Run the primary-store migrations
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute "sabi-staging-migrate-primary" \
+            --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
+            --wait
+
+      - name: Run the payment-store migrations
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute "sabi-staging-migrate-payments" \
+            --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
+            --wait
+
+      - name: Print the mapped URLs and DNS records
+        run: |
+          set -euo pipefail
+          {
+            echo "## Sabi staging is up"
+            echo
+            echo "### Service URLs"
+            terraform -chdir="${TF_DIR}" output -raw urls
+            echo
+            echo "### DNS records to add at Namecheap"
+            terraform -chdir="${TF_DIR}" output -json dns_records
+            echo
+            echo "Add the records above, then wait for the managed certificates to become ACTIVE."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show the service URLs in the log
+        run: terraform -chdir="${TF_DIR}" output -raw urls

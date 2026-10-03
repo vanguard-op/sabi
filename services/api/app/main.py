@@ -21,6 +21,7 @@ from app.api import health
 from app.core.audit import AuditLog
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
+from app.core.identity import build_identity_token_provider
 from app.core.logging import configure_logging
 from app.core.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware
 from app.core.rate_limit import (
@@ -66,16 +67,42 @@ MODULE_NAMES = (
 ROUTERLESS_MODULES = frozenset({"reconciliation"})
 
 
+def _probe_redis(url: str) -> None:
+    """Fail fast when a redis-backed store cannot reach its cache.
+
+    The store is selected explicitly (settings), never inferred from the
+    environment. A selected Redis that is unreachable must stop the boot rather
+    than accept sessions and rate-limit counters that would be lost or written
+    to an unreachable host on the first request.
+
+    The imported client is an instance the app never uses: its connection pool
+    closes when the probe returns, so no idle socket is leaked.
+    """
+    import redis
+
+    client = redis.Redis.from_url(url, decode_responses=True)
+    try:
+        client.ping()
+    except Exception as exc:  # noqa: BLE001 - redis raises a family of connection errors
+        raise RuntimeError(
+            "cache_url is unreachable; refusing to start with a degraded store"
+        ) from exc
+    finally:
+        client.close()
+
+
 def _build_session_store(settings: Settings):
-    if settings.environment == "development":
-        return InMemorySessionStore()
-    return RedisSessionStore(settings.cache_url)
+    if settings.resolved_session_store_backend == "redis":
+        _probe_redis(settings.cache_url)
+        return RedisSessionStore(settings.cache_url)
+    return InMemorySessionStore()
 
 
 def _build_rate_limit_store(settings: Settings):
-    if settings.environment == "development":
-        return InMemoryRateLimitStore()
-    return RedisRateLimitStore(settings.cache_url)
+    if settings.resolved_rate_limit_store_backend == "redis":
+        _probe_redis(settings.cache_url)
+        return RedisRateLimitStore(settings.cache_url)
+    return InMemoryRateLimitStore()
 
 
 def _build_audit_log(session_factory) -> AuditLog:  # type: ignore[no-untyped-def]
@@ -164,8 +191,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         default_window_seconds=settings.auth_rate_limit_window_seconds,
     )
     app.state.audit_log = _build_audit_log(session_factory)
-    app.state.agent_ai_client = build_agent_client()
-    app.state.payment_module_client = build_payment_client(settings)
+    # On Cloud Run the private AI and payment services reject a call without a
+    # Google identity token. The provider is bound only when hosted; local and
+    # test processes keep a plain unauthenticated HTTP hop.
+    identity_provider = build_identity_token_provider() if settings.is_hosted else None
+    app.state.agent_ai_client = build_agent_client(identity_provider=identity_provider)
+    app.state.payment_module_client = build_payment_client(
+        settings, identity_provider=identity_provider
+    )
     # The case workflow's refund boundary now resolves to the isolated payment
     # module over the same hop the gateway's payment endpoints use (C-029).
     app.state.cases_refund_port = HttpPaymentModuleRefundPort(app.state.payment_module_client)

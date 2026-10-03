@@ -1,0 +1,69 @@
+# Sabi GCP staging lifecycle: `stop`.
+#
+# Manual by design (D-033). Scales every Cloud Run service to zero and stops the
+# Cloud SQL instance, then reports the residual idle cost. The environment is
+# rebuilt by `gcp-up`; nothing is destroyed here.
+#
+# Set the same repository variables as `gcp-up`. Auth is Workload Identity
+# Federation (NFR-024).
+
+name: gcp-stop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: gcp-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  stop:
+    name: scale to zero and stop Cloud SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: gcp-staging
+    steps:
+      - uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Scale every Cloud Run service to zero
+        run: |
+          set -euo pipefail
+          for svc in sabi-staging-api sabi-staging-ai sabi-staging-payments sabi-staging-console; do
+            gcloud run services update "$svc" \
+              --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
+              --min-instances=0 --max-instances=0 --quiet
+            echo "scaled $svc to zero"
+          done
+
+      - name: Stop the Cloud SQL instance
+        run: |
+          set -euo pipefail
+          gcloud sql instances patch "sabi-staging-pg" \
+            --project="${{ vars.GCP_PROJECT_ID }}" --activation-policy=NEVER --quiet
+
+      - name: Report the residual idle cost
+        run: |
+          {
+            echo "## Sabi staging stopped"
+            echo
+            echo "Cloud Run services are scaled to zero and Cloud SQL is suspended. Idle cost is storage and registry only, roughly:"
+            echo
+            echo "| Item | Approx. monthly idle |"
+            echo "|---|---|"
+            echo "| Cloud SQL HDD storage (10 GiB) | \$1-2 |"
+            echo "| Artifact Registry images | \$0.10 / GiB |"
+            echo "| Cloud SQL backups | from storage usage |"
+            echo "| Secret Manager secret versions | \$0.06 per active version after 6 |"
+            echo "| Compute | \$0 (Cloud Run at zero, SQL suspended) |"
+            echo
+            echo "Expect roughly \$2-3/mo while stopped (D-033). Run \`gcp-up\` to resume."
+          } >> "$GITHUB_STEP_SUMMARY"

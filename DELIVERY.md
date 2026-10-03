@@ -11,7 +11,7 @@ risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; t
 | Owner | Owns | Read-only |
 |---|---|---|
 | lead | DELIVERY.md, CONTRACTS.md, ASSETS.md, .delivery/**, packages/contracts/** | docs/** |
-| infra-engineer | infra/**, .github/**, docker-compose*.yml, Makefile, root config, .gitignore | docs/**, packages/contracts/** |
+| infra-engineer | infra/**, .github/**, docker-compose*.yml, Makefile, root config, .gitignore, .env.example | docs/**, packages/contracts/** |
 | backend-engineer | services/api/**, services/payments/**, migrations/** | packages/contracts/**, docs/** |
 | frontend-engineer | apps/mobile/**, apps/console/** | packages/contracts/**, docs/** |
 | ai-engineer | services/ai/** | packages/contracts/**, docs/** |
@@ -119,6 +119,9 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-070 | FEAT-002 | frontend-engineer | Done | C-022 |
 | T-071 | FEAT-007 | frontend-engineer | Done | C-033 |
 | T-072 | FEAT-001 | frontend-engineer | Done | C-002, C-004 |
+| T-073 | — | infra-engineer | Done | — |
+| T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
+| T-075 | — | infra-engineer | Done | — |
 
 ## Decisions log
 
@@ -155,6 +158,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-029 | C-035 gains a failed-payment branch (`409` with the shared error envelope's `details` carrying `status: failed, reason`) and C-033's `range` is documented as `{minimum, maximum}` minor units | A failed bill has no token and must not poll `awaiting_token` forever; the 409 mirrors C-031's handling of a payment that did not succeed and keeps the repo's one error envelope. Both sides re-dispatched | lead |
 | D-030 | FEAT-008's "every completed payment" scope is the proof-bearing flows (federal C-031, bill C-034), not raw C-017/C-018 authorise-and-execute | `Receipt.kind` enumerates only `official_e_receipt`, `biller_confirmation`, `token`, so only the federal and bill flows carry a receipt; the generic loop has no proof to store. QA's gate observation is answered by the schema, no new capture work | lead |
 | D-031 | docs/Sabi/model-quality.md re-pinned to `gemini-3.1-flash-lite` (docs commit `770008f`) and the parent submodule pointer bumped in the same commit | The docs still named the preview flash model against D-026 and the implementation, which failed the phase gate on a stale assertion | lead |
+| D-032 | Hosted environments move to GCP; GCP project `sabi-hq` (number 303978222288) on the Vanguard Billing account, region `us-central1`, served on subdomains of `sabi.ahmadkhidir.com`; Cloud Run for the API, AI, payment module, and console, Cloud SQL Postgres for both stores, Secret Manager, Artifact Registry; no Memorystore for staging; HDD database storage; Cloud Run domain mapping for TLS, never a load balancer | User-directed; GCP's pay-per-use serverless tiers fit a pre-revenue staging deploy, and a load balancer would bill ~$18/mo even when idle, defeating the teardown story. Supersedes the AWS af-south-1 choice of D-012 for the hosted environments. The apex `ahmadkhidir.com` stays untouched; only `sabi.ahmadkhidir.com` is used | user |
+| D-033 | GCP lifecycle is three manual GitHub Actions: `up` (build, migrate, deploy), `stop` (suspend Cloud SQL and scale Cloud Run to zero), `destroy` (`terraform destroy`, retaining the state bucket) | The user needs to bring the staging environment down quickly when unused. Idle cost is storage and registry, not compute: ~$2–3/mo stopped, ~$0.05/mo destroyed | user |
+| D-034 | Terraform remote state lives in `gs://sabi-hq-tfstate` (us-central1, versioning on, uniform access) | Shared state is required for the CI-driven lifecycle; the bucket survives `destroy` so the environment can be rebuilt | lead |
+| D-035 | Staging Cloud SQL is a single zonal shared-core instance on HDD, so NFR-011's 99.9% availability is not met there; the target applies to production only | Staging is pre-release and must stay cheap to run and tear down (D-032/D-033); HA doubles the instance cost and would defeat the stop/destroy story | lead |
 
 ## Definition of Done
 
