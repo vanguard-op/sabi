@@ -23,7 +23,7 @@ from app.bills.router import router as bills_router
 from app.core.errors import APIError
 from app.core.ids import new_id
 from app.db.models import Receipt, Service
-from app.payments_port import InMemoryPaymentLookup, PaymentView
+from app.payments_port import InMemoryPaymentLookup, PaymentEventView, PaymentView
 
 FIXED_NOW = datetime(2026, 3, 1, 9, 0, tzinfo=UTC)
 
@@ -37,6 +37,7 @@ def _payment(
     payment_id: str | None = None,
     user_id: str = "user-1",
     service_id: str = "service-1",
+    status: str = "succeeded",
 ) -> PaymentView:
     return PaymentView(
         payment_id=payment_id or new_id(),
@@ -46,7 +47,7 @@ def _payment(
         payee="Eko Electricity",
         amount=5_000,
         currency="NGN",
-        status="succeeded",
+        status=status,
         channel="app",
         created_at=FIXED_NOW,
         updated_at=FIXED_NOW,
@@ -497,6 +498,59 @@ def test_token_of_another_users_payment_is_404(bills) -> None:
     response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
 
     assert response.status_code == 404
+
+
+# A terminal failure has no token coming, so the endpoint must report the
+# failure rather than hold the client on ``awaiting_token`` (C-035 revision 1).
+def test_token_failed_payment_is_409_with_the_recorded_reason(bills) -> None:
+    payment = _payment(status="failed")
+    bills.lookup.add(payment)
+    bills.lookup.add_event(
+        PaymentEventView(
+            event_id=new_id(),
+            payment_id=payment.payment_id,
+            status="failed",
+            actor="rail",
+            occurred_at=FIXED_NOW,
+            created_at=FIXED_NOW,
+            detail="The biller rejected the payment after the debit.",
+        )
+    )
+    bills.sign_in()
+
+    response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "status": "failed",
+        "reason": "The biller rejected the payment after the debit.",
+    }
+
+
+def test_token_failed_payment_without_a_recorded_reason_is_409(bills) -> None:
+    payment = _payment(status="failed")
+    bills.lookup.add(payment)
+    bills.sign_in()
+
+    response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["status"] == "failed"
+    # The reason is part of the body even when the rail or biller recorded none.
+    assert body["reason"] is None
+
+
+@pytest.mark.parametrize("status", ["reversed", "refunded"])
+def test_token_unwound_payment_is_409(bills, status: str) -> None:
+    payment = _payment(status=status)
+    bills.lookup.add(payment)
+    bills.sign_in()
+
+    response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
+
+    assert response.status_code == 409
+    assert response.json()["status"] == "failed"
 
 
 def test_token_reports_payment_unavailable_when_the_store_is_not_wired(

@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user
@@ -88,6 +89,11 @@ def pay_bill(
     "/payments/bills/{paymentId}/token",
     response_model=BillTokenResponse,
     response_model_exclude_none=True,
+    responses={
+        200: {"description": "The token was issued and is stored with its receipt."},
+        202: {"description": "The payment settled; the token has not arrived yet."},
+        409: {"description": "The payment failed; no token will be issued."},
+    },
 )
 def get_bill_token(
     paymentId: str,  # noqa: N803  (contract path placeholder is camelCase)
@@ -95,8 +101,17 @@ def get_bill_token(
     session: AccountOwner,
     db: DbSession,
     lookup: PaymentReader,
-) -> BillTokenResponse:
+) -> BillTokenResponse | Response:
     result = service.get_token(db, lookup, user_id=session.user_id, payment_id=paymentId)
+    if result.status == service.FAILED_STATUS:
+        # A terminal failure has no token and must not be polled; return the
+        # contract's 409 body so the client opens the FEAT-009 failure/refund
+        # path instead of waiting on ``awaiting_token`` (C-035). Emitted
+        # verbatim so ``reason`` is present as ``null`` when none was recorded.
+        return JSONResponse(
+            status_code=409,
+            content={"status": result.status, "reason": result.reason},
+        )
     # A token that has not arrived is an accepted, still-in-progress state; the
     # client retries after ``retryAfterSeconds`` (C-035).
     if result.status is not None:

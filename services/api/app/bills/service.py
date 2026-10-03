@@ -48,6 +48,14 @@ _CURRENCY = "NGN"
 AWAITING_TOKEN_STATUS = "awaiting_token"
 TOKEN_RETRY_AFTER_SECONDS = 3
 
+# States from which a bill's token can no longer arrive (schema.md,
+# Payment.status). ``failed`` is a biller or rail refusal; ``reversed`` and
+# ``refunded`` are a bill that was debited and then unwound (FEAT-007 edge case
+# "biller rejects after rail debit", FEAT-009). The client must stop polling and
+# take the failure/refund path, so all three report the contract's failed branch.
+FAILED_STATUS = "failed"
+TERMINAL_FAILURE_STATUSES = frozenset({"failed", "reversed", "refunded"})
+
 # The daily-bill payment channel for this API surface.
 _CHANNEL = "app"
 
@@ -172,7 +180,13 @@ def get_token(
     user_id: str,
     payment_id: str,
 ) -> BillTokenResponse:
-    """Return a bill's token, or report that it is still arriving."""
+    """Return a bill's token, report it still arriving, or report failure.
+
+    A stored token always wins: once captured it is returned with its receipt
+    (200). Otherwise a payment in a terminal failure state has no token coming,
+    so the client is told to stop polling and enter the failure/refund path
+    (409; FEAT-007, FEAT-009). Any other state is held open and retried (202).
+    """
     payment = lookup.get(user_id=user_id, payment_id=payment_id)
     if payment is None:
         # An unknown payment and another account's payment read as the same 404.
@@ -181,6 +195,12 @@ def get_token(
     receipt = repository.get_token_receipt(db, payment_id=payment.payment_id, user_id=user_id)
     if receipt is not None and receipt.document_ref.strip():
         return BillTokenResponse(token=receipt.document_ref, receipt_id=receipt.id)
+
+    if payment.status in TERMINAL_FAILURE_STATUSES:
+        return BillTokenResponse(
+            status=FAILED_STATUS,
+            reason=_failure_reason(lookup, user_id=user_id, payment_id=payment.payment_id),
+        )
 
     # The payment has not produced its token yet: hold it open and let the
     # client check back rather than marking it complete without the token
@@ -194,6 +214,22 @@ def get_token(
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+def _failure_reason(lookup: PaymentLookup, *, user_id: str, payment_id: str) -> str | None:
+    """The rail's or biller's reason for a terminal failure, when one is recorded.
+
+    The payment port carries the reason on the payment's timeline: the failing
+    event records it as its detail. The port's payment view does not expose
+    ``failureReason`` directly, so this reads the boundary that exists rather
+    than inventing a reason; ``None`` means no reason was recorded.
+    """
+    reason: str | None = None
+    for event in lookup.events(user_id=user_id, payment_id=payment_id):
+        detail = (event.detail or "").strip()
+        if event.status in TERMINAL_FAILURE_STATUSES and detail:
+            reason = detail
+    return reason
+
+
 def _require_biller_online(biller: BillerPort, service_id: str) -> None:
     if biller.health(service_id=service_id) == "unavailable":
         raise APIError(
@@ -249,6 +285,8 @@ def _has_alphanumeric(value: str) -> bool:
 
 __all__ = [
     "AWAITING_TOKEN_STATUS",
+    "FAILED_STATUS",
+    "TERMINAL_FAILURE_STATUSES",
     "TOKEN_RETRY_AFTER_SECONDS",
     "get_token",
     "pay",

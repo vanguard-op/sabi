@@ -64,12 +64,14 @@ class BillPaymentResponse(BaseModel):
 
 
 class BillTokenResponse(BaseModel):
-    """C-035 result, covering both branches.
+    """C-035 result, covering all three branches.
 
     A 200 carries the token and its receipt id and no ``status``; a 202 carries
-    ``status`` and ``retryAfterSeconds``. The service sets only the fields its
-    branch owns and the route serialises with ``exclude_none`` so each status
-    returns exactly the contract's shape.
+    ``status`` (``awaiting_token``) and ``retryAfterSeconds``; a 409 carries
+    ``status`` (``failed``) and ``reason``. The service sets only the fields its
+    branch owns; 200 and 202 serialise with ``exclude_none`` so each returns
+    exactly the contract's shape, while the failed branch is emitted verbatim so
+    ``reason`` is present as ``null`` when no reason was recorded.
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -78,6 +80,7 @@ class BillTokenResponse(BaseModel):
     receipt_id: str | None = Field(default=None, alias="receiptId")
     status: str | None = None
     retry_after_seconds: int | None = Field(default=None, alias="retryAfterSeconds")
+    reason: str | None = None
 
 
 __all__ = [
