@@ -173,10 +173,10 @@ Errors: 401 (unauthenticated), 429 (rate limited)
 ReceiptSummary: receiptId: string, paymentId: string, reference: string, payee: string, amount: integer, currency: string, kind: string (official_e_receipt|biller_confirmation|token), status: string, issuedAt: string|null
 
 ### C-024: GET /v1/receipts/{receiptId}
-Status: Frozen
+Status: Frozen (revision 2)
 Auth: Session cookie (authenticated account owner)
 Request: —
-Response 200: receipt: Receipt, payment: PaymentSummary
+Response 200: receipt: Receipt (includes unverifiedReason: string|null), payment: PaymentSummary
 Errors: 401 (unauthenticated), 404 (unknown receipt)
 
 ### C-025: GET /v1/receipts/{receiptId}/document

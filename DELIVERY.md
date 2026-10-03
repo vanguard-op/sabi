@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `e69b928`. 14 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `f240f8b`. 14 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
@@ -133,7 +133,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-046 | FEAT-008 | backend-engineer | Blocked | C-024 |
+| T-046 | FEAT-008 | backend-engineer | In Progress | C-024 |
 | T-047 | — | backend-engineer | Backlog | — |
 | T-048 | FEAT-009 | backend-engineer | Backlog | C-029 |
 | T-049 | — | backend-engineer | In Progress | C-039, C-040 |
