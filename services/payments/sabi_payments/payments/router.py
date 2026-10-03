@@ -1,4 +1,4 @@
-"""C-017..C-019: payment authorisation, execution, and listing.
+"""C-017..C-019 and C-029: payment authorisation, execution, listing, and refund.
 
 Paths are declared without the ``/v1`` prefix; the payment application mounts
 this router under it, exactly as the API and AI services discover their module
@@ -29,6 +29,8 @@ from sabi_payments.payments.schemas import (
     ExecuteResponse,
     PaymentListResponse,
     PaymentSummary,
+    RefundRequest,
+    RefundResponse,
 )
 
 router = APIRouter(tags=["payments"])
@@ -123,6 +125,29 @@ def list_payments(
             for payment in page.payments
         ],
         next_cursor=page.next_cursor,
+    )
+
+
+@router.post("/payments/{paymentId}/refund", status_code=202, response_model=RefundResponse)
+def refund(
+    paymentId: str,  # noqa: N803  (contract path placeholder is camelCase)
+    request: RefundRequest,
+    payments: ServiceDep,
+    user_id: UserDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> RefundResponse:
+    # A refund acts on the stored payment, so no payee or service type is
+    # resolved here; the account owner is the only trusted value it needs.
+    result = payments.refund(
+        user_id=user_id,
+        payment_id=paymentId,
+        reason=request.reason,
+        idempotency_key=idempotency_key or "",
+    )
+    return RefundResponse(
+        payment_id=result.payment_id,
+        status=result.status,
+        refund_reference=result.refund_reference,
     )
 
 

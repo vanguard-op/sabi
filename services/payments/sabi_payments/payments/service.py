@@ -1,4 +1,4 @@
-"""Payment authorisation and execution (FEAT-005, C-017..C-019).
+"""Payment authorisation, execution, listing, and refunding (FEAT-005, FEAT-009).
 
 Rules the module owns:
 
@@ -9,6 +9,9 @@ Rules the module owns:
   (FEAT-005, "Duplicate authorisation").
 - An unknown rail outcome is held ``pending`` and reconciled, never retried
   blindly; a refusal fails cleanly with no partial debit (architecture.md).
+- Only a settled payment can be reversed or refunded, and a second refund for
+  the same reference is blocked at the rail boundary rather than paid twice
+  (FEAT-009; operations.md, "Duplicate-refund prevention").
 
 The service is pure with respect to HTTP: it takes values, not requests, so the
 same calls serve the HTTP surface and an in-process port.
@@ -28,12 +31,16 @@ from sabi_payments.core.config import PaymentSettings
 from sabi_payments.core.errors import PaymentError
 from sabi_payments.core.ids import new_id
 from sabi_payments.core.mandate import MandateRecord, MandateSigner, verify_mandate
-from sabi_payments.core.rail import DisabledRail, RailCharge, RailOutcome, RailPort
+from sabi_payments.core.rail import RailCharge, RailOutcome
+from sabi_payments.core.state import PaymentState
 from sabi_payments.db.audit import PaymentAuditLog
 from sabi_payments.db.models import Payment, PaymentMandate
 from sabi_payments.payments import repository
+from sabi_payments.rail.disabled import DisabledRefundRail
+from sabi_payments.rail.port import RailRefund, RailRefundOutcome, RefundRailPort
 
 _CURRENCY = "NGN"
+_TERMINAL_REFUND_STATES = frozenset({"reversed", "refunded"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +56,13 @@ class ExecutedPayment:
     payment_id: str
     status: str
     rail_reference: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RefundedPayment:
+    payment_id: str
+    status: str
+    refund_reference: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,12 +104,12 @@ class PaymentService:
         session_factory: sessionmaker[Session],
         *,
         settings: PaymentSettings,
-        rail: RailPort | None = None,
+        rail: RefundRailPort | None = None,
         audit: PaymentAuditLog | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._settings = settings
-        self._rail = rail or DisabledRail()
+        self._rail = rail or DisabledRefundRail()
         self._audit = audit or PaymentAuditLog(session_factory)
         self._signer = MandateSigner(settings.mandate_signing_key.get_secret_value())
 
@@ -352,6 +366,84 @@ class PaymentService:
         next_cursor = encode_cursor(page[-1]) if len(rows) > limit and page else None
         return PaymentPage(payments=page, next_cursor=next_cursor)
 
+    # --- C-029 ---------------------------------------------------------------
+
+    def refund(
+        self,
+        *,
+        user_id: str,
+        payment_id: str,
+        reason: str,
+        idempotency_key: str,
+    ) -> RefundedPayment:
+        if not idempotency_key.strip():
+            raise PaymentError(400, "invalid_request", "A refund needs an Idempotency-Key header.")
+
+        with self._session_factory() as session:
+            payment = repository.get_owned_payment(session, payment_id, user_id)
+            if payment is None:
+                # An unknown payment and another account's payment are the same
+                # None, so the endpoint does not reveal which ids exist.
+                raise PaymentError(404, "not_found", "We could not find that payment.")
+
+            # A payment that already reversed or refunded has had its refund; a
+            # second request is the duplicate FEAT-009 blocks by reference
+            # (operations.md, "Duplicate-refund prevention").
+            if payment.status in _TERMINAL_REFUND_STATES:
+                raise _duplicate_refund()
+            if payment.status != PaymentState.SUCCEEDED.value:
+                raise PaymentError(
+                    422,
+                    "validation_failed",
+                    "This payment cannot be refunded in its current state.",
+                )
+
+            outcome = self._rail.refund(
+                RailRefund(
+                    payment_id=payment.id,
+                    user_id=user_id,
+                    amount=payment.amount,
+                    currency=payment.currency,
+                    reference=payment.rail_reference,
+                    reason=reason,
+                    idempotency_key=idempotency_key,
+                )
+            )
+            if outcome.status == "duplicate":
+                raise _duplicate_refund()
+            if outcome.status not in _TERMINAL_REFUND_STATES:
+                # The rail did not settle the refund; the payment stays as it
+                # was rather than being reported as reversed or refunded.
+                raise PaymentError(
+                    503,
+                    "payment_unavailable",
+                    "The refund could not be completed right now. Try again shortly.",
+                )
+
+            _apply_refund_outcome(payment, outcome)
+            # ``reason`` is the user's own words; it belongs on the payment's
+            # timeline and is not sent to application logs.
+            repository.add_event(
+                session,
+                payment_id=payment.id,
+                status=payment.status,
+                actor="rail",
+                detail=reason,
+            )
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                raise _duplicate_refund() from None
+
+        self._audit.append(
+            f"payment.{payment.status}",
+            actor_id=user_id,
+            target=payment.id,
+            detail={"status": payment.status, "refundReference": outcome.refund_reference},
+        )
+        return RefundedPayment(payment.id, payment.status, outcome.refund_reference)
+
 
 _EXECUTED_STATES = frozenset({"succeeded", "pending", "failed", "reversed", "refunded"})
 
@@ -401,11 +493,25 @@ def _is_funding_refusal(reason: str | None) -> bool:
     return "insufficient" in lowered or "limit" in lowered
 
 
+def _apply_refund_outcome(payment: Payment, outcome: RailRefundOutcome) -> None:
+    """Move a settled payment to its terminal reversal or refund state.
+
+    Only called for a settled outcome: an unknown one must not be written as a
+    completed refund (FEAT-009).
+    """
+    payment.status = outcome.status
+
+
+def _duplicate_refund() -> PaymentError:
+    return PaymentError(409, "conflict", "A refund for this payment has already been requested.")
+
+
 __all__ = [
     "AuthorisedPayment",
     "ExecutedPayment",
     "PaymentPage",
     "PaymentService",
+    "RefundedPayment",
     "decode_cursor",
     "encode_cursor",
 ]

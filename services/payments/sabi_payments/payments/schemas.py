@@ -1,4 +1,4 @@
-"""Wire schemas for the payment authorisation surface (C-017..C-019).
+"""Wire schemas for the payment surface (C-017..C-019, C-029).
 
 Field names are camelCase on the wire and map to the module's snake_case model
 at this boundary (DELIVERY.md, conventions). Amounts are integer minor units
@@ -93,6 +93,28 @@ class PaymentListResponse(BaseModel):
     next_cursor: str | None = Field(default=None, serialization_alias="nextCursor")
 
 
+class RefundRequest(BaseModel):
+    """C-029 refund submission. The idempotency key arrives as a header.
+
+    ``reason`` is user-supplied and may carry personal data; it is stored on the
+    payment's own timeline and never written to application logs.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid", str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class RefundResponse(BaseModel):
+    """C-029 result. ``status`` is ``reversed`` or ``refunded``."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    payment_id: str = Field(serialization_alias="paymentId")
+    status: str
+    refund_reference: str | None = Field(default=None, serialization_alias="refundReference")
+
+
 __all__ = [
     "AuthoriseRequest",
     "AuthoriseResponse",
@@ -101,4 +123,6 @@ __all__ = [
     "ExecuteResponse",
     "PaymentListResponse",
     "PaymentSummary",
+    "RefundRequest",
+    "RefundResponse",
 ]

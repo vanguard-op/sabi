@@ -17,18 +17,35 @@ from sabi_payments.core.config import PaymentSettings
 from sabi_payments.core.rail import RailCharge, RailOutcome
 from sabi_payments.db.base import Base
 from sabi_payments.payments.service import PaymentService
+from sabi_payments.rail.port import RailRefund, RailRefundOutcome
 
 
 class FakeRail:
-    """A rail double returning a fixed outcome, recording every charge."""
+    """A rail double returning a fixed outcome, recording every request.
 
-    def __init__(self, outcome: RailOutcome | None = None) -> None:
+    It implements both boundaries so a test can exercise execution and refund
+    through the same double, mirroring a real adapter.
+    """
+
+    def __init__(
+        self,
+        outcome: RailOutcome | None = None,
+        refund_outcome: RailRefundOutcome | None = None,
+    ) -> None:
         self.outcome = outcome or RailOutcome(status="succeeded", reference="RAIL-1")
+        self.refund_outcome = refund_outcome or RailRefundOutcome(
+            status="reversed", refund_reference="RAIL-RF-1"
+        )
         self.charges: list[RailCharge] = []
+        self.refunds: list[RailRefund] = []
 
     def charge(self, request: RailCharge) -> RailOutcome:
         self.charges.append(request)
         return self.outcome
+
+    def refund(self, request: RailRefund) -> RailRefundOutcome:
+        self.refunds.append(request)
+        return self.refund_outcome
 
 
 @pytest.fixture
