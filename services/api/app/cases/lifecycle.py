@@ -14,7 +14,7 @@ the safe direction: the case is escalated, not left waiting.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.db.models import PaymentCase
 
@@ -62,6 +62,20 @@ def can_transition(current: str, target: str) -> bool:
     return target in ALLOWED_CASE_TRANSITIONS.get(current, frozenset())
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Put a datetime on the UTC timeline, reading a naive one as UTC.
+
+    SQLite returns a naive datetime for a ``DateTime(timezone=True)`` column
+    even though the escalation job's clock is aware, so comparing the two
+    directly raises. A naive value is taken as UTC; an aware value already
+    carries its instant and is left as-is, which keeps the PostgreSQL path
+    unchanged.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
 def add_business_days(start: datetime, days: int) -> datetime:
     """Advance by business days, skipping Saturday and Sunday."""
     current = start
@@ -78,7 +92,7 @@ def window_deadline(case: PaymentCase) -> datetime | None:
     days = service_window_days(case.type)
     if days is None:
         return None
-    return add_business_days(case.opened_at, days)
+    return add_business_days(_as_utc(case.opened_at), days)
 
 
 def exceeds_service_window(case: PaymentCase, now: datetime) -> bool:
@@ -86,7 +100,7 @@ def exceeds_service_window(case: PaymentCase, now: datetime) -> bool:
     if case.status not in ACTIVE_CASE_STATUSES:
         return False
     deadline = window_deadline(case)
-    return deadline is not None and now >= deadline
+    return deadline is not None and _as_utc(now) >= deadline
 
 
 def find_breaches(cases: list[PaymentCase], now: datetime) -> list[WindowBreach]:

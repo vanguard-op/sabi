@@ -555,6 +555,52 @@ def test_case_within_its_window_does_not_escalate() -> None:
     assert lifecycle.exceeds_service_window(case, now) is False
 
 
+def test_naive_opened_at_is_read_as_utc_against_an_aware_clock() -> None:
+    # SQLite returns a naive datetime for a DateTime(timezone=True) column
+    # while the escalation job's clock is aware; the window must still resolve
+    # rather than raise, and report its deadline on the UTC timeline.
+    case = _seed_case_case_type(
+        "failed_no_delivery",
+        status="awaiting_provider",
+        opened_at=datetime(2026, 10, 5, 9, 0),
+    )
+    assert lifecycle.window_deadline(case) == datetime(2026, 10, 8, 9, 0, tzinfo=UTC)
+
+
+def test_naive_opened_at_past_its_window_escalates() -> None:
+    case = _seed_case_case_type(
+        "failed_no_delivery",
+        status="awaiting_provider",
+        opened_at=datetime(2026, 10, 5, 9, 0),
+    )
+    now = datetime(2026, 10, 8, 12, 0, tzinfo=UTC)
+    assert lifecycle.exceeds_service_window(case, now) is True
+    assert [breach.case_id for breach in lifecycle.find_breaches([case], now)] == [case.id]
+
+
+def test_naive_opened_at_within_its_window_does_not_escalate() -> None:
+    case = _seed_case_case_type(
+        "refund",
+        status="awaiting_provider",
+        opened_at=datetime(2026, 10, 5, 9, 0),
+    )
+    now = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    assert lifecycle.exceeds_service_window(case, now) is False
+
+
+def test_aware_opened_at_is_unchanged_against_an_aware_clock() -> None:
+    # The PostgreSQL path returns aware timestamps; the comparison and the
+    # deadline are exactly as before.
+    case = _seed_case_case_type(
+        "failed_no_delivery",
+        status="awaiting_provider",
+        opened_at=datetime(2026, 10, 5, 9, 0, tzinfo=UTC),
+    )
+    assert lifecycle.window_deadline(case) == datetime(2026, 10, 8, 9, 0, tzinfo=UTC)
+    now = datetime(2026, 10, 8, 12, 0, tzinfo=UTC)
+    assert lifecycle.exceeds_service_window(case, now) is True
+
+
 def test_resolved_or_closed_case_never_escalates() -> None:
     now = datetime(2026, 12, 1, 12, 0, tzinfo=UTC)
     for status in ("resolved", "closed"):
