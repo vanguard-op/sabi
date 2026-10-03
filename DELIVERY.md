@@ -118,7 +118,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 ### Phase 2: The payment loop
 
-Planned only; nothing dispatched. Routes are written at dispatch time.
+Planned only; nothing dispatched. No task below has a `.delivery/T-###.md` route yet: a route is written immediately before its dispatch and deleted when the task closes, so the absence of route files here is the hold. Contracts are frozen; board status is the gate.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
