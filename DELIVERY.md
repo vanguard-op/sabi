@@ -123,10 +123,10 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-030 | FEAT-005 | backend-engineer | Backlog | C-017–C-019 |
-| T-031 | FEAT-002 | backend-engineer | Backlog | C-020–C-022 |
-| T-032 | FEAT-008 | backend-engineer | Backlog | C-023–C-025 |
-| T-033 | FEAT-009 | backend-engineer | Backlog | C-026–C-029 |
+| T-030 | FEAT-005 | backend-engineer | In Progress | C-017–C-019 |
+| T-031 | FEAT-002 | backend-engineer | In Progress | C-020–C-022 |
+| T-032 | FEAT-008 | backend-engineer | In Progress | C-023–C-025 |
+| T-033 | FEAT-009 | backend-engineer | In Progress | C-026–C-029 |
 | T-034 | FEAT-006 | backend-engineer | Backlog | C-030–C-032 |
 | T-035 | FEAT-007 | backend-engineer | Backlog | C-033–C-035 |
 | T-036 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
