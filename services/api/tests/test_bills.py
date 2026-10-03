@@ -521,7 +521,10 @@ def test_token_failed_payment_is_409_with_the_recorded_reason(bills) -> None:
     response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
 
     assert response.status_code == 409
-    assert response.json() == {
+    error = response.json()["error"]
+    assert error["code"] == "conflict"
+    assert error["message"] == "The biller rejected the payment after the debit."
+    assert error["details"] == {
         "status": "failed",
         "reason": "The biller rejected the payment after the debit.",
     }
@@ -535,10 +538,12 @@ def test_token_failed_payment_without_a_recorded_reason_is_409(bills) -> None:
     response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
 
     assert response.status_code == 409
-    body = response.json()
-    assert body["status"] == "failed"
-    # The reason is part of the body even when the rail or biller recorded none.
-    assert body["reason"] is None
+    error = response.json()["error"]
+    assert error["code"] == "conflict"
+    # The envelope still carries a plain message when the biller recorded none.
+    assert error["message"]
+    assert error["details"]["status"] == "failed"
+    assert error["details"]["reason"] is None
 
 
 @pytest.mark.parametrize("status", ["reversed", "refunded"])
@@ -550,7 +555,9 @@ def test_token_unwound_payment_is_409(bills, status: str) -> None:
     response = bills.client.get(f"/v1/payments/bills/{payment.payment_id}/token")
 
     assert response.status_code == 409
-    assert response.json()["status"] == "failed"
+    error = response.json()["error"]
+    assert error["code"] == "conflict"
+    assert error["details"]["status"] == "failed"
 
 
 def test_token_reports_payment_unavailable_when_the_store_is_not_wired(

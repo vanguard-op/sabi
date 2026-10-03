@@ -70,8 +70,8 @@ class BillTokenResponse(BaseModel):
     ``status`` (``awaiting_token``) and ``retryAfterSeconds``; a 409 carries
     ``status`` (``failed``) and ``reason``. The service sets only the fields its
     branch owns; 200 and 202 serialise with ``exclude_none`` so each returns
-    exactly the contract's shape, while the failed branch is emitted verbatim so
-    ``reason`` is present as ``null`` when no reason was recorded.
+    exactly the contract's shape, while the route turns the failed branch into
+    the standard conflict envelope (the reason travels in ``error.details``).
     """
 
     model_config = ConfigDict(populate_by_name=True)
