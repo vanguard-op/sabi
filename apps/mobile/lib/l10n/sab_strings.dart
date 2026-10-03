@@ -79,6 +79,11 @@ class SabStrings {
   String get creatingAccount => _t('creatingAccount');
   String get passkeyUnsupportedTitle => _t('passkeyUnsupportedTitle');
   String get passkeyUnsupportedBody => _t('passkeyUnsupportedBody');
+  String get passkeySetupUnavailableTitle => _t('passkeySetupUnavailableTitle');
+  String get passkeySetupUnavailableBody => _t('passkeySetupUnavailableBody');
+  String get passkeySetupUnavailableSignIn =>
+      _t('passkeySetupUnavailableSignIn');
+  String get passkeyRetry => _t('passkeyRetry');
   String get useRecoveryInstead => _t('useRecoveryInstead');
   String get offlineQueue => _t('offlineQueue');
   String get errorTitle => _t('errorTitle');
@@ -282,6 +287,12 @@ class SabStrings {
     'creatingAccount': 'Creating your account…',
     'passkeyUnsupportedTitle': 'This device can’t use a passkey',
     'passkeyUnsupportedBody': 'You can still create an account with a recovery code and email. That is less secure than a passkey, so save the code carefully.',
+    'passkeySetupUnavailableTitle': 'Passkey setup isn’t available here',
+    'passkeySetupUnavailableBody':
+        'This build can’t set up a passkey on this device yet, so passkeys won’t work right now. You can create an account with a recovery code instead. Nothing you entered was rejected.',
+    'passkeySetupUnavailableSignIn':
+        'Passkeys aren’t available on this build. Sign in with a recovery code instead.',
+    'passkeyRetry': 'The passkey prompt didn’t finish. Give it another try.',
     'useRecoveryInstead': 'Create account with a recovery code',
     'offlineQueue': 'You’re offline. Account creation is queued and will finish when you reconnect.',
     'errorTitle': 'Something went wrong',
@@ -475,6 +486,15 @@ class SabStrings {
     'getStarted': 'Start now',
     'signIn': 'Sign in',
     'dataHandling': 'How Sabi dey handle your data',
+    'passkeyUnsupportedTitle': 'This device no fit use passkey',
+    'passkeyUnsupportedBody':
+        'You still fit create account with recovery code and email. That one no strong like passkey, so keep the code well.',
+    'passkeySetupUnavailableTitle': 'Passkey setup no dey work here',
+    'passkeySetupUnavailableBody':
+        'This build never set up passkey on this device yet, so passkey no go work right now. You fit create account with recovery code instead. Nothing you enter no dey rejected.',
+    'passkeySetupUnavailableSignIn':
+        'Passkey no dey this build. Use recovery code take sign in.',
+    'passkeyRetry': 'The passkey prompt no finish. Try am again.',
     'getStartedLoading': 'Dey check your device…',
     'showPasskey': 'Use passkey',
     'emptyTitle': 'You never pay anything',

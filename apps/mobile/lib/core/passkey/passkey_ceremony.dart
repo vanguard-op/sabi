@@ -25,26 +25,79 @@ abstract class PasskeyCeremony {
   Future<Map<String, dynamic>> authenticate(Map<String, dynamic> publicKey);
 }
 
-/// The device has no usable platform authenticator: no passkey can be enrolled
-/// or asserted here. The caller falls back to the recovery-code path and says
-/// so, rather than fabricating a credential (FEAT-001 edge case).
+/// Why no passkey ceremony can run, so the screen can be specific about the
+/// cause instead of blaming the user (FEAT-001 edge case; screens/01-welcome).
+enum PasskeyUnavailableReason {
+  /// The platform has no usable authenticator: an old OS, or no credential
+  /// provider enabled. The reduced-security recovery-code path applies.
+  noAuthenticator,
+
+  /// The relying-party origin is not associated with this build, so the OS
+  /// refuses the ceremony before any credential is made (`DomainNotAssociated`
+  /// on the plugin). A setup problem in the build or the RP, not the user's
+  /// data being rejected; the recovery-code path is the way forward.
+  domainNotAssociated,
+}
+
+/// The device or relying party cannot host a passkey ceremony: no passkey can be
+/// enrolled or asserted here. The caller falls back to the recovery-code path
+/// and says why, rather than fabricating a credential (FEAT-001 edge case).
 class PasskeyUnavailable implements Exception {
-  const PasskeyUnavailable();
+  const PasskeyUnavailable([
+    this.reason = PasskeyUnavailableReason.noAuthenticator,
+  ]);
+
+  /// The cause, so the screen distinguishes a device without an authenticator
+  /// from a build whose relying party is not set up.
+  final PasskeyUnavailableReason reason;
 
   @override
-  String toString() => 'PasskeyUnavailable';
+  String toString() => 'PasskeyUnavailable($reason)';
+}
+
+/// Why a ceremony that started did not complete: either the user stepped away
+/// (quietly, not an error) or something worth retrying failed.
+enum PasskeyFailureReason {
+  /// The user dismissed the system sheet. Not an error: return quietly to the
+  /// ready state, never to a failure banner.
+  cancelled,
+
+  /// The system prompt timed out before a credential was produced.
+  timeout,
+
+  /// The authenticator reported a case the plugin does not classify.
+  unhandled,
+
+  /// Options the platform could not parse; a fresh ceremony is a meaningful
+  /// retry, unlike the recovery-code fallback.
+  malformed,
+
+  /// The gateway rejected the credential and asked for a fresh ceremony
+  /// (C-002/C-004 `400`/`410`).
+  verification,
+
+  /// Any other failure on the same path.
+  other,
 }
 
 /// The ceremony ran but did not complete: the user dismissed the system prompt,
 /// it timed out, or the authenticator rejected the request. Distinct from
 /// [PasskeyUnavailable] so the caller retries the same path instead of
-/// switching to the recovery-code fallback.
+/// switching to the recovery-code fallback, and carries a [reason] so the
+/// screen branches on the outcome rather than matching strings.
 class PasskeyCeremonyFailure implements Exception {
-  const PasskeyCeremonyFailure([this.message]);
+  const PasskeyCeremonyFailure([
+    this.message,
+    this.reason = PasskeyFailureReason.other,
+  ]);
 
   /// A short diagnostic reason; never user-facing copy.
   final String? message;
 
+  /// The classified outcome, so the caller can treat a cancellation quietly
+  /// and offer a retry only when a retry is meaningful.
+  final PasskeyFailureReason reason;
+
   @override
-  String toString() => message ?? 'PasskeyCeremonyFailure';
+  String toString() => message ?? 'PasskeyCeremonyFailure($reason)';
 }

@@ -118,15 +118,24 @@ void main() {
       );
     });
 
-    test('a cancelled prompt is retryable, not the fallback', () async {
-      final authenticator = _FakeAuthenticator()
-        ..authenticateError = PasskeyAuthCancelledException();
-      final ceremony = PlatformPasskeyCeremony(authenticator: authenticator);
-      await expectLater(
-        ceremony.authenticate(_requestOptions()),
-        throwsA(isA<PasskeyCeremonyFailure>()),
-      );
-    });
+    test(
+      'a cancelled prompt is a quiet cancellation, not the fallback',
+      () async {
+        final authenticator = _FakeAuthenticator()
+          ..authenticateError = PasskeyAuthCancelledException();
+        final ceremony = PlatformPasskeyCeremony(authenticator: authenticator);
+        await expectLater(
+          ceremony.authenticate(_requestOptions()),
+          throwsA(
+            isA<PasskeyCeremonyFailure>().having(
+              (error) => error.reason,
+              'reason',
+              PasskeyFailureReason.cancelled,
+            ),
+          ),
+        );
+      },
+    );
 
     test('unparseable options are retryable, not the fallback', () async {
       final ceremony = PlatformPasskeyCeremony(

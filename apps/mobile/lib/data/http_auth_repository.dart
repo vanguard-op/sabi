@@ -7,7 +7,11 @@ import '../models/account.dart';
 import 'repositories.dart';
 
 export '../core/passkey/passkey_ceremony.dart'
-    show PasskeyUnavailable, PasskeyCeremonyFailure;
+    show
+        PasskeyUnavailable,
+        PasskeyUnavailableReason,
+        PasskeyCeremonyFailure,
+        PasskeyFailureReason;
 
 /// Live authentication against the gateway (FEAT-001; C-001–C-007).
 ///
@@ -168,8 +172,10 @@ class HttpAuthRepository implements AuthRepository {
     );
   }
 
-  /// Runs a ceremony, letting the unavailable signal through so the caller can
-  /// offer the fallback, and wrapping every other failure as retryable.
+  /// Runs a ceremony, letting the typed outcomes through so the caller can
+  /// branch on them: the unavailable signal offers the fallback, a cancellation
+  /// returns quietly, and a retryable failure shows a retry. Anything the
+  /// platform did not classify is a bare retryable failure.
   Future<Map<String, dynamic>> _ceremonyCredential(
     Future<Map<String, dynamic>> Function() ceremony,
   ) async {
@@ -188,7 +194,10 @@ class HttpAuthRepository implements AuthRepository {
       switch (error.statusCode) {
         // 400 invalid credential or 410 expired challenge: the ceremony must be
         // run again, which is not a recovery-code fallback.
-        400 || 410 => PasskeyCeremonyFailure(error.message),
+        400 || 410 => PasskeyCeremonyFailure(
+          error.message,
+          PasskeyFailureReason.verification,
+        ),
         _ => ApiServerFailure(error.message),
       };
 
