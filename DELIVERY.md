@@ -105,44 +105,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console (T-049–T-051, T-054, T-057–T-059) |
-
-### Phase 2: The payment loop
-
-Active. The payment loop, receipts, cases, identity verification, federal and bill flows, channels, and the Operations Console back end are built; the mobile client is wired to the gateway behind the `USE_LIVE_REPOSITORIES` build flag (T-060). The board's `Backlog` status is the dispatch gate. D1–D3 remain unsecured; the phase proceeds on mock/sandbox rails under D-027.
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-030 | FEAT-005 | backend-engineer | Done | C-017–C-019 |
-| T-031 | FEAT-002 | backend-engineer | Done | C-020–C-022 |
-| T-032 | FEAT-008 | backend-engineer | Done | C-023–C-025 |
-| T-033 | FEAT-009 | backend-engineer | Done | C-026–C-029 |
-| T-034 | FEAT-006 | backend-engineer | Done | C-030–C-032 |
-| T-035 | FEAT-007 | backend-engineer | Done | C-033–C-035 |
-| T-036 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
-| T-037 | FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Done | C-017–C-019, C-030–C-035 |
-| T-038 | FEAT-008, FEAT-009 | frontend-engineer | Done | C-023–C-029 |
-| T-039 | FEAT-002 | frontend-engineer | Done | C-020–C-022 |
-| T-040 | FEAT-005, FEAT-009 | ai-engineer | Done | C-017, C-026–C-029 |
-| T-041 | FEAT-005 | backend-engineer | Done | C-017 |
-| T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Done | C-026–C-035 |
-| T-043 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
-| T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
-| T-046 | FEAT-008 | backend-engineer | Done | C-024 |
-| T-047 | — | backend-engineer | Done | — |
-| T-048 | FEAT-009 | backend-engineer | Done | C-029 |
-| T-053 | FEAT-006 | backend-engineer | Done | C-030 |
-| T-055 | FEAT-005 | backend-engineer | Done | C-017–C-019 |
-| T-056 | FEAT-010 | backend-engineer | Done | C-038 |
-| T-060 | FEAT-001, FEAT-003, FEAT-004, FEAT-005, FEAT-008, FEAT-009 | frontend-engineer | Done | C-001–C-043 |
-| T-061 | FEAT-009 | backend-engineer | Done | — |
-| T-062 | FEAT-004, FEAT-005, FEAT-006, FEAT-007 | frontend-engineer | Done | C-011, C-035 (revision 1) |
-| T-063 | FEAT-001 | frontend-engineer | Done | C-001–C-005 |
-| T-064 | FEAT-007 | backend-engineer | Done | C-035 (revision 1) |
-| T-065 | FEAT-001 | backend-engineer | Done | C-002 |
-| T-066 | FEAT-001 | frontend-engineer | Done | C-004, C-005 |
-| T-052 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
-| T-067 | FEAT-009 | backend-engineer | Done | C-029 |
+| Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console |
+| Phase 2: The payment loop | 2026-10-03 | C-017–C-038 implemented and conformant (C-035 at revision 1); FEAT-002/005/006/007/008/009/010 accepted; QA gate passed on API 53 + AI 16 + mobile 255 integration tests with both services booting; MQ-001–MQ-003 live bars deferred under D-022 |
 
 ## Decisions log
 
@@ -176,7 +140,9 @@ Active. The payment loop, receipts, cases, identity verification, federal and bi
 | D-026 | The default high-volume model path moves from `gemini-3-flash-preview` to `gemini-3.1-flash-lite`; list prices refreshed to the published rates | The flash-lite tier is stable rather than preview, cheaper ($0.25/$1.50 vs $0.50/$3.00 per million), and removes preview deprecation exposure from the default build | user |
 | D-027 | Payment features proceed against mock and sandbox rails with contracts C-017–C-038 frozen as written, swapped for the licensed partner later | Unblocks Phase 2 while D1–D3 remain unsecured; the isolated payment module and its port keep the rail swappable without touching callers | user |
 | D-028 | The client passkey ceremony uses the `passkeys` plugin (Corbado) | Verified publisher, Android + iOS, and explicit custom relying-party-server support matching the self-hosted py_webauthn backend; a hand-rolled platform channel is avoided | user |
-| D-029 | C-035 gains a failed-payment branch (`409: status: failed, reason`) and C-033's `range` is documented as `{minimum, maximum}` minor units | A failed bill has no token and must not poll `awaiting_token` forever; the 409 mirrors C-031's handling of a payment that did not succeed. Both sides re-dispatched | lead |
+| D-029 | C-035 gains a failed-payment branch (`409` with the shared error envelope's `details` carrying `status: failed, reason`) and C-033's `range` is documented as `{minimum, maximum}` minor units | A failed bill has no token and must not poll `awaiting_token` forever; the 409 mirrors C-031's handling of a payment that did not succeed and keeps the repo's one error envelope. Both sides re-dispatched | lead |
+| D-030 | FEAT-008's "every completed payment" scope is the proof-bearing flows (federal C-031, bill C-034), not raw C-017/C-018 authorise-and-execute | `Receipt.kind` enumerates only `official_e_receipt`, `biller_confirmation`, `token`, so only the federal and bill flows carry a receipt; the generic loop has no proof to store. QA's gate observation is answered by the schema, no new capture work | lead |
+| D-031 | docs/Sabi/model-quality.md re-pinned to `gemini-3.1-flash-lite` (docs commit `770008f`) and the parent submodule pointer bumped in the same commit | The docs still named the preview flash model against D-026 and the implementation, which failed the phase gate on a stale assertion | lead |
 
 ## Definition of Done
 
