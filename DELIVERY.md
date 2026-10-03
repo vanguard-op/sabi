@@ -116,6 +116,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 |---|---|---|---|---|
 | T-068 | FEAT-001 | infra-engineer | Done | — |
 | T-069 | FEAT-009, FEAT-010 | backend-engineer | Done | — |
+| T-070 | FEAT-002 | frontend-engineer | Done | C-022 |
+| T-071 | FEAT-007 | frontend-engineer | Done | C-033 |
 
 ## Decisions log
 

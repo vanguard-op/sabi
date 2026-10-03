@@ -579,6 +579,9 @@ class _BillPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = SabColorTokens.of(context);
     final validation = state.billValidation;
+    // The resolved service names the identifier it expects: an electricity
+    // biller wants a meter number, airtime a phone number, water an account.
+    final recipient = _recipientCopy(state, payment);
     return Container(
       margin: const EdgeInsets.only(bottom: SabSpacing.lg),
       padding: const EdgeInsets.all(SabSpacing.md),
@@ -600,14 +603,12 @@ class _BillPanel extends StatelessWidget {
           if (state.phase == PaymentPhase.recipientRequired)
             _RecipientField(
               controller: recipientController,
-              payment: payment,
+              label: recipient.label,
+              hint: recipient.hint,
               serviceId: serviceId,
             )
           else ...[
-            _ValueRow(
-              label: payment.recipientLabel,
-              value: state.recipient ?? '',
-            ),
+            _ValueRow(label: recipient.label, value: state.recipient ?? ''),
           ],
           if (state.phase == PaymentPhase.failure &&
               validation != null &&
@@ -623,6 +624,36 @@ class _BillPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The label and hint for a bill's recipient field, derived from the resolved
+/// service so every biller gets the identifier it actually expects (FEAT-007).
+({String label, String hint}) _recipientCopy(
+  PaymentConfirmationState state,
+  PaymentStrings payment,
+) {
+  final service = state.obligation.service;
+  return switch (BillRecipientKind.forService(
+    name: service.name,
+    category: service.category,
+  )) {
+    BillRecipientKind.meter => (
+      label: payment.meterLabel,
+      hint: payment.meterHint,
+    ),
+    BillRecipientKind.phone => (
+      label: payment.phoneLabel,
+      hint: payment.phoneHint,
+    ),
+    BillRecipientKind.account => (
+      label: payment.accountLabel,
+      hint: payment.accountHint,
+    ),
+    BillRecipientKind.generic => (
+      label: payment.recipientLabel,
+      hint: payment.recipientHint,
+    ),
+  };
 }
 
 /// The returned prepaid token, shown in monospace so it can be read and copied
@@ -689,19 +720,21 @@ class _BillTokenView extends StatelessWidget {
 class _RecipientField extends ConsumerWidget {
   const _RecipientField({
     required this.controller,
-    required this.payment,
+    required this.label,
+    required this.hint,
     required this.serviceId,
   });
 
   final TextEditingController controller;
-  final PaymentStrings payment;
+  final String label;
+  final String hint;
   final String serviceId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SabTextField(
-      label: payment.recipientLabel,
-      hint: payment.recipientHint,
+      label: label,
+      hint: hint,
       controller: controller,
       textInputAction: TextInputAction.done,
       onSubmitted: (value) => ref
@@ -711,6 +744,11 @@ class _RecipientField extends ConsumerWidget {
   }
 }
 
+/// A compact label/value line: the label on the left and the value right
+/// aligned, the way [SectionRow] reads. The value is allowed to shrink and
+/// ellipsize (or wrap) instead of reserving a fixed label column and stretching
+/// the value across the remaining width, so a short meter number does not leave
+/// a gap and a long one stays legible at the smallest common width.
 class _ValueRow extends StatelessWidget {
   const _ValueRow({required this.label, required this.value});
 
@@ -722,9 +760,9 @@ class _ValueRow extends StatelessWidget {
     final colors = SabColorTokens.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        SizedBox(
-          width: SabSizes.summaryLabelWidth,
+        Flexible(
           child: Text(
             label,
             style: SabTypography.bodySmall.copyWith(
@@ -732,9 +770,12 @@ class _ValueRow extends StatelessWidget {
             ),
           ),
         ),
-        Expanded(
+        const SizedBox(width: SabSpacing.md),
+        Flexible(
           child: Text(
             value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
             style: SabTypography.mono.copyWith(color: colors.textPrimary),
           ),
         ),

@@ -11,6 +11,7 @@ import '../../../components/status_pill.dart';
 import '../../../core/connectivity.dart';
 import '../../../design_system/icons.dart';
 import '../../../design_system/tokens.dart';
+import '../account_screen.dart' show accountProvider;
 import 'verification_controller.dart';
 import 'verification_models.dart';
 import 'verification_strings.dart';
@@ -35,6 +36,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   final _nin = TextEditingController();
   final _bvn = TextEditingController();
 
+  /// The last authoritative status this screen already propagated to the
+  /// account cache, so a rebuild or a repeat read does not invalidate again.
+  KycStatus? _syncedKyc;
+
   @override
   void dispose() {
     _nin.dispose();
@@ -52,6 +57,27 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     // and a load retries when the connection returns.
     ref.listen<bool>(connectivityProvider, (_, next) {
       ref.read(verificationControllerProvider.notifier).setOnline(next);
+    });
+
+    // A check changes the account's stored verification status (C-008), but
+    // `accountProvider` caches the record it fetched when Account first loaded;
+    // without this it would still render the old status on return (FEAT-002,
+    // screens/09 "Verified", screens/05 "Transition on success"). Listening to
+    // the controller covers every path that reaches the outcome — load, submit
+    // result, and poll result — in one place, and Account keeps reading the
+    // authoritative record rather than this screen's transient phase.
+    ref.listen<VerificationState>(verificationControllerProvider, (_, next) {
+      switch (next.status?.kycStatus) {
+        case KycStatus.verified:
+        case KycStatus.pending:
+          final status = next.status!.kycStatus;
+          if (_syncedKyc != status) {
+            _syncedKyc = status;
+            ref.invalidate(accountProvider);
+          }
+        case KycStatus.unverified || KycStatus.rejected || null:
+          _syncedKyc = null;
+      }
     });
 
     return Scaffold(

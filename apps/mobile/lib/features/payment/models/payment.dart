@@ -342,3 +342,64 @@ class PaymentObligation {
 /// flow. Federal and bill flows carry extra resolve/validate steps before the
 /// shared authorisation (FEAT-006, FEAT-007).
 enum PaymentKind { standard, federal, bill }
+
+/// The kind of identifier a biller expects, which decides the recipient field's
+/// label and hint (FEAT-007).
+///
+/// An electricity bill wants a meter number, airtime wants a phone number, and
+/// a water or television account wants an account number; the category and name
+/// the catalogue returns are the only signal the client has, so an unrecognised
+/// biller falls back to [generic] rather than guessing.
+enum BillRecipientKind {
+  meter,
+  phone,
+  account,
+  generic;
+
+  /// Classifies a service from its catalogue name and category.
+  ///
+  /// The catalogue returns a free-text `name` and a coarse `category` (for
+  /// example "Biller" or "Government"), so the match stays tolerant: a known
+  /// household service is recognised from either field, and anything else is
+  /// [generic].
+  static BillRecipientKind forService({
+    required String name,
+    required String category,
+  }) {
+    final haystack = '${name.toLowerCase()} ${category.toLowerCase()}';
+    bool has(String token) => haystack.contains(token);
+
+    // Electricity first: "meter" and "token" also appear in airtime copy, so
+    // the power words are checked before the telecom ones.
+    if (has('electric') ||
+        has('meter') ||
+        has('prepaid') ||
+        has('power') ||
+        has('energy')) {
+      return BillRecipientKind.meter;
+    }
+    if (has('airtime') ||
+        has('data') ||
+        has('mobile') ||
+        has('phone') ||
+        has('telecom') ||
+        has('mtn') ||
+        has('airtel') ||
+        has('glo') ||
+        has('9mobile')) {
+      return BillRecipientKind.phone;
+    }
+    if (has('water') ||
+        has('television') ||
+        has('cable') ||
+        has('dstv') ||
+        has('gotv') ||
+        has('startimes') ||
+        has('broadband') ||
+        has('subscription') ||
+        has('account')) {
+      return BillRecipientKind.account;
+    }
+    return BillRecipientKind.generic;
+  }
+}

@@ -83,8 +83,20 @@ class PaymentStrings {
 
   // Bills (FEAT-007)
   String get billTitle => _t('billTitle');
+
+  /// The recipient field's label and hint. Each biller names the identifier it
+  /// expects, so the pair is chosen from the resolved service rather than one
+  /// string covering every biller. [recipientLabel]/[recipientHint] remain the
+  /// generic fallback for a biller the mapping does not name.
   String get recipientLabel => _t('recipientLabel');
   String get recipientHint => _t('recipientHint');
+  String get meterLabel => _t('meterLabel');
+  String get meterHint => _t('meterHint');
+  String get phoneLabel => _t('phoneLabel');
+  String get phoneHint => _t('phoneHint');
+  String get accountLabel => _t('accountLabel');
+  String get accountHint => _t('accountHint');
+
   String get recipientNotFound => _t('recipientNotFound');
   String get billerOfflineTitle => _t('billerOfflineTitle');
   String get billerOfflineBody => _t('billerOfflineBody');
@@ -155,8 +167,14 @@ class PaymentStrings {
     'refundStartedTitle': 'Refund started',
     'refundStartedBody': 'We’ve asked the rail to reverse this payment. We’ll update you on your preferred channel.',
     'billTitle': 'Pay this bill',
-    'recipientLabel': 'Meter or phone number',
-    'recipientHint': 'Enter the number you’re paying',
+    'recipientLabel': 'Meter, phone, or account number',
+    'recipientHint': 'Enter the number for this biller',
+    'meterLabel': 'Meter number',
+    'meterHint': 'e.g. your prepaid meter number',
+    'phoneLabel': 'Phone number',
+    'phoneHint': 'e.g. 0801 234 5678',
+    'accountLabel': 'Account number',
+    'accountHint': 'e.g. your customer or account number',
     'recipientNotFound': 'That number wasn’t found. Check it and try again.',
     'billerOfflineTitle': 'Biller is offline',
     'billerOfflineBody': 'We can’t reach this biller right now, so no payment is made. Try again later.',
@@ -195,6 +213,12 @@ class PaymentStrings {
     'billerOfflineTitle': 'Biller offline',
     'billerOfflineBody':
         'We no reach this biller now. No payment go happen. Try later.',
+    'meterLabel': 'Meter number',
+    'meterHint': 'e.g. your prepaid meter number',
+    'phoneLabel': 'Phone number',
+    'phoneHint': 'e.g. 0801 234 5678',
+    'accountLabel': 'Account number',
+    'accountHint': 'e.g. your customer account number',
     'successTitle': 'Payment don settle',
     'doneLabel': 'Done',
   };
