@@ -54,7 +54,7 @@ class ComplianceFinding(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     )
 
 
-class AuditExport(UUIDPrimaryKeyMixin, CreatedAtMixin, TimestampedMixin, Base):
+class AuditExport(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     """A queued audit extract (C-043).
 
     The job carries the requested window and format only; the extract itself is
@@ -72,7 +72,9 @@ class AuditExport(UUIDPrimaryKeyMixin, CreatedAtMixin, TimestampedMixin, Base):
 
     __table_args__ = (
         CheckConstraint("format IN ('csv', 'json')", name="audit_export_format"),
-        CheckConstraint("status IN ('queued', 'running', 'done', 'failed')", name="audit_export_status"),
+        CheckConstraint(
+            "status IN ('queued', 'running', 'done', 'failed')", name="audit_export_status"
+        ),
         CheckConstraint("range_from <= range_to", name="audit_export_range_order"),
     )
 

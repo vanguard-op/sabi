@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `f240f8b`. 14 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `e646521`. 14 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
@@ -140,7 +140,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-050 | — | backend-engineer | In Progress | C-041–C-043 |
 | T-051 | — | frontend-engineer | In Progress | C-013–C-016, C-039–C-043 |
 | T-052 | FEAT-010 | backend-engineer | Backlog | C-036–C-038 |
-| T-053 | FEAT-006 | backend-engineer | Backlog | C-030 |
+| T-053 | FEAT-006 | backend-engineer | In Progress | C-030 |
 
 Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
 
