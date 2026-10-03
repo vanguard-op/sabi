@@ -34,8 +34,9 @@ logger = logging.getLogger("sabi.app")
 
 # Modules that own a router under /v1. A module that has not landed yet is
 # skipped so the monolith boots at Foundation and picks the router up when the
-# module directory appears.
-MODULE_NAMES = ("identity", "catalogue", "registry", "agent")
+# module directory appears. Dotted names are nested packages with their own
+# router, such as identity verification under the identity module.
+MODULE_NAMES = ("identity", "identity.verification", "catalogue", "registry", "agent")
 
 
 def _build_session_store(settings: Settings):
