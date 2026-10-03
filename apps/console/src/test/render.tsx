@@ -1,7 +1,8 @@
-import { vi } from 'vitest';
-import { render, type RenderOptions } from '@testing-library/react';
+import { expect, vi } from 'vitest';
+import { render, waitFor, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider';
+import { useAuth } from '../auth/context';
 import { ConsoleDataContext, type ConsoleData } from '../data/context';
 import type { Staff } from '../api/types';
 
@@ -48,13 +49,29 @@ function seedStaff(staff: Staff | null) {
   );
 }
 
+/**
+ * Reports the auth status for the harness. A view only knows its role once the
+ * server-confirmed session has landed, so waiting on this lets a test observe
+ * the view's real states rather than the transient forbidden state it shows
+ * while the session is still `checking`.
+ */
+function SessionProbe() {
+  const { status } = useAuth();
+  return <span data-testid="session-status" data-status={status} />;
+}
+
 interface Options extends Omit<RenderOptions, 'wrapper'> {
   data: ConsoleData;
   staff?: Staff | null;
   route?: string;
 }
 
-export function renderWithProviders(
+/**
+ * Renders a view inside the console providers and resolves the stubbed session
+ * before returning, so every test asserts against the state the authenticated
+ * operator sees. This is the single place a test confirms a session.
+ */
+export async function renderWithProviders(
   ui: React.ReactElement,
   { data, staff = STAFF, route = '/', ...options }: Options,
 ) {
@@ -63,12 +80,22 @@ export function renderWithProviders(
     return (
       <ConsoleDataContext.Provider value={data}>
         <AuthProvider>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          <MemoryRouter initialEntries={[route]}>
+            <SessionProbe />
+            {children}
+          </MemoryRouter>
         </AuthProvider>
       </ConsoleDataContext.Provider>
     );
   }
-  return render(ui, { wrapper: Wrapper, ...options });
+  const result = render(ui, { wrapper: Wrapper, ...options });
+  await waitFor(() =>
+    expect(result.getByTestId('session-status')).not.toHaveAttribute(
+      'data-status',
+      'checking',
+    ),
+  );
+  return result;
 }
 
 export { STAFF, AUDITOR };

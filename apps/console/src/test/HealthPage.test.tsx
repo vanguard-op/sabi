@@ -8,17 +8,20 @@ import { renderWithProviders } from '../test/render';
 describe('HealthPage', () => {
   it('renders health counts and quarantined capability', async () => {
     const data = createMockData();
-    renderWithProviders(<HealthPage />, { data });
+    await renderWithProviders(<HealthPage />, { data });
     expect(await screen.findByText(/Cable TV subscription/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 healthy/i)).toBeInTheDocument();
+    // Counts reflect the seeded capabilities: two healthy, one degraded, and one
+    // quarantined (a quarantined capability is counted once, under quarantine,
+    // not also under its unavailable health status).
+    expect(screen.getByText(/2 healthy/i)).toBeInTheDocument();
     expect(screen.getByText(/1 degraded/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/1 quarantined/i)).toBeInTheDocument();
   });
 
   it('filters the table by health state', async () => {
     const data = createMockData();
-    renderWithProviders(<HealthPage />, { data });
+    await renderWithProviders(<HealthPage />, { data });
     await screen.findByText(/Cable TV subscription/i);
 
     await userEvent.selectOptions(screen.getByLabelText(/filter by health/i), 'degraded');
@@ -30,7 +33,7 @@ describe('HealthPage', () => {
 
   it('offers restore for a quarantined capability and applies it', async () => {
     const data = createMockData();
-    renderWithProviders(<HealthPage />, { data });
+    await renderWithProviders(<HealthPage />, { data });
     await screen.findByText(/Cable TV subscription/i);
 
     await userEvent.click(screen.getByRole('button', { name: /restore/i }));
@@ -45,7 +48,7 @@ describe('HealthPage', () => {
   it('shows an empty state when the filter matches nothing', async () => {
     const data = createMockData();
     data.state.capabilities = [];
-    renderWithProviders(<HealthPage />, { data });
+    await renderWithProviders(<HealthPage />, { data });
     expect(await screen.findByText(/no capabilities in this state/i)).toBeInTheDocument();
   });
 });
