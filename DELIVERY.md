@@ -142,6 +142,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-021 | Add an API gateway agent module forwarding C-009 and C-012 to the AI service | architecture.md makes the gateway the client's sole entry point, but the agent routes exist only on the AI service; without the module the Phase 1 outcome "a request resolves to a real agency" is unreachable | lead |
 | D-022 | Model quality is verified by QA-authored fixture-based harness runs in Phase 1; live golden-set accuracy with human judges is deferred | The MQ-001/MQ-002/MQ-003 datasets and judges require real labelled data and provider access, neither available at the gate; the pinned model, decoding, 0.70 cutoff, and fallbacks are verified | lead |
 | D-023 | Add a documented `make test-integration` target and run `tests/**` in CI | QA's integration and acceptance layer was not executed by `make test` or CI, so the gate was not enforced | lead |
+| D-024 | The Operations Console is a dedicated staff web console in Phase 1; provider self-service is Phase 2; staff log in with email + password + TOTP under MFA; the console is a stateless deployable in the primary region behind the API gateway | operations.md names a staff/provider surface that is explicitly not a mobile screen; branding.md is mobile-only. Splitting staff console now from provider portal later avoids a provider-auth contract before provider volume exists. Supersedes D-011. | user |
 
 ## Definition of Done
 
