@@ -62,6 +62,17 @@ variable "db_disk_type" {
   }
 }
 
+# Whether to create the Cloud Run workloads (services, jobs, their IAM, and the
+# domain mappings). False by default so the bootstrap apply can create the
+# platform — Artifact Registry, Cloud SQL, secrets, network — before any image
+# exists; Cloud Run rejects an image that is not yet pushed, so the workloads are
+# created by the second apply once the images are in the registry (D-036).
+variable "deploy_workloads" {
+  description = "Create the Cloud Run services, jobs, IAM, and domain mappings."
+  type        = bool
+  default     = false
+}
+
 # Private-service sizing. These default to zero so the environment costs nothing
 # while stopped; the `up` workflow raises them when it deploys (D-033).
 variable "api_min_instances" {

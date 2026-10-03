@@ -108,6 +108,10 @@ jobs:
         env:
           TF_VAR_container_image_tag: latest
           TF_VAR_api_min_instances: "0"
+          # Platform only: Cloud Run rejects a service or job whose image is not
+          # yet in Artifact Registry, so the workloads are created by the second
+          # apply, after the build and push (D-036).
+          TF_VAR_deploy_workloads: "false"
         run: |
           set -euo pipefail
           cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
@@ -158,6 +162,9 @@ jobs:
         env:
           TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
+          # The images now exist, so this apply creates the Cloud Run services,
+          # jobs, their IAM, and the domain mappings (D-036).
+          TF_VAR_deploy_workloads: "true"
         run: |
           set -euo pipefail
           terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \

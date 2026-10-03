@@ -117,7 +117,10 @@ locals {
 # --- Private services ------------------------------------------------------------
 
 resource "google_cloud_run_v2_service" "private_services" {
-  for_each = local.private_services
+  # Held false during the bootstrap apply: Cloud Run refuses to create a service
+  # whose image is not yet in Artifact Registry, so the workloads are created by
+  # the second apply after the images are pushed (D-036).
+  for_each = var.deploy_workloads ? local.private_services : {}
 
   name                = "${local.prefix}-${each.value.name}"
   location            = var.region
@@ -200,7 +203,8 @@ resource "google_cloud_run_v2_service" "private_services" {
 # --- Public services -------------------------------------------------------------
 
 resource "google_cloud_run_v2_service" "public_services" {
-  for_each = local.public_services
+  # See private_services: created only once the images exist (D-036).
+  for_each = var.deploy_workloads ? local.public_services : {}
 
   name                = "${local.prefix}-${each.value.name}"
   location            = var.region
