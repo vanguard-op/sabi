@@ -16,6 +16,7 @@ dependencies:
   go_router: ^18.0.2
   intl: ^0.20.3
   rive: ^0.14.11
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
