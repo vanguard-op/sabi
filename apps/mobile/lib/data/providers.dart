@@ -23,6 +23,14 @@ final receiptRepositoryProvider = Provider<ReceiptRepository>(
   (ref) => MockReceiptRepository(),
 );
 
+final receiptsRepositoryProvider = Provider<ReceiptsRepository>(
+  (ref) => MockReceiptsRepository(),
+);
+
+final casesRepositoryProvider = Provider<CasesRepository>(
+  (ref) => MockCasesRepository(),
+);
+
 /// The app session, shared by the router and the screens.
 final sessionProvider = Provider<SessionStore>((ref) {
   final store = SessionStore();

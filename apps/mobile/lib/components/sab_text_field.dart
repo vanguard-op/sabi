@@ -19,6 +19,7 @@ class SabTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.autofocus = false,
+    this.onChanged,
     this.onSubmitted,
     this.suffixIcon,
   });
@@ -34,6 +35,7 @@ class SabTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final bool autofocus;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final Widget? suffixIcon;
 
@@ -47,6 +49,7 @@ class SabTextField extends StatelessWidget {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       autofocus: autofocus,
+      onChanged: onChanged,
       onSubmitted: onSubmitted,
       style: SabTypography.body.copyWith(
         color: SabColorTokens.of(context).textPrimary,

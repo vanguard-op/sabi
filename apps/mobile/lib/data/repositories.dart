@@ -4,7 +4,9 @@ import '../l10n/sab_strings.dart';
 import '../models/account.dart';
 import '../models/channel_link.dart';
 import '../models/intent_result.dart';
+import '../models/payment_case.dart';
 import '../models/payment_method.dart';
+import '../models/receipt.dart';
 import '../models/receipt_summary.dart';
 import '../models/service_summary.dart';
 
@@ -96,7 +98,150 @@ class ChannelAlreadyLinkedException implements Exception {
   const ChannelAlreadyLinkedException();
 }
 
-/// Recent receipts (Phase 2 FEAT-008; not yet contracted, mocked for Home).
+/// Recent receipts for Home (FEAT-008).
 abstract class ReceiptRepository {
   Future<List<ReceiptSummary>> recent({int limit = 10});
+}
+
+/// A page of receipts plus the cursor for the next one (C-023). A null cursor
+/// means the end of the history.
+@immutable
+class ReceiptPage {
+  const ReceiptPage({required this.receipts, this.nextCursor});
+
+  final List<ReceiptSummary> receipts;
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}
+
+/// A page of cases plus the cursor for the next one (C-026).
+@immutable
+class CasePage {
+  const CasePage({required this.cases, this.nextCursor});
+
+  final List<CaseSummary> cases;
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}
+
+/// A case as returned by the list endpoint (C-026).
+@immutable
+class CaseSummary {
+  const CaseSummary({
+    required this.caseId,
+    required this.paymentId,
+    required this.type,
+    required this.status,
+    required this.openedAt,
+    required this.updatedAt,
+  });
+
+  final String caseId;
+  final String paymentId;
+  final CaseType type;
+  final CaseStatus status;
+  final DateTime openedAt;
+  final DateTime updatedAt;
+
+  factory CaseSummary.fromJson(Map<String, dynamic> json) => CaseSummary(
+    caseId: json['caseId'].toString(),
+    paymentId: json['paymentId'].toString(),
+    type: CaseType.parse((json['type'] ?? 'failed_no_delivery').toString()),
+    status: CaseStatus.parse((json['status'] ?? 'open').toString()),
+    openedAt:
+        DateTime.tryParse(json['openedAt']?.toString() ?? '') ?? DateTime(0),
+    updatedAt:
+        DateTime.tryParse(json['updatedAt']?.toString() ?? '') ?? DateTime(0),
+  );
+}
+
+/// Receipt retrieval (FEAT-008; C-023, C-024, C-025). Every method is scoped to
+/// the authenticated account owner; the screen depends on this abstraction, not
+/// on a transport.
+abstract class ReceiptsRepository {
+  /// Lists the owner's receipts, newest first, optionally filtered by [query]
+  /// across reference, payee, and date (C-023).
+  Future<ReceiptPage> list({String? query, String? cursor, int limit = 20});
+
+  /// Fetches one receipt with the payment it proves (C-024).
+  Future<ReceiptDetail> detail(String receiptId);
+
+  /// Fetches the stored document behind a receipt, for export or share
+  /// (C-025). Throws [ReceiptDocumentPendingException] while the source
+  /// document is still being written.
+  Future<ReceiptDocument> document(String receiptId);
+}
+
+/// Thrown when a receipt's source document has not arrived yet (C-025 409).
+class ReceiptDocumentPendingException implements Exception {
+  const ReceiptDocumentPendingException();
+}
+
+/// Thrown when a receipt is not found or not owned by the account (C-024/C-025).
+class ReceiptNotFoundException implements Exception {
+  const ReceiptNotFoundException();
+}
+
+/// A `409` from a refund: the reference was already refunded (FEAT-009).
+class DuplicateRefundException implements Exception {
+  const DuplicateRefundException();
+}
+
+/// A `422` from a refund: the payment is not refundable in its current state.
+class RefundNotAllowedException implements Exception {
+  const RefundNotAllowedException();
+}
+
+/// The result of initiating a refund (C-029). Status is `reversed` or
+/// `refunded`.
+@immutable
+class RefundResult {
+  const RefundResult({
+    required this.paymentId,
+    required this.status,
+    this.refundReference,
+  });
+
+  final String paymentId;
+  final String status;
+  final String? refundReference;
+
+  factory RefundResult.fromJson(Map<String, dynamic> json) => RefundResult(
+    paymentId: json['paymentId'].toString(),
+    status: json['status'].toString(),
+    refundReference: json['refundReference']?.toString(),
+  );
+}
+
+/// Payment status, failure, and refund handling (FEAT-009; C-026–C-029).
+abstract class CasesRepository {
+  /// Lists the owner's cases, optionally filtered by [status] (C-026).
+  Future<CasePage> list({String? status, String? cursor, int limit = 20});
+
+  /// Fetches one case with its payment and timeline (C-027).
+  Future<CaseDetail> detail(String caseId);
+
+  /// Opens a dispute on a case (C-028). Throws [DuplicateDisputeException] when
+  /// a dispute already exists for the payment.
+  Future<CaseSummary> dispute({required String caseId, required String reason});
+
+  /// Requests a refund for a payment (C-029). The caller supplies the
+  /// idempotency key so a retry is never a second refund.
+  Future<RefundResult> refund({
+    required String paymentId,
+    required String reason,
+    required String idempotencyKey,
+  });
+}
+
+/// Thrown when a dispute already exists for the payment (C-028 409).
+class DuplicateDisputeException implements Exception {
+  const DuplicateDisputeException();
+}
+
+/// Thrown when a case or payment is not found or not owned (C-027/C-029).
+class CaseNotFoundException implements Exception {
+  const CaseNotFoundException();
 }
