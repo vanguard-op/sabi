@@ -12,7 +12,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production"]
@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     webauthn_rp_name: str = "Sabi"
     webauthn_origin: str = "http://localhost:8000"
 
+    # Native clients present a platform origin rather than the web one: iOS runs
+    # the ceremony under "https://<rp_id>" and Android under
+    # "android:apk-key-hash:<sha256>" for its signing certificate. The iOS origin
+    # follows from rp_id; list the Android origins here per deployment. Anything
+    # not in this list is refused, so an unrecognised origin cannot slip through.
+    webauthn_native_origins: list[str] = Field(default_factory=list)
+
     # Session and recovery secrets (NFR-021, NFR-024, NFR-026).
     session_cookie_name: str = "sabi_session"
     session_secret: SecretStr = SecretStr(DEV_PLACEHOLDER)
@@ -94,6 +101,22 @@ class Settings(BaseSettings):
     def hsts_enabled(self) -> bool:
         """HSTS is emitted everywhere except local development over HTTP (NFR-022)."""
         return self.environment != "development"
+
+    @property
+    def webauthn_allowed_origins(self) -> list[str]:
+        """Origins a passkey ceremony may present (FEAT-001).
+
+        The web client presents ``webauthn_origin``, iOS ``https://<rp_id>``,
+        and Android each configured ``android:apk-key-hash:<sha256>``. The
+        verifier treats the web origin as the primary and admits the native
+        origins alongside it, so a valid native ceremony is not rejected merely
+        for not being the web origin.
+        """
+        origins = [self.webauthn_origin, f"https://{self.webauthn_rp_id}"]
+        origins.extend(self.webauthn_native_origins)
+        # py_webauthn matches origins by exact membership; drop duplicates so a
+        # deployment where the web and iOS origins coincide stays unambiguous.
+        return list(dict.fromkeys(origins))
 
     @model_validator(mode="after")
     def _validate(self) -> Settings:

@@ -96,7 +96,7 @@ def verify_registration(
         credential=credential,
         expected_challenge=challenge,
         expected_rp_id=settings.webauthn_rp_id,
-        expected_origin=settings.webauthn_origin,
+        expected_origin=settings.webauthn_allowed_origins,
     )
 
 
@@ -113,7 +113,7 @@ def verify_authentication(
         credential=credential,
         expected_challenge=challenge,
         expected_rp_id=settings.webauthn_rp_id,
-        expected_origin=settings.webauthn_origin,
+        expected_origin=settings.webauthn_allowed_origins,
         credential_public_key=public_key,
         credential_current_sign_count=sign_count,
     )
