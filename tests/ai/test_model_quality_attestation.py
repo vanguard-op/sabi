@@ -22,12 +22,20 @@ _AI_ROOT = _ROOT / "services" / "ai"
 
 
 def test_pinned_model_build_matches_the_quality_contract() -> None:
-    """model-quality.md pins the primary and flash builds; the code must match."""
+    """The pinned primary and flash builds; the code must match the decision of record.
+
+    D-026 moves the high-volume path from ``gemini-3-flash-preview`` to the
+    stable, lower-cost ``gemini-3.1-flash-lite``, and the delivery Stack table
+    records the same. ``model-quality.md`` still names the superseded preview
+    build (a doc gap reported at this gate); the constant here follows the
+    decision of record, not the stale document. This is a substrate check, not
+    the MQ accuracy bar, which remains unmeasured and reported separately.
+    """
 
     from core.config import FLASH_MODEL_ID, PRIMARY_MODEL_ID
 
     assert PRIMARY_MODEL_ID == "gemini-3.1-pro-preview"
-    assert FLASH_MODEL_ID == "gemini-3-flash-preview"
+    assert FLASH_MODEL_ID == "gemini-3.1-flash-lite"
 
 
 def test_decoding_is_pinned_temperature_zero_for_every_capability() -> None:
