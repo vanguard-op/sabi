@@ -29,6 +29,7 @@ from app.core.rate_limit import (
 from app.core.sessions import InMemorySessionStore, RedisSessionStore, SessionManager
 from app.db.audit import DatabaseAuditLog
 from app.db.session import build_session_factory
+from app.payments.client import build_payment_client
 
 logger = logging.getLogger("sabi.app")
 
@@ -42,6 +43,7 @@ MODULE_NAMES = (
     "catalogue",
     "registry",
     "agent",
+    "payments",
     "receipts",
     "cases",
     "bills",
@@ -98,9 +100,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         # Close whatever client is bound at shutdown time: the factory builds one,
         # and a test may have substituted a double without a close method.
-        client = getattr(application.state, "agent_ai_client", None)
-        if client is not None and hasattr(client, "close"):
-            client.close()
+        for state_key in ("agent_ai_client", "payment_module_client"):
+            client = getattr(application.state, state_key, None)
+            if client is not None and hasattr(client, "close"):
+                client.close()
 
     app = FastAPI(
         title="Sabi API",
@@ -122,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.audit_log = _build_audit_log(session_factory)
     app.state.agent_ai_client = build_agent_client()
+    app.state.payment_module_client = build_payment_client(settings)
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(CorrelationIdMiddleware)
