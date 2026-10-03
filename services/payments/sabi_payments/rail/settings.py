@@ -17,6 +17,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RailBackend = Literal["auto", "mock", "disabled"]
@@ -40,9 +41,11 @@ class RailSettings(BaseSettings):
         "success"
     )
 
-    # Read here so ``auto`` can resolve without importing the payment settings
-    # (which own the datastore, not the rail). Both read the same environment.
-    environment: Environment = "development"
+    # The deployed environment, read from the app-wide ``ENVIRONMENT`` variable
+    # rather than a ``rail_``-prefixed one, so it always matches PaymentSettings.
+    # ``auto`` resolves from it, and getting this wrong would select the mock in
+    # production and report obligations as settled when no money moved.
+    environment: Environment = Field(default="development", validation_alias="ENVIRONMENT")
 
     def resolved_backend(self) -> ResolvedBackend:
         """Resolve ``auto``: mock in development, disabled everywhere else."""

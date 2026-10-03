@@ -124,7 +124,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-038 | FEAT-008, FEAT-009 | frontend-engineer | In Progress | C-023–C-029 |
 | T-039 | FEAT-002 | frontend-engineer | In Progress | C-020–C-022 |
 | T-040 | FEAT-005, FEAT-009 | ai-engineer | Backlog | C-017, C-026–C-029 |
-| T-041 | FEAT-005 | backend-engineer | In Progress | C-017 |
+| T-041 | FEAT-005 | backend-engineer | Done | C-017 |
 | T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Done | C-026–C-035 |
 | T-043 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
 | T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |

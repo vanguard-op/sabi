@@ -133,3 +133,19 @@ def test_configured_scenario_and_prefix_reach_the_adapter() -> None:
     assert isinstance(rail, MockRail)
     assert rail.default_scenario is MockScenario.DECLINE
     assert rail.charge(charge()).status == "failed"
+
+
+def test_auto_never_selects_the_mock_outside_development(monkeypatch) -> None:
+    """A simulated settled charge outside development would tell a user an
+    obligation was paid when no money moved. The environment must be read from
+    the app-wide ENVIRONMENT variable, not a rail_-prefixed one, or it silently
+    defaults to development."""
+    from sabi_payments.rail.settings import RailSettings
+
+    for env in ("staging", "production"):
+        monkeypatch.setenv("ENVIRONMENT", env)
+        monkeypatch.delenv("RAIL_BACKEND", raising=False)
+        assert RailSettings().resolved_backend() == "disabled", env
+
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    assert RailSettings().resolved_backend() == "mock"

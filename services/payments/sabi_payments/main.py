@@ -21,6 +21,7 @@ from sabi_payments.core.errors import register_exception_handlers
 from sabi_payments.db.audit import PaymentAuditLog
 from sabi_payments.db.session import build_session_factory
 from sabi_payments.payments.service import PaymentService
+from sabi_payments.rail.factory import build_rail
 
 # Feature routers are auto-discovered: a package exposing ``router: APIRouter``
 # is mounted at ``/v1`` and declares its paths without the prefix.
@@ -57,7 +58,10 @@ def create_app(settings: PaymentSettings | None = None) -> FastAPI:
     app.state.session_factory = session_factory
     app.state.audit_log = PaymentAuditLog(session_factory)
     app.state.payment_service = PaymentService(
-        session_factory, settings=settings, audit=app.state.audit_log
+        session_factory,
+        settings=settings,
+        audit=app.state.audit_log,
+        rail=build_rail(),
     )
 
     register_exception_handlers(app)
