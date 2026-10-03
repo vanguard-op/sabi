@@ -126,7 +126,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-040 | FEAT-005, FEAT-009 | ai-engineer | Backlog | C-017, C-026–C-029 |
 | T-041 | FEAT-005 | backend-engineer | Done | C-017 |
 | T-042 | FEAT-006, FEAT-007, FEAT-009 | backend-engineer | Done | C-026–C-035 |
-| T-043 | FEAT-010 | backend-engineer | In Progress | C-036–C-038 |
+| T-043 | FEAT-010 | backend-engineer | Done | C-036–C-038 |
 | T-044 | FEAT-005, FEAT-006, FEAT-008, FEAT-009 | qa-engineer | Backlog | C-017–C-029 |
 
 ### Operations Console and contract gaps
@@ -143,6 +143,7 @@ Planned and routed; nothing dispatched. Every task below has a `.delivery/T-###.
 | T-053 | FEAT-006 | backend-engineer | Done | C-030 |
 | T-054 | — | backend-engineer | Done | C-039, C-041–C-043 |
 | T-055 | FEAT-005 | backend-engineer | Done | C-017–C-019 |
+| T-056 | FEAT-010 | backend-engineer | In Progress | C-038 |
 
 Dependencies that gate this phase (overview.md): D1 licensed payment partner, D2 OAGF PSSP channel, D3 NIN/BVN verification path. Registered payment features cannot ship without them.
 

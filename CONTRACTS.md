@@ -274,11 +274,11 @@ Response 200: status: string (succeeded|pending|failed), reference: string|null
 Errors: 400 (invalid confirmation), 409 (duplicate authorisation), 410 (session timed out after authorisation; payment pending)
 
 ### C-038: GET /v1/channels/sms/status/{reference}
-Status: Implemented
-Auth: Channel identity (MSISDN session)
-Request: —
+Status: Frozen (revision 2)
+Auth: Channel identity, resolved server-side from the aggregator session or delivery report. The subscriber number is never taken from a client-supplied header: an inbound header is spoofable, so C-038 accepts the MSISDN-bound session established by C-036/C-037 or the aggregator's signed callback context, and an unrecognised caller gets 404.
+Request: sessionId: string|null (the MSISDN-bound session from C-036/C-037, when the caller holds one)
 Response 200: reference: string, status: string (queued|sent|delivered|failed), token: string|null
-Errors: 404 (unknown reference)
+Errors: 404 (unknown reference, or no bound session for the caller)
 
 ## Phase 1.5: Operations Console
 
