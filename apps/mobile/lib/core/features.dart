@@ -22,8 +22,9 @@ enum SabFeature {
 }
 
 /// The enabled feature set. Phase 1 ships onboarding, intent understanding,
-/// discovery, and composed surfaces; later-phase payment surfaces stay gated and
-/// render a neutral fallback until their phase lands.
+/// discovery, and composed surfaces; the route-backed payment surfaces register
+/// a real builder, so [phase2] lights them up while a phase-2 surface whose
+/// builder is not yet registered still renders the neutral gated fallback.
 @immutable
 class SabFeatureFlags {
   const SabFeatureFlags(this.enabled);
@@ -41,8 +42,23 @@ class SabFeatureFlags {
     SabFeature.composedSurfaces,
     SabFeature.providerRegistration,
   });
+
+  /// Phase 1 plus the payment-loop surfaces. The provider selects [phase1] until
+  /// the phase gate; switching it to [phase2] lights up every route-backed
+  /// surface that already registers a real builder.
+  static const SabFeatureFlags phase2 = SabFeatureFlags({
+    SabFeature.passwordlessOnboarding,
+    SabFeature.intentUnderstanding,
+    SabFeature.serviceDiscovery,
+    SabFeature.composedSurfaces,
+    SabFeature.providerRegistration,
+    SabFeature.identityVerification,
+    SabFeature.paymentAuthorization,
+    SabFeature.receiptCapture,
+    SabFeature.failureRecovery,
+  });
 }
 
 final featureFlagsProvider = Provider<SabFeatureFlags>(
-  (ref) => SabFeatureFlags.phase1,
+  (ref) => SabFeatureFlags.phase2,
 );
