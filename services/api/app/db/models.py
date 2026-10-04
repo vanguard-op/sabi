@@ -25,6 +25,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -153,6 +154,19 @@ class Service(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         _enum_check("type", ("government", "biller", "merchant"), "type"),
         _enum_check("status", ("active", "unavailable", "retired"), "status"),
         CheckConstraint("known_amount IS NULL OR known_amount >= 0", name="known_amount_nonneg"),
+        # A service is identified by its natural key ``(name, collecting_body)``,
+        # compared case-insensitively: the catalogue seeder upserts on it, and a
+        # database-level guard stops a concurrent load creating the duplicate that
+        # would split discovery ranking and grounding (FEAT-004, FEAT-012). A
+        # unique *expression* index is used because the constraint is on the
+        # case-folded columns, not the raw ones; the seeder keeps its
+        # application-level upsert as defence in depth.
+        Index(
+            "uq_services_natural_key",
+            func.lower(name),
+            func.lower(collecting_body),
+            unique=True,
+        ),
     )
 
 

@@ -11,7 +11,8 @@ import json
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -25,6 +26,26 @@ from app.catalogue.seed import (
 )
 from app.db.base import Base
 from app.db.models import Service
+
+
+def _case_insensitive_unique_index(engine) -> None:
+    """SQLite does not implement ``lower(col)`` expression indexes by default, so
+    install a minimal equivalent on the connection the test will use. This makes
+    SQLite reject a duplicate case-folded natural key, mirroring the Postgres
+    unique expression index the migration applies.
+    """
+
+    def create(conn, _record) -> None:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='services'"
+        ).fetchone()
+        if exists:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_services_natural_key "
+                "ON services (lower(name), lower(collecting_body))"
+            )
+
+    event.listen(engine, "connect", create)
 
 
 @pytest.fixture
@@ -56,6 +77,19 @@ def _entry(**overrides: object) -> CatalogueEntry:
     }
     values.update(overrides)
     return CatalogueEntry(**values)  # type: ignore[arg-type]
+
+
+def _build(name: str, collecting_body: str) -> Service:
+    return Service(
+        type="biller",
+        name=name,
+        collecting_body=collecting_body,
+        category="airtime",
+        aliases=[],
+        known_amount=None,
+        currency="NGN",
+        status="active",
+    )
 
 
 # --- data file --------------------------------------------------------------
@@ -189,6 +223,66 @@ def test_known_amount_is_never_invented(db: Session) -> None:
     db.commit()
 
     assert all(row.known_amount is None for row in db.query(Service).all())
+
+
+# --- natural-key uniqueness (database level) --------------------------------
+
+
+@pytest.fixture
+def constrained_db() -> Session:
+    """A store with the case-insensitive natural-key uniqueness applied."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    _case_insensitive_unique_index(engine)
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine, expire_on_commit=False) as session:
+            yield session
+    finally:
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_duplicate_natural_key_insert_is_rejected(constrained_db: Session) -> None:
+    constrained_db.add(_build("MTN Airtime", "MTN Nigeria"))
+    constrained_db.commit()
+
+    constrained_db.add(_build("MTN Airtime", "MTN Nigeria"))
+    with pytest.raises(IntegrityError):
+        constrained_db.commit()
+
+
+def test_duplicate_natural_key_is_rejected_case_insensitively(constrained_db: Session) -> None:
+    constrained_db.add(_build("MTN Airtime", "MTN Nigeria"))
+    constrained_db.commit()
+
+    constrained_db.add(_build("mtn airtime", "MTN NIGERIA"))
+    with pytest.raises(IntegrityError):
+        constrained_db.commit()
+
+
+def test_distinct_natural_keys_both_persist(constrained_db: Session) -> None:
+    constrained_db.add(_build("MTN Airtime", "MTN Nigeria"))
+    constrained_db.add(_build("Airtel Airtime", "Airtel Nigeria"))
+    constrained_db.commit()
+    assert constrained_db.query(Service).count() == 2
+
+
+def test_model_declares_the_case_insensitive_natural_key() -> None:
+    # The model carries the same unique expression index the migration creates,
+    # so an Alembic compare does not drift from the store.
+    table = Base.metadata.tables["services"]
+    natural_key = next(
+        (index for index in table.indexes if index.name == "uq_services_natural_key"),
+        None,
+    )
+    assert natural_key is not None and natural_key.unique
+    rendered = str(natural_key.expressions[0])
+    assert "lower" in rendered and "name" in rendered
+    assert "collecting_body" in str(natural_key.expressions[1])
 
 
 # --- validation -------------------------------------------------------------
