@@ -23,7 +23,13 @@
     <application
         android:label="Sabi"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
+        <!-- allowBackup=false (D-039): the session cookie lives in secure
+             storage, whose key can be restored without its Keystore key after an
+             Android auto-restore, raising `InvalidKeyException: Failed to unwrap
+             key`. A payments client must not have its session copied off-device
+             anyway, so backups are disabled outright. -->
         <meta-data
             android:name="asset_statements"
             android:resource="@string/asset_statements" />

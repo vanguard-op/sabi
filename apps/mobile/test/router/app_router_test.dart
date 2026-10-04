@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -28,16 +30,83 @@ List<Override> _baseOverrides() => [
   ),
 ];
 
+/// A resolved session, so the router does not touch platform storage.
+Override _session({required bool authenticated}) =>
+    sessionProvider.overrideWith((ref) {
+      final store = SessionStore();
+      if (authenticated) {
+        store.signIn();
+      } else {
+        store.signOut();
+      }
+      ref.onDispose(store.dispose);
+      return store;
+    });
+
+// The launch check is a no-op once the session is already resolved, which every
+// test here provides through [_session].
+final _noopBootstrap = sessionBootstrapProvider.overrideWith((ref) {});
+
 void main() {
   testWidgets('an unauthenticated deep link falls back to Welcome', (
     tester,
   ) async {
-    await pumpSabApp(tester, overrides: _baseOverrides());
+    await pumpSabApp(
+      tester,
+      overrides: [
+        ..._baseOverrides(),
+        _session(authenticated: false),
+        _noopBootstrap,
+      ],
+    );
     await tester.pumpAndSettle();
     containerOf(tester).read(routerProvider).go('/account');
     await tester.pumpAndSettle();
     expect(find.byType(WelcomeScreen), findsOneWidget);
     expect(find.byType(AccountScreen), findsNothing);
+  });
+
+  testWidgets('the app holds on the splash while the session is unresolved', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    final store = SessionStore();
+    await pumpSabApp(
+      tester,
+      overrides: [
+        ..._baseOverrides(),
+        sessionProvider.overrideWithValue(store),
+        sessionBootstrapProvider.overrideWith((ref) => pending.future),
+      ],
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('startup')), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(find.byType(HomeScreen), findsNothing);
+
+    store.resolveUnauthenticated();
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+  });
+
+  testWidgets('a resolved launch check replaces the splash with Home', (
+    tester,
+  ) async {
+    final store = SessionStore();
+    await pumpSabApp(
+      tester,
+      overrides: [
+        ..._baseOverrides(),
+        sessionProvider.overrideWithValue(store),
+        sessionBootstrapProvider.overrideWith(
+          (ref) => store.resolveAuthenticated(),
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('startup')), findsNothing);
   });
 
   testWidgets('an authenticated app opens on Home inside the shell', (
@@ -47,11 +116,8 @@ void main() {
       tester,
       overrides: [
         ..._baseOverrides(),
-        sessionProvider.overrideWith((ref) {
-          final store = SessionStore()..signIn();
-          ref.onDispose(store.dispose);
-          return store;
-        }),
+        _session(authenticated: true),
+        _noopBootstrap,
       ],
     );
     await tester.pumpAndSettle();
@@ -67,11 +133,8 @@ void main() {
       tester,
       overrides: [
         ..._baseOverrides(),
-        sessionProvider.overrideWith((ref) {
-          final store = SessionStore()..signIn();
-          ref.onDispose(store.dispose);
-          return store;
-        }),
+        _session(authenticated: true),
+        _noopBootstrap,
       ],
     );
     await tester.pumpAndSettle();
@@ -90,11 +153,8 @@ void main() {
       tester,
       overrides: [
         ..._baseOverrides(),
-        sessionProvider.overrideWith((ref) {
-          final store = SessionStore()..signIn();
-          ref.onDispose(store.dispose);
-          return store;
-        }),
+        _session(authenticated: true),
+        _noopBootstrap,
       ],
     );
     await tester.pumpAndSettle();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'data/providers.dart';
 import 'design_system/theme.dart';
 import 'router/app_router.dart';
 
@@ -12,6 +13,10 @@ class SabApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    // Kick off the launch check: it restores the persisted session cookie and
+    // verifies it, resolving the session store the router listens to. Watching
+    // it here means it runs once for the app's lifetime.
+    ref.watch(sessionBootstrapProvider);
     return MaterialApp.router(
       title: 'Sabi',
       debugShowCheckedModeBanner: false,

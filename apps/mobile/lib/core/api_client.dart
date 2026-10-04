@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
 import 'api_exception.dart';
+import 'session.dart';
 
 /// A thin JSON client over the API gateway (architecture.md "API Gateway /
 /// Backend-for-Frontend").
@@ -12,16 +13,18 @@ import 'api_exception.dart';
 /// Responsibilities kept deliberately narrow:
 /// - Builds `/v1` URLs from [ApiConfig.baseUrl].
 /// - Sends and receives JSON with camelCase fields.
-/// - Carries the session as the platform cookie jar: `dart:io` / the browser
-///   persist `Set-Cookie` and resend it, and [http.Client] uses that jar, so the
-///   HttpOnly session cookie from C-002/C-004 is neither read nor stored in
-///   Dart code. The client never logs a request/response body or header.
+/// - Carries the session cookie explicitly through [SessionCookieStore]. Native
+///   Flutter has no browser cookie jar, so `dart:io` does not persist or resend
+///   the HttpOnly session cookie set by C-002/C-004; the store is the jar. It
+///   captures `Set-Cookie` from each response and resends it as a `Cookie`
+///   header, and it never reads the value out for logging.
 /// - Maps the shared error envelope to [ApiException] and treats a transport
 ///   failure as [ApiUnreachable].
 class SabApiClient {
   SabApiClient({
     required ApiConfig config,
     http.Client? httpClient,
+    SessionCookieStore? sessionCookie,
     this.onUnauthenticated,
     this.onUnreachable,
   })
@@ -29,10 +32,15 @@ class SabApiClient {
     // private field rather than promoted to a public one.
     // ignore: prefer_initializing_formals
     : _config = config,
-      _http = httpClient ?? http.Client();
+       _http = httpClient ?? http.Client(),
+       // A named parameter cannot be private, so the cookie store is copied to
+       // the private field rather than promoted to a public one.
+       // ignore: prefer_initializing_formals
+       _sessionCookie = sessionCookie;
 
   final ApiConfig _config;
   final http.Client _http;
+  final SessionCookieStore? _sessionCookie;
 
   /// Called once when the gateway rejects the session cookie, before
   /// [ApiUnauthenticated] is thrown. The client raises the shared
@@ -110,10 +118,17 @@ class SabApiClient {
     Object? body,
     Map<String, String>? headers,
   }) async {
+    final cookieStore = _sessionCookie;
+    // Restore the persisted cookie before the first request; `load` is
+    // idempotent and fails closed, so this is safe on every call.
+    await cookieStore?.load();
+
     final uri = _uri(path, query);
+    final cookie = cookieStore?.cookieHeader;
     final requestHeaders = <String, String>{
       'accept': 'application/json',
       if (body != null) 'content-type': 'application/json',
+      'cookie': ?cookie,
       ...?headers,
     };
 
@@ -138,10 +153,20 @@ class SabApiClient {
       throw ApiUnreachable(error);
     }
 
+    if (cookieStore != null) {
+      final setCookie = response.headersSplitValues['set-cookie'];
+      if (setCookie != null && setCookie.isNotEmpty) {
+        await cookieStore.capture(setCookie);
+      }
+    }
+
     return _decode(response, raiseReauth: !_isPublicAuthPath(path));
   }
 
-  ApiResponse _decode(http.Response response, {required bool raiseReauth}) {
+  Future<ApiResponse> _decode(
+    http.Response response, {
+    required bool raiseReauth,
+  }) async {
     final status = response.statusCode;
     Map<String, dynamic>? decoded;
     if (response.body.isNotEmpty) {
@@ -174,7 +199,12 @@ class SabApiClient {
       // Re-authorisation flow rather than a bare error (user-flow
       // "Authentication Gate"). Public auth endpoints opt out — their 401 is a
       // credential outcome the sign-in screen shows inline.
-      if (raiseReauth) onUnauthenticated?.call();
+      if (raiseReauth) {
+        // A definitive rejection of the cookie: forget it so a dead session is
+        // never resent, then raise the overlay.
+        await _sessionCookie?.clear();
+        onUnauthenticated?.call();
+      }
       throw ApiUnauthenticated(
         code: code,
         message: rawMessage,
@@ -211,6 +241,12 @@ class SabApiClient {
     503 => 'That service is unavailable right now.',
     _ => 'The request failed.',
   };
+
+  /// Forgets the persisted session cookie when the user signs out, so a later
+  /// launch does not restore a session the user ended (screens/09-account).
+  Future<void> clearSession() async {
+    await _sessionCookie?.clear();
+  }
 
   void close() => _http.close();
 }

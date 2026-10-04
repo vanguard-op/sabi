@@ -19,5 +19,11 @@
 	<array>
 		<string>webcredentials:$(WEBAUTHN_RP_ID)</string>
 	</array>
+	<!-- Keychain sharing for flutter_secure_storage (D-039). The plugin writes
+	     the session cookie to the app's Keychain access group; declaring the
+	     entitlement (empty: the app's own group only) keeps access stable across
+	     launches. No group is shared with another app. -->
+	<key>keychain-access-groups</key>
+	<array/>
 </dict>
 </plist>

@@ -140,10 +140,11 @@ class HttpAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
-    // The end-user contract has no sign-out endpoint; the client clears its
-    // session state and the cookie is dropped by the platform jar. A future
-    // C-### logout is a drop-in change here.
-    return;
+    // The end-user contract has no sign-out endpoint, so the client ends the
+    // session locally: the persisted cookie is cleared so a later launch does
+    // not restore it, and the caller resolves the session store to signed out.
+    // A future C-### logout is a drop-in change here.
+    await _api.clearSession();
   }
 
   /// Fetches a ceremony's `challengeId` and `publicKey` (C-001/C-003), mapping

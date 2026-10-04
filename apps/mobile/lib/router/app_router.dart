@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../components/navigation_shell.dart';
 import '../core/features.dart';
 import '../data/providers.dart';
+import '../design_system/sab_art.dart';
+import '../design_system/tokens.dart';
 import '../features/account/account_screen.dart';
 import '../features/account/verification/verification_screen.dart';
 import '../features/case/case_screen.dart';
@@ -24,6 +26,7 @@ class SabRoutes {
 
   static const welcome = '/welcome';
   static const signIn = '/sign-in';
+  static const startup = '/startup';
   static const home = '/home';
   static const receipts = '/receipts';
   static const account = '/account';
@@ -41,11 +44,21 @@ GoRouter buildRouter(Ref ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: SabRoutes.welcome,
+    initialLocation: SabRoutes.startup,
     refreshListenable: session,
     redirect: (context, state) {
       final location = state.matchedLocation;
       final isPublic = publicRoutes.contains(location);
+      final isStartup = location == SabRoutes.startup;
+
+      // Until the launch check settles, hold on the splash: routing to Welcome
+      // or Home before it resolves would flash the wrong destination.
+      if (session.isUnresolved) {
+        return isStartup ? null : SabRoutes.startup;
+      }
+      if (isStartup) {
+        return session.isAuthenticated ? SabRoutes.home : SabRoutes.welcome;
+      }
       if (!session.isAuthenticated && !isPublic) {
         final from = Uri.encodeComponent(state.uri.toString());
         return '${SabRoutes.welcome}?from=$from';
@@ -56,6 +69,10 @@ GoRouter buildRouter(Ref ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: SabRoutes.startup,
+        builder: (context, state) => const _StartupScreen(),
+      ),
       GoRoute(
         path: SabRoutes.welcome,
         builder: (context, state) =>
@@ -155,3 +172,30 @@ GoRouter buildRouter(Ref ref) {
 }
 
 final routerProvider = Provider<GoRouter>((ref) => buildRouter(ref));
+
+/// The launch surface while the persisted session is being verified. It shows
+/// the brand mark on the token surface, so the app opens on Sabi rather than an
+/// empty frame; the router moves off it as soon as the session store resolves.
+class _StartupScreen extends StatelessWidget {
+  const _StartupScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SabColorTokens.of(context);
+    return Scaffold(
+      key: const ValueKey('startup'),
+      backgroundColor: colors.surface,
+      body: Center(
+        child: Semantics(
+          label: 'Loading',
+          liveRegion: true,
+          child: const SabArt(
+            artboard: SabArtboard.brandMark,
+            size: SabSizes.artBrandMark,
+            semanticLabel: 'Sabi',
+          ),
+        ),
+      ),
+    );
+  }
+}
