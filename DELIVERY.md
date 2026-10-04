@@ -157,6 +157,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-106 | C-012 | ai-engineer | Done | — |
 | T-107 | C-012 | frontend-engineer | Done | — |
 | T-108 | C-012 | backend-engineer | Done | — |
+| T-109 | FEAT-011 | product-shaper | In Progress | — |
 
 ## Decisions log
 
@@ -212,6 +213,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-048 | A repeatable, idempotent seeder loads real Nigerian services from a version-controlled data file so the owner never hand-enters the catalogue | The ungrounded-reply symptoms were partly an empty catalogue; a data file plus a script makes the catalogue reproducible per environment | user |
 | D-049 | The catalogue seed runs on every `gcp-up` from a Terraform-managed Cloud Run job, not as an ad-hoc manual job | The catalogue must exist for the assistant to ground, so it belongs to the deploy; a managed job is recreated by a fresh `up` and removed by `destroy`, unlike the hand-made job it replaces | user |
 | D-050 | The conversation is the primary control surface: Home composes and completes every task inline (payment, identity verification, receipt, failure recovery) and resolves record lookups, while the existing screens stay a fully functional alternate route; the user chooses and neither path is the fallback for the other. Only task-shaped surfaces are agent-composed; shell and static chrome stay prewritten. Supersedes the "task-first surfaces leave the conversation" framing in screens.md | The product owner's intent is chat-first access to everything, without forcing traditional click-through, while still letting a user take the screens route if they prefer it | user |
+| D-051 | Sabi adopts the real A2UI protocol via the official Flutter GenUI SDK renderer (`github.com/flutter/genui`, v0.9.1), with a client-published Sabi catalog as a JSON Schema; the hand-rolled composed-surface parser is retired and every agent-composed surface (confirmation, amount entry, discovery, receipt, verification, recovery) renders through it. A2UI-shaped payloads become the C-012 contract | Investigation showed the current code is an A2UI-shaped lookalike: the message names match, but the component catalogue is a server-side hand copy of the client's (already drifted, which is why every composition falls back) with no negotiation or schema validation. Using the maintained renderer and one catalog removes the drift and the duplicated protocol | user |
 
 ## Definition of Done
 
