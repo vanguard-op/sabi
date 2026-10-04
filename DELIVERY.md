@@ -133,10 +133,11 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-084 | C-009 | frontend-engineer | Done | — |
 | T-085 | FEAT-003 | product-shaper | Done | — |
 | T-086 | C-009 | frontend-engineer | Done | — |
-| T-087 | C-009 | backend-engineer | In Progress | — |
-| T-088 | C-009 | ai-engineer | In Progress | — |
-| T-089 | C-009 | frontend-engineer | In Progress | — |
+| T-087 | C-009 | backend-engineer | Done | — |
+| T-088 | C-009 | ai-engineer | Done | — |
+| T-089 | C-009 | frontend-engineer | Done | — |
 | T-090 | FEAT-003 | product-shaper | Ready | — |
+| T-091 | C-009 | frontend-engineer | In Progress | — |
 
 ## Decisions log
 
