@@ -240,86 +240,200 @@ def test_rank_services_falls_back_to_keyword_search(catalogue):
 
 # --- MQ-003 interface composition ------------------------------------------------
 
+_CATALOG_ID = "https://sabi.app/a2ui/v1/catalog.json"
 
-def test_compose_surface_returns_a_validated_stream(catalogue):
-    payload = {
+
+def _stream(*components, surface_id="s1"):
+    return {
         "messages": [
-            {"type": "createSurface", "surfaceId": "s1"},
             {
-                "type": "updateComponents",
-                "components": [{"component": "ConfirmationSummary", "id": "c1"}],
+                "version": "v0.9",
+                "createSurface": {"surfaceId": surface_id, "catalogId": _CATALOG_ID},
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {"surfaceId": surface_id, "components": list(components)},
             },
         ]
     }
+
+
+def test_compose_surface_returns_a_validated_stream(catalogue):
+    payload = _stream(
+        {"id": "root", "component": "ConfirmationSummary", "amount": 500000, "payee": "Ikeja"},
+    )
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface("confirmation", {"amount": 500000})
+    outcome = serving.compose_surface("confirmation", {"amount": 500000}, catalog_id=_CATALOG_ID)
     assert outcome.source == "model"
     assert outcome.messages
     assert outcome.fallback == "confirmation"
+    assert outcome.catalog_id == _CATALOG_ID
     assert provider.last_request.prompt_id == "interface_composition"
+    assert _CATALOG_ID in provider.last_request.contents
 
 
 @pytest.mark.parametrize("task", ["verification", "recovery"])
 def test_compose_surface_accepts_the_new_tasks(catalogue, task):
-    payload = {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "s1", "task": task},
-            {"type": "updateComponents", "components": [{"component": "StatusPill", "id": "c1"}]},
-        ]
-    }
+    component = "Verification" if task == "verification" else "Recovery"
+    payload = _stream({"id": "root", "component": component, "title": "Verify"})
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface(task, {"state": "pending"})
+    outcome = serving.compose_surface(task, {"state": "pending"}, catalog_id=_CATALOG_ID)
     assert outcome.source == "model"
     assert outcome.fallback == task
     assert task in provider.last_request.contents
 
 
 def test_compose_surface_receipt_carries_a_resolved_record(catalogue):
-    payload = {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "s1", "task": "receipt"},
-            {"type": "updateComponents", "components": [{"component": "ReceiptCard", "id": "c1"}]},
-        ]
-    }
+    payload = _stream(
+        {
+            "id": "root",
+            "component": "ReceiptCard",
+            "reference": "FT-1",
+            "payee": "Agency",
+            "amount": 100,
+        },
+    )
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface("receipt", {"reference": "FT-1", "receiptId": "rcpt-1"})
+    outcome = serving.compose_surface(
+        "receipt", {"reference": "FT-1", "receiptId": "rcpt-1"}, catalog_id=_CATALOG_ID
+    )
     assert outcome.source == "model"
     assert outcome.fallback == "receipt"
     assert "FT-1" in provider.last_request.contents
 
 
 def test_compose_surface_rejects_an_unknown_component(catalogue):
-    payload = {
-        "messages": [
-            {
-                "type": "updateComponents",
-                "components": [{"component": "EvilWidget", "id": "c1"}],
-            }
-        ]
-    }
+    payload = _stream({"id": "root", "component": "EvilWidget", "x": 1})
     serving, _ = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface("confirmation")
+    outcome = serving.compose_surface("confirmation", catalog_id=_CATALOG_ID)
     assert outcome.used_fallback is True
     assert outcome.messages == ()
     assert outcome.fallback == "confirmation"
 
 
-def test_compose_surface_rejects_a_malformed_message(catalogue):
-    payload = {"messages": [{"type": "createSurface"}, "not-an-object"]}
+def test_compose_surface_rejects_a_surface_naming_another_catalog(catalogue):
+    payload = {
+        "messages": [
+            {
+                "version": "v0.9",
+                "createSurface": {"surfaceId": "s1", "catalogId": "https://other/x.json"},
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "s1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ConfirmationSummary",
+                            "amount": 1,
+                            "payee": "x",
+                        }
+                    ],
+                },
+            },
+        ]
+    }
     serving, _ = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface("confirmation")
+    outcome = serving.compose_surface("confirmation", catalog_id=_CATALOG_ID)
+    assert outcome.used_fallback is True
+    assert outcome.messages == ()
+
+
+def test_compose_surface_rejects_a_missing_required_property(catalogue):
+    payload = _stream({"id": "root", "component": "ConfirmationSummary", "amount": 500000})
+    serving, _ = _serving(catalogue, [json_response(payload, model_id="primary")])
+    outcome = serving.compose_surface("confirmation", catalog_id=_CATALOG_ID)
+    assert outcome.used_fallback is True
+    assert outcome.messages == ()
+
+
+def test_compose_surface_rejects_a_malformed_message(catalogue):
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "s1"}},
+            "not-an-object",
+        ]
+    }
+    serving, _ = _serving(catalogue, [json_response(payload, model_id="primary")])
+    outcome = serving.compose_surface("confirmation", catalog_id=_CATALOG_ID)
     assert outcome.used_fallback is True
     assert outcome.messages == ()
 
 
 def test_compose_surface_falls_back_when_the_provider_fails(catalogue):
     serving, _ = _serving(catalogue, [ProviderUnavailable("down")])
-    outcome = serving.compose_surface("receipt")
+    outcome = serving.compose_surface("receipt", catalog_id=_CATALOG_ID)
     assert outcome.used_fallback is True
     assert outcome.fallback == "receipt"
 
 
+def test_compose_surface_falls_back_without_a_compatible_catalog(catalogue):
+    # An absent or unknown catalog degrades to the same-task fallback, never a
+    # failure (C-012 revision 2; FEAT-011 edge case).
+    serving, provider = _serving(catalogue, [])
+    for catalog_id in (None, "", "https://nope.example/catalog.json"):
+        outcome = serving.compose_surface("discovery", catalog_id=catalog_id)
+        assert outcome.used_fallback is True
+        assert outcome.messages == ()
+        assert outcome.fallback == "discovery"
+        assert outcome.catalog_id is None
+    assert provider.requests == []
+
+
 def test_unknown_task_falls_back_to_a_known_task_key(catalogue):
     serving, _ = _serving(catalogue, [ProviderUnavailable("down")])
-    outcome = serving.compose_surface("mystery")
+    outcome = serving.compose_surface("mystery", catalog_id=_CATALOG_ID)
     assert outcome.fallback == "confirmation"
+
+
+def test_composition_validates_against_the_injected_catalog(catalogue):
+    """The serving seam composes against whichever catalog it was built with.
+
+    A custom catalog with one component of its own proves the agent is not
+    validating against a fixed private name list: a component that is catalog-
+    defined passes, and the published name is refused.
+    """
+    from core.a2ui_catalog import A2uiCatalog
+
+    custom = A2uiCatalog(
+        catalog_id="https://example.test/a2ui/v1/catalog.json",
+        components={
+            "CustomCard": {
+                "type": "object",
+                "properties": {"title": {"type": "string"}},
+                "required": ["title"],
+            }
+        },
+    )
+    provider = FakeModelProvider(
+        [
+            json_response(
+                {
+                    "messages": [
+                        {
+                            "version": "v0.9",
+                            "createSurface": {
+                                "surfaceId": "s1",
+                                "catalogId": custom.catalog_id,
+                            },
+                        },
+                        {
+                            "version": "v0.9",
+                            "updateComponents": {
+                                "surfaceId": "s1",
+                                "components": [
+                                    {"id": "root", "component": "CustomCard", "title": "Hi"}
+                                ],
+                            },
+                        },
+                    ]
+                },
+                model_id="primary",
+            )
+        ]
+    )
+    serving = ModelServing(provider, catalogue, catalog=custom)
+    outcome = serving.compose_surface("confirmation", catalog_id=custom.catalog_id)
+    assert outcome.source == "model"
+    assert outcome.catalog_id == custom.catalog_id

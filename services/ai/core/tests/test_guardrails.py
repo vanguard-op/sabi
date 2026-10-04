@@ -5,11 +5,10 @@ from core.guardrails import (
     LANGUAGE_FALLBACK_NOTE,
     enforce_intent,
     enforce_reply,
-    validate_composition,
 )
 from core.history import CLARIFICATION_LIMIT, CLARIFICATION_LIMIT_KEY
 from core.retrieval import RetrievedRecord
-from core.schemas import CLIENT_COMPONENT_CATALOGUE, Intent
+from core.schemas import Intent
 
 
 def _context():
@@ -214,58 +213,3 @@ def test_declines_at_the_clarification_bound():
     assert "clarification_limit_reached" in outcome.flags
     # The after-bound reply is the model's; the structured contract asks no question.
     assert outcome.reply is not None
-
-
-# --- Composition ------------------------------------------------------------------
-
-
-def _message(component: str):
-    return {
-        "type": "updateComponents",
-        "components": [{"component": component, "id": "c1"}],
-    }
-
-
-def test_valid_composition_passes():
-    validation = validate_composition(
-        [
-            {"type": "createSurface", "surfaceId": "s1"},
-            _message("ConfirmationSummary"),
-        ],
-        allowed_components=CLIENT_COMPONENT_CATALOGUE,
-    )
-    assert validation.ok is True
-    assert "ConfirmationSummary" in validation.component_names
-
-
-def test_unknown_component_is_rejected():
-    validation = validate_composition(
-        [_message("EvilWidget")],
-        allowed_components=CLIENT_COMPONENT_CATALOGUE,
-    )
-    assert validation.ok is False
-    assert any("unknown component" in error for error in validation.errors)
-
-
-def test_executable_content_is_rejected():
-    validation = validate_composition(
-        [{"type": "updateDataModel", "data": "<script>alert(1)</script>"}],
-        allowed_components=CLIENT_COMPONENT_CATALOGUE,
-    )
-    assert validation.ok is False
-
-
-def test_external_resource_load_is_rejected():
-    validation = validate_composition(
-        [{"type": "updateDataModel", "data": "https://evil.example/x.js"}],
-        allowed_components=CLIENT_COMPONENT_CATALOGUE,
-    )
-    assert validation.ok is False
-
-
-def test_unknown_message_type_is_rejected():
-    validation = validate_composition(
-        [{"type": "runPayment"}],
-        allowed_components=CLIENT_COMPONENT_CATALOGUE,
-    )
-    assert validation.ok is False

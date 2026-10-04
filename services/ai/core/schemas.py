@@ -251,30 +251,11 @@ class RankingResult:
 
 
 # --- Composition (MQ-003) --------------------------------------------------------
-
-COMPOSITION_MESSAGE_TYPES: frozenset[str] = frozenset(
-    {"createSurface", "updateComponents", "updateDataModel"}
-)
-
-# The composable components named in the shared component catalogue
-# (screens.md, "Shared / Common Components"). The client catalogue is authoritative;
-# the composition feature passes the exact set it validates against.
-CLIENT_COMPONENT_CATALOGUE: frozenset[str] = frozenset(
-    {
-        "NavigationShell",
-        "ComposedTaskSurface",
-        "ConfirmationSummary",
-        "ServiceResultRow",
-        "StatusPill",
-        "ReceiptCard",
-        "EmptyState",
-        "ErrorState",
-        "OfflineBanner",
-        "SuccessToast",
-        "AmountEntry",
-        "ProviderPicker",
-    }
-)
+# The composition vocabulary the agent composes against is the published Sabi A2UI
+# catalog, held as one artifact and validated in :mod:`core.a2ui_catalog` and
+# :mod:`core.a2ui`. There is deliberately no component-name list here: a server-side
+# hand copy of the client's names drifts from the client and was the defect this
+# module must never reintroduce (FEAT-011, MQ-003).
 
 # The task-shaped surfaces the agent composes (C-012, FEAT-011). Every task has a
 # client fallback form, so a known task is exactly one that has a fallback. The

@@ -19,20 +19,28 @@ class SurfaceRequest(BaseModel):
     ``context`` is untrusted, free-form task context (for example the amount and
     payee of a confirmation). It is serialised into the prompt as data and can
     never change the composition rules.
+
+    ``catalogId`` is the client's published Sabi A2UI catalog, negotiated from the
+    ``supportedCatalogIds`` the client advertises. It is passed to composition
+    unchanged; an absent value is not compatible, so the agent sends no surface and
+    the client renders its same-task fallback (C-012 revision 2).
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     task: str
     context: dict[str, Any] = Field(default_factory=dict)
+    catalog_id: str | None = Field(default=None, alias="catalogId")
 
 
 class SurfaceResponse(BaseModel):
-    """The declarative UI stream and the fallback task key.
+    """The A2UI message stream and the fallback task key.
 
-    ``messages`` is empty exactly when composition failed and the client must
-    render its static fallback form for ``fallback``. The stream is already
-    validated against the client component catalogue before it reaches here.
+    ``messages`` is the A2UI v0.9 stream conforming to the published catalog; it is
+    empty exactly when composition failed and the client must render its static
+    fallback form for ``fallback``. The stream was validated against the negotiated
+    catalog before reaching here (the agent-side phase of A2UI's two-phase
+    validation).
     """
 
     messages: list[dict[str, Any]]

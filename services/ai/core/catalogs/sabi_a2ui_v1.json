@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sabi.app/a2ui/v1/catalog.json",
+  "catalogId": "https://sabi.app/a2ui/v1/catalog.json",
+  "title": "Sabi A2UI Catalog",
+  "description": "The Sabi client composed-surface catalog: the confirmation summary, amount entry, provider picker, service result row, receipt card, status pill, verification, and recovery surfaces (FEAT-011).",
+  "components": {
+    "ConfirmationSummary": {
+      "type": "object",
+      "description": "A payment confirmation: amount, payee, charges, and reference.",
+      "properties": {
+        "amount": {"type": "integer", "description": "Minor units (kobo)."},
+        "currency": {"type": "string", "default": "NGN"},
+        "payee": {"type": "string"},
+        "charges": {"type": ["integer", "null"]},
+        "reference": {"type": ["string", "null"]}
+      },
+      "required": ["amount", "payee"],
+      "additionalProperties": true
+    },
+    "AmountEntry": {
+      "type": "object",
+      "description": "Requests a variable amount for the resolved obligation.",
+      "properties": {
+        "currency": {"type": "string", "default": "NGN"},
+        "minimum": {"type": ["integer", "null"]},
+        "maximum": {"type": ["integer", "null"]},
+        "prompt": {"type": ["string", "null"]}
+      },
+      "required": [],
+      "additionalProperties": true
+    },
+    "ProviderPicker": {
+      "type": "object",
+      "description": "A choice among several matching collecting bodies. Each service is a ServiceResultRow-shaped object.",
+      "properties": {
+        "services": {
+          "type": "array",
+          "items": {"$ref": "#/components/ServiceResultRow"}
+        }
+      },
+      "required": ["services"],
+      "additionalProperties": true
+    },
+    "ServiceResultRow": {
+      "type": "object",
+      "description": "One discovery result: collecting body and obligation.",
+      "properties": {
+        "serviceId": {"type": "string"},
+        "name": {"type": "string"},
+        "collectingBody": {"type": "string"},
+        "category": {"type": "string"},
+        "knownAmount": {"type": ["integer", "null"]},
+        "currency": {"type": "string", "default": "NGN"},
+        "status": {"type": "string", "default": "active"},
+        "confidence": {"type": "number"}
+      },
+      "required": ["serviceId", "collectingBody", "category"],
+      "additionalProperties": true
+    },
+    "ReceiptCard": {
+      "type": "object",
+      "description": "A resolved record or post-payment receipt.",
+      "properties": {
+        "receiptId": {"type": "string"},
+        "reference": {"type": "string"},
+        "payee": {"type": "string"},
+        "amount": {"type": "integer", "description": "Minor units (kobo)."},
+        "currency": {"type": "string", "default": "NGN"},
+        "issuedAt": {"type": "string"},
+        "kind": {"type": "string"},
+        "status": {"type": "string"}
+      },
+      "required": ["reference", "payee", "amount"],
+      "additionalProperties": true
+    },
+    "StatusPill": {
+      "type": "object",
+      "description": "A payment state. Colour is never the only signal: the pill pairs a semantic colour with a glyph and a label.",
+      "properties": {
+        "status": {"type": "string", "description": "Open enum: pending, settled, failed, awaitingReceipt, unverified, verified, suspended. Unknown variants render as pending (A2UI open enums)."},
+        "label": {"type": ["string", "null"]}
+      },
+      "required": ["status"],
+      "additionalProperties": true
+    },
+    "Verification": {
+      "type": "object",
+      "description": "An identity-verification task held in the conversation. The task is held, not failed, and resumes once verification succeeds.",
+      "properties": {
+        "title": {"type": "string"},
+        "body": {"type": ["string", "null"]},
+        "actionLabel": {"type": ["string", "null"]}
+      },
+      "required": ["title"],
+      "additionalProperties": true
+    },
+    "Recovery": {
+      "type": "object",
+      "description": "A failed-payment or case recovery task: the current state and the next step.",
+      "properties": {
+        "title": {"type": "string"},
+        "body": {"type": ["string", "null"]},
+        "status": {"type": ["string", "null"]},
+        "actionLabel": {"type": ["string", "null"]}
+      },
+      "required": ["title"],
+      "additionalProperties": true
+    }
+  },
+  "styles": {},
+  "functions": {}
+}

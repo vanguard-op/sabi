@@ -1,76 +1,88 @@
 """Contract conformance for POST /v1/agent/surfaces (C-012, MQ-003).
 
 The model is mocked in every test, so the suite is deterministic and never
-touches the network or the google-genai SDK.
+touches the network or the google-genai SDK. The composed payload is a real A2UI
+v0.9 stream composed against the published Sabi catalog; the agent validates it
+before sending (the agent-side phase of A2UI's two-phase validation).
 """
 
 from __future__ import annotations
 
 from composition.tests.conftest import build_test_client
+from core.a2ui_catalog import published_catalog
 from core.config import PRIMARY_MODEL_ID
 from core.errors import ProviderUnavailable
 from core.schemas import FALLBACK_TASKS
 from core.testing import json_response
 
 _HEADERS = {"Content-Type": "application/json"}
+_CATALOG_ID = published_catalog().catalog_id
+
+
+def _a2ui(surface_id: str, components: list[dict], *, data: dict | None = None) -> dict:
+    """A well-formed A2UI v0.9 stream naming the published catalog."""
+
+    messages: list[dict] = [
+        {"version": "v0.9", "createSurface": {"surfaceId": surface_id, "catalogId": _CATALOG_ID}},
+        {
+            "version": "v0.9",
+            "updateComponents": {"surfaceId": surface_id, "components": components},
+        },
+    ]
+    if data is not None:
+        messages.append(
+            {
+                "version": "v0.9",
+                "updateDataModel": {"surfaceId": surface_id, "path": "/", "value": data},
+            }
+        )
+    return {"messages": messages}
 
 
 def _verification_stream() -> dict:
-    return {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "verify-1", "task": "verification"},
-            {
-                "type": "updateComponents",
-                "components": [
-                    {"component": "StatusPill", "id": "status"},
-                    {"component": "ConfirmationSummary", "id": "details"},
-                ],
-            },
-            {"type": "updateDataModel", "data": {"status": "unverified"}},
-        ]
-    }
+    return _a2ui(
+        "verify-1",
+        [{"id": "root", "component": "Verification", "title": "Verify your identity"}],
+        data={"status": "unverified"},
+    )
 
 
 def _recovery_stream() -> dict:
-    return {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "case-1", "task": "recovery"},
-            {
-                "type": "updateComponents",
-                "components": [
-                    {"component": "StatusPill", "id": "status"},
-                    {"component": "ConfirmationSummary", "id": "payment"},
-                ],
-            },
-            {"type": "updateDataModel", "data": {"caseReference": "CASE-7", "state": "refunding"}},
-        ]
-    }
+    return _a2ui(
+        "case-1",
+        [{"id": "root", "component": "Recovery", "title": "Refund in progress"}],
+        data={"caseReference": "CASE-7", "state": "refunding"},
+    )
 
 
 def _record_receipt_stream() -> dict:
-    return {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "receipt-1", "task": "receipt"},
+    return _a2ui(
+        "receipt-1",
+        [
             {
-                "type": "updateComponents",
-                "components": [{"component": "ReceiptCard", "id": "receipt"}],
-            },
-            {"type": "updateDataModel", "data": {"receiptId": "rcpt-9", "kind": "token"}},
-        ]
-    }
+                "id": "root",
+                "component": "ReceiptCard",
+                "reference": "FT-2026-1",
+                "payee": "FIRS",
+                "amount": 500000,
+            }
+        ],
+        data={"receiptId": "rcpt-9", "kind": "token"},
+    )
 
 
 def _valid_stream() -> dict:
-    return {
-        "messages": [
-            {"type": "createSurface", "surfaceId": "confirm-1"},
+    return _a2ui(
+        "confirm-1",
+        [
             {
-                "type": "updateComponents",
-                "components": [{"component": "ConfirmationSummary", "id": "summary"}],
-            },
-            {"type": "updateDataModel", "data": {"amount": 500000}},
-        ]
-    }
+                "id": "root",
+                "component": "ConfirmationSummary",
+                "amount": 500000,
+                "payee": "Ikeja Electric",
+            }
+        ],
+    )
 
 
 # --- Happy path ------------------------------------------------------------------
@@ -80,15 +92,19 @@ def test_composes_a_catalogue_valid_surface() -> None:
     client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
-        json={"task": "confirmation", "context": {"amount": 500000, "payee": "Ikeja Electric"}},
+        json={
+            "task": "confirmation",
+            "context": {"amount": 500000, "payee": "Ikeja Electric"},
+            "catalogId": _CATALOG_ID,
+        },
     )
     assert response.status_code == 200
     body = response.json()
-    assert [message["type"] for message in body["messages"]] == [
+    assert [next(k for k in message if k != "version") for message in body["messages"]] == [
         "createSurface",
         "updateComponents",
-        "updateDataModel",
     ]
+    assert body["messages"][0]["createSurface"]["catalogId"] == _CATALOG_ID
     assert body["fallback"] == "confirmation"
 
 
@@ -98,12 +114,15 @@ def test_composes_a_verification_surface() -> None:
     )
     response = client.post(
         "/v1/agent/surfaces",
-        json={"task": "verification", "context": {"status": "unverified"}},
+        json={
+            "task": "verification",
+            "context": {"status": "unverified"},
+            "catalogId": _CATALOG_ID,
+        },
     )
     assert response.status_code == 200
     body = response.json()
     assert body["fallback"] == "verification"
-    assert body["messages"][0]["task"] == "verification"
     assert "verification" in provider.last_request.contents
 
 
@@ -111,12 +130,12 @@ def test_composes_a_recovery_surface() -> None:
     client, _ = build_test_client([json_response(_recovery_stream(), model_id=PRIMARY_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
-        json={"task": "recovery", "context": {"caseReference": "CASE-7"}},
+        json={"task": "recovery", "context": {"caseReference": "CASE-7"}, "catalogId": _CATALOG_ID},
     )
     assert response.status_code == 200
     body = response.json()
     assert body["fallback"] == "recovery"
-    assert [message["type"] for message in body["messages"]] == [
+    assert [next(k for k in message if k != "version") for message in body["messages"]] == [
         "createSurface",
         "updateComponents",
         "updateDataModel",
@@ -134,7 +153,10 @@ def test_receipt_accepts_a_resolved_record_context() -> None:
         [json_response(_record_receipt_stream(), model_id=PRIMARY_MODEL_ID)]
     )
     context = {"recordKind": "receipt", "reference": "FT-2026-1", "receiptId": "rcpt-9"}
-    response = client.post("/v1/agent/surfaces", json={"task": "receipt", "context": context})
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={"task": "receipt", "context": context, "catalogId": _CATALOG_ID},
+    )
     assert response.status_code == 200
     assert response.json()["fallback"] == "receipt"
     request_contents = provider.last_request.contents
@@ -155,20 +177,20 @@ def test_every_contract_task_is_accepted() -> None:
     }
     for task in sorted(FALLBACK_TASKS):
         client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
-        response = client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
+        response = client.post(
+            "/v1/agent/surfaces", json={"task": task, "context": {}, "catalogId": _CATALOG_ID}
+        )
         assert response.status_code == 200, task
         assert response.json()["fallback"] == task
 
 
 def test_invalid_composition_keeps_the_new_task_fallback() -> None:
-    payload = {
-        "messages": [
-            {"type": "updateComponents", "components": [{"component": "EvilWidget", "id": "x"}]}
-        ]
-    }
+    payload = _a2ui("s1", [{"id": "root", "component": "EvilWidget"}])
     client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
     for task in ("verification", "recovery"):
-        response = client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
+        response = client.post(
+            "/v1/agent/surfaces", json={"task": task, "context": {}, "catalogId": _CATALOG_ID}
+        )
         assert response.status_code == 200
         assert response.json() == {"messages": [], "fallback": task}
 
@@ -177,26 +199,56 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     client, provider = build_test_client(
         [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
     )
-    client.post("/v1/agent/surfaces", json={"task": "receipt", "context": {}})
+    client.post(
+        "/v1/agent/surfaces", json={"task": "receipt", "context": {}, "catalogId": _CATALOG_ID}
+    )
     request = provider.last_request
     assert request.model_id == PRIMARY_MODEL_ID
     assert request.prompt_id == "interface_composition"
-    assert request.prompt_version == "v2"
+    assert request.prompt_version == "v3"
     assert request.decoding.temperature == 0.0
-    assert "receipt" in request.contents
+    assert _CATALOG_ID in request.contents
+    assert "Verification" in request.contents and "Recovery" in request.contents
+
+
+# --- Catalog negotiation (C-012: fallback, not a failure) ------------------------
+
+
+def test_no_compatible_catalog_falls_back_to_the_same_task() -> None:
+    """No compatible catalog negotiated -> same-task fallback, never an error."""
+
+    client, provider = build_test_client([])
+    for catalog_id in (None, "", "https://other.example/a2ui/v9/catalog.json"):
+        body = {"task": "discovery", "context": {}}
+        if catalog_id is not None:
+            body["catalogId"] = catalog_id
+        response = client.post("/v1/agent/surfaces", json=body)
+        assert response.status_code == 200
+        assert response.json() == {"messages": [], "fallback": "discovery"}
+    # The agent never called the model when it had no catalog to compose against.
+    assert provider.requests == []
+
+
+def test_unknown_catalog_does_not_call_the_model() -> None:
+    client, provider = build_test_client(
+        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+    )
+    client.post(
+        "/v1/agent/surfaces",
+        json={"task": "confirmation", "context": {}, "catalogId": "https://nope/catalog.json"},
+    )
+    assert provider.requests == []
 
 
 # --- Fallback behaviour (C-012: 200 with fallback on invalid composition) --------
 
 
 def test_unknown_component_falls_back_but_stays_200() -> None:
-    payload = {
-        "messages": [
-            {"type": "updateComponents", "components": [{"component": "EvilWidget", "id": "x"}]}
-        ]
-    }
+    payload = _a2ui("s1", [{"id": "root", "component": "EvilWidget"}])
     client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
-    response = client.post("/v1/agent/surfaces", json={"task": "confirmation", "context": {}})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "confirmation", "context": {}, "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["messages"] == []
@@ -205,26 +257,39 @@ def test_unknown_component_falls_back_but_stays_200() -> None:
 
 def test_malformed_stream_falls_back() -> None:
     client, _ = build_test_client([json_response({"messages": "nope"}, model_id=PRIMARY_MODEL_ID)])
-    response = client.post("/v1/agent/surfaces", json={"task": "amount_entry", "context": {}})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "amount_entry", "context": {}, "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 200
     assert response.json() == {"messages": [], "fallback": "amount_entry"}
 
 
 def test_executable_content_falls_back() -> None:
-    payload = {
-        "messages": [
-            {"type": "updateDataModel", "data": "<script>alert(1)</script>"},
-        ]
-    }
+    payload = _a2ui(
+        "s1",
+        [
+            {
+                "id": "root",
+                "component": "ReceiptCard",
+                "reference": "<script>alert(1)</script>",
+                "payee": "x",
+                "amount": 1,
+            }
+        ],
+    )
     client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
-    response = client.post("/v1/agent/surfaces", json={"task": "receipt", "context": {}})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "receipt", "context": {}, "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 200
     assert response.json()["messages"] == []
 
 
 def test_provider_failure_falls_back_to_the_same_task() -> None:
     client, _ = build_test_client([ProviderUnavailable("down")])
-    response = client.post("/v1/agent/surfaces", json={"task": "discovery", "context": {}})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "discovery", "context": {}, "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 200
     assert response.json() == {"messages": [], "fallback": "discovery"}
 
@@ -234,7 +299,9 @@ def test_provider_failure_falls_back_to_the_same_task() -> None:
 
 def test_unknown_task_is_a_400() -> None:
     client, _ = build_test_client([])
-    response = client.post("/v1/agent/surfaces", json={"task": "run_payment", "context": {}})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "run_payment", "context": {}, "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_request"
 
@@ -250,7 +317,9 @@ def test_missing_task_is_rejected_with_the_error_envelope() -> None:
 
 def test_context_defaults_to_an_empty_object() -> None:
     client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
-    response = client.post("/v1/agent/surfaces", json={"task": "confirmation"})
+    response = client.post(
+        "/v1/agent/surfaces", json={"task": "confirmation", "catalogId": _CATALOG_ID}
+    )
     assert response.status_code == 200
     assert response.json()["fallback"] == "confirmation"
 
@@ -260,7 +329,10 @@ def test_context_may_carry_arbitrary_task_data() -> None:
         [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
     )
     context = {"receiptNumber": "FT-1", "kind": "official_e_receipt"}
-    client.post("/v1/agent/surfaces", json={"task": "receipt", "context": context})
+    client.post(
+        "/v1/agent/surfaces",
+        json={"task": "receipt", "context": context, "catalogId": _CATALOG_ID},
+    )
     assert "FT-1" in provider.last_request.contents
 
 

@@ -41,9 +41,12 @@ INTENT_PROMPT_VERSION = "v4"
 # Interface composition moved to ``v2`` when the composed surface became the task
 # mechanism for every task and record type (MQ-003, FEAT-011): the task enum gained
 # ``verification`` and ``recovery``, and ``receipt`` now also composes a resolved
-# record the user asked about, not only a post-payment service payment. The v1
-# template named only confirmation, amount entry, receipt, and discovery.
-INTERFACE_COMPOSITION_PROMPT_VERSION = "v2"
+# record the user asked about, not only a post-payment service payment. It moved to
+# ``v3`` with A2UI adoption (D-051): the payload is a real A2UI v0.9 message stream
+# composed against the published Sabi catalog, the surface names the negotiated
+# ``catalogId``, and the allowed components come from that catalog, not a server-side
+# copy.
+INTERFACE_COMPOSITION_PROMPT_VERSION = "v3"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,

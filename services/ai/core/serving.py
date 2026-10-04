@@ -16,6 +16,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from core.a2ui import validate_a2ui_stream
+from core.a2ui_catalog import A2uiCatalog, negotiate_catalog, published_catalog
 from core.config import (
     CAPABILITY_DECODING,
     CAPABILITY_MODEL_PATH,
@@ -36,7 +38,6 @@ from core.fallback import (
 from core.grounding import build_context, ground_ranking
 from core.guardrails import (
     RANKING_CONFIDENCE_THRESHOLD,
-    validate_composition,
 )
 from core.guardrails import enforce_intent as apply_intent_guardrails
 from core.history import (
@@ -55,7 +56,6 @@ from core.retrieval import (
     render_untrusted_block,
 )
 from core.schemas import (
-    CLIENT_COMPONENT_CATALOGUE,
     COMPOSITION_RESPONSE_SCHEMA,
     FALLBACK_TASKS,
     INTENT_RESPONSE_SCHEMA,
@@ -85,8 +85,9 @@ _SYSTEM_INSTRUCTIONS: Mapping[Capability, str] = {
         "service or a collecting body."
     ),
     Capability.INTERFACE_COMPOSITION: (
-        "You compose a declarative UI message stream from the client's component "
-        "catalogue. You never emit executable code or external resource loads."
+        "You compose a declarative A2UI message stream against the published Sabi "
+        "catalog. You never emit executable code, external resource loads, or a "
+        "component outside that catalog."
     ),
 }
 
@@ -130,11 +131,17 @@ class RankingOutcome:
 
 @dataclass(frozen=True)
 class CompositionOutcome:
-    """The result of MQ-003 interface composition, shaped for C-012."""
+    """The result of MQ-003 interface composition, shaped for C-012.
+
+    ``messages`` is the validated A2UI v0.9 stream (empty on the fallback path).
+    ``catalog_id`` is the negotiated catalog the surface names, or null when no
+    compatible catalog was negotiated so the client renders its same-task fallback.
+    """
 
     messages: tuple[Mapping[str, Any], ...]
     fallback: str
     source: str
+    catalog_id: str | None = None
     model_id: str | None = None
     prompt_version: str = PROMPT_VERSION
     used_fallback: bool = False
@@ -151,7 +158,7 @@ class ModelServing:
         *,
         settings: ModelSettings | None = None,
         prompt_version: str | None = None,
-        allowed_components: Sequence[str] | None = None,
+        catalog: A2uiCatalog | None = None,
     ) -> None:
         self._provider = provider
         self._retrieval = retrieval
@@ -159,11 +166,11 @@ class ModelServing:
         # ``None`` means each capability loads the prompt version it is pinned to;
         # an explicit value is a test or evaluation override for all capabilities.
         self._prompt_version = prompt_version
-        self._allowed_components = (
-            frozenset(allowed_components)
-            if allowed_components is not None
-            else CLIENT_COMPONENT_CATALOGUE
-        )
+        # The published Sabi catalog the composition capability composes and
+        # validates against. Defaulted to the published artifact; an explicit value
+        # is a test override. There is no separate component-name list, so the
+        # agent and the client cannot drift (FEAT-011, MQ-003).
+        self._catalog = catalog or published_catalog()
         self._tracker = CostTracker()
 
     # -- MQ-001 intent resolution -------------------------------------------------
@@ -400,6 +407,7 @@ class ModelServing:
         task: str,
         context: Mapping[str, Any] | None = None,
         *,
+        catalog_id: str | None = None,
         cost: TaskCost | None = None,
     ) -> CompositionOutcome:
         capability = Capability.INTERFACE_COMPOSITION
@@ -410,6 +418,24 @@ class ModelServing:
         # data: a `receipt` task carries a resolved record reference from a record
         # lookup the same way it carries a post-payment payment's fields.
         fallback_key = task if task in FALLBACK_TASKS else "confirmation"
+
+        # A2UI catalog negotiation (FEAT-011): the agent selects from the catalog id
+        # the client advertised. With no compatible catalog it sends no surface and
+        # the client renders its same-task fallback, so no task becomes unreachable.
+        catalog = self._resolve_catalog(catalog_id)
+        if catalog is None:
+            logger.info("composition_no_compatible_catalog")
+            return CompositionOutcome(
+                messages=(),
+                fallback=fallback_key,
+                source=FALLBACK_SOURCE,
+                catalog_id=None,
+                model_id=None,
+                prompt_version=self._version_for(capability),
+                used_fallback=True,
+                cost=task_cost,
+            )
+
         try:
             prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
@@ -419,9 +445,10 @@ class ModelServing:
                 render(
                     prompt.text,
                     {
+                        "catalog_id": catalog.catalog_id,
                         "task": task,
                         "context": json.dumps(context or {}, sort_keys=True, default=str),
-                        "allowed_components": ", ".join(sorted(self._allowed_components)),
+                        "allowed_components": ", ".join(catalog.component_names()),
                     },
                 ),
                 COMPOSITION_RESPONSE_SCHEMA,
@@ -429,30 +456,28 @@ class ModelServing:
             response = self._provider.generate(request)
             task_cost.record(response.usage)
             payload = parse_json(response.text) if response.parsed is None else response.parsed
-            if not isinstance(payload, Mapping):
-                raise OutputValidationError("composition payload must be an object")
-            raw_messages = payload.get("messages")
-            if not isinstance(raw_messages, Sequence) or isinstance(raw_messages, (str, bytes)):
-                raise OutputValidationError("messages must be an array")
-            if any(not isinstance(item, Mapping) for item in raw_messages):
-                raise OutputValidationError("every composition message must be an object")
-            messages = [dict(item) for item in raw_messages]
-            validation = validate_composition(messages, allowed_components=self._allowed_components)
-            if not validation.ok or not messages:
+            validation = validate_a2ui_stream(payload, catalog=catalog)
+            if not validation.ok:
+                # The agent-side pre-send phase refused the stream: a hallucinated
+                # component, a malformed message, executable content, or a surface
+                # naming another catalog. Degrade to the same-task fallback rather
+                # than sending a broken surface (MQ-003, FEAT-011).
                 logger.info("composition_rejected errors=%d", len(validation.errors))
                 return CompositionOutcome(
                     messages=(),
                     fallback=fallback_key,
                     source=FALLBACK_SOURCE,
+                    catalog_id=catalog.catalog_id,
                     model_id=request.model_id,
                     prompt_version=prompt.version,
                     used_fallback=True,
                     cost=task_cost,
                 )
             return CompositionOutcome(
-                messages=tuple(messages),
+                messages=validation.messages,
                 fallback=fallback_key,
                 source=MODEL_SOURCE,
+                catalog_id=catalog.catalog_id,
                 model_id=request.model_id,
                 prompt_version=prompt.version,
                 used_fallback=False,
@@ -464,11 +489,27 @@ class ModelServing:
                 messages=(),
                 fallback=fallback_key,
                 source=FALLBACK_SOURCE,
+                catalog_id=catalog.catalog_id,
                 model_id=None,
                 prompt_version=self._version_for(capability),
                 used_fallback=True,
                 cost=task_cost,
             )
+
+    def _resolve_catalog(self, catalog_id: str | None) -> A2uiCatalog | None:
+        """Select the catalog for a request, or ``None`` when none is compatible.
+
+        The serving instance's catalog is the published Sabi catalog; a test may
+        inject a different one, which this matches by its own id first. The
+        published-catalog lookup covers the negotiated ids (a future second catalog
+        version), so the seam and the real negotiation agree.
+        """
+
+        if not catalog_id:
+            return None
+        if catalog_id.strip() == self._catalog.catalog_id:
+            return self._catalog
+        return negotiate_catalog(catalog_id)
 
     # -- Internals ----------------------------------------------------------------
 

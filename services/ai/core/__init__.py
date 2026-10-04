@@ -8,6 +8,18 @@ model-backed capabilities.
 
 from __future__ import annotations
 
+from core.a2ui import (
+    MESSAGE_TYPES,
+    StreamValidation,
+    validate_a2ui_stream,
+)
+from core.a2ui_catalog import (
+    A2UI_VERSION,
+    A2uiCatalog,
+    negotiate_catalog,
+    published_catalog,
+    supported_catalog_ids,
+)
 from core.config import (
     CAPABILITY_DECODING,
     CAPABILITY_MODEL_PATH,
@@ -52,12 +64,10 @@ from core.guardrails import (
     LANGUAGE_FALLBACK_NOTE,
     RANKING_CONFIDENCE_THRESHOLD,
     SUPPORTED_LANGUAGES,
-    CompositionValidation,
     GuardrailOutcome,
     enforce_intent,
     enforce_reply,
     normalize_question,
-    validate_composition,
 )
 from core.history import (
     CLARIFICATION_LIMIT,
@@ -83,8 +93,6 @@ from core.retrieval import (
     render_untrusted_block,
 )
 from core.schemas import (
-    CLIENT_COMPONENT_CATALOGUE,
-    COMPOSITION_MESSAGE_TYPES,
     DETECTED_LANGUAGES,
     FALLBACK_TASKS,
     INTENT_TYPES,
@@ -105,12 +113,11 @@ from core.serving import (
 from core.telemetry import CostTracker, TaskCost, estimate_cost, price_for
 
 __all__ = [
+    "A2UI_VERSION",
     "CAPABILITY_DECODING",
     "CAPABILITY_MODEL_PATH",
     "CLARIFICATION_LIMIT",
     "CLARIFICATION_LIMIT_KEY",
-    "CLIENT_COMPONENT_CATALOGUE",
-    "COMPOSITION_MESSAGE_TYPES",
     "COST_CEILINGS",
     "DETECTED_LANGUAGES",
     "FALLBACK_CONFIDENCE",
@@ -125,15 +132,16 @@ __all__ = [
     "LANGUAGE_FALLBACK_NOTE",
     "LANGUAGES",
     "MAX_HISTORY_TURNS",
+    "MESSAGE_TYPES",
     "NON_COMMAND_INTENT_TYPE",
     "PAYMENT_INTENT_TYPES",
     "PRIMARY_MODEL_ID",
     "PROMPT_VERSION",
     "RANKING_CONFIDENCE_THRESHOLD",
     "SUPPORTED_LANGUAGES",
+    "A2uiCatalog",
     "Capability",
     "CompositionOutcome",
-    "CompositionValidation",
     "ConversationTurn",
     "CostTracker",
     "DecodingSettings",
@@ -164,6 +172,7 @@ __all__ = [
     "RetrievalIndex",
     "RetrievedRecord",
     "ServiceSummary",
+    "StreamValidation",
     "TaskCost",
     "amount_is_traceable",
     "amounts_in_text",
@@ -177,12 +186,15 @@ __all__ = [
     "ground_ranking",
     "keyword_resolution",
     "load_prompt",
+    "negotiate_catalog",
     "normalize_question",
     "parse_json",
     "price_for",
     "prompt_version_for",
+    "published_catalog",
     "render",
     "render_history",
     "render_untrusted_block",
-    "validate_composition",
+    "supported_catalog_ids",
+    "validate_a2ui_stream",
 ]

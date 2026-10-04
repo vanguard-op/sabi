@@ -16,8 +16,9 @@ These are product decisions enforced in code, not left to the implementer:
   its prewritten fallback; its wording is never edited or pinned (MQ-001, MQ-004).
 * Language: a detected language that is not enabled is flagged and noted rather than
   mis-resolved (MQ-004); the reply's language is bound into the prompt, not fixed here.
-* Composition: only client-catalogue components, and never executable code, scripts,
-  or external resource loads (MQ-003).
+* Composition: the composed surface is an A2UI message stream validated against the
+  published catalog in :mod:`core.a2ui`, the agent-side pre-send phase; no private
+  component-name copy lives here (MQ-003).
 
 Nothing here raises for a merely imperfect model answer; it either repairs the
 sequence or marks it unresolved so the caller can ask, decline, or render a fallback.
@@ -28,15 +29,12 @@ deterministically rewritten here.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any
 
 from core.config import INTENT_CONFIDENCE_CUTOFF
 from core.grounding import GroundingContext, amount_is_traceable, ground_intent
 from core.history import CLARIFICATION_LIMIT, CLARIFICATION_LIMIT_KEY
 from core.schemas import (
-    COMPOSITION_MESSAGE_TYPES,
     NON_COMMAND_INTENT_TYPE,
     PAYMENT_INTENT_TYPES,
     Intent,
@@ -262,103 +260,7 @@ def enforce_intent(
 
 
 # --- Composition guardrails ------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class CompositionValidation:
-    """The result of validating a declarative UI stream against the catalogue."""
-
-    ok: bool
-    errors: tuple[str, ...] = ()
-    component_names: tuple[str, ...] = ()
-
-
-def _walk_strings(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, Mapping):
-        found: list[str] = []
-        for item in value.values():
-            found.extend(_walk_strings(item))
-        return found
-    if isinstance(value, (list, tuple)):
-        found = []
-        for item in value:
-            found.extend(_walk_strings(item))
-        return found
-    return []
-
-
-def _component_names(message: Mapping[str, Any]) -> list[str]:
-    """Extract component names from the shapes the client catalogue uses."""
-
-    names: list[str] = []
-    candidates = message.get("components")
-    if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
-        candidates = []
-
-    def from_entry(entry: Any) -> str | None:
-        if isinstance(entry, str):
-            return entry
-        if isinstance(entry, Mapping):
-            for key in ("component", "componentName", "type", "name"):
-                value = entry.get(key)
-                if isinstance(value, str):
-                    return value
-            # A nested component object under a "component" key.
-            nested = entry.get("component")
-            if isinstance(nested, Mapping):
-                for key in ("componentName", "type", "name"):
-                    value = nested.get(key)
-                    if isinstance(value, str):
-                        return value
-        return None
-
-    for entry in candidates:
-        name = from_entry(entry)
-        if name:
-            names.append(name)
-
-    # createSurface may carry a root component directly.
-    root = from_entry(message.get("root"))
-    if root:
-        names.append(root)
-    return names
-
-
-def validate_composition(
-    messages: Sequence[Mapping[str, Any]],
-    *,
-    allowed_components: frozenset[str] | None = None,
-) -> CompositionValidation:
-    """Validate a UI stream: known message types, catalogue components, no code."""
-
-    allowed = allowed_components
-    errors: list[str] = []
-    names: list[str] = []
-
-    if not isinstance(messages, Sequence) or isinstance(messages, (str, bytes)):
-        return CompositionValidation(ok=False, errors=("messages must be an array",))
-
-    for index, message in enumerate(messages):
-        if not isinstance(message, Mapping):
-            errors.append(f"message {index} is not an object")
-            continue
-        message_type = message.get("type")
-        if message_type not in COMPOSITION_MESSAGE_TYPES:
-            errors.append(f"message {index} has unknown type {message_type!r}")
-            continue
-        for text in _walk_strings(message):
-            lowered = text.lower()
-            if any(pattern in lowered for pattern in _EXECUTABLE_PATTERNS):
-                errors.append(f"message {index} contains executable content")
-                break
-            if _EXTERNAL_LOAD_RE.search(text):
-                errors.append(f"message {index} contains an external resource load")
-                break
-        for name in _component_names(message):
-            names.append(name)
-            if allowed is not None and name not in allowed:
-                errors.append(f"message {index} requests unknown component {name!r}")
-
-    return CompositionValidation(ok=not errors, errors=tuple(errors), component_names=tuple(names))
+# A composed surface is an A2UI message stream, validated against the published
+# catalog in :mod:`core.a2ui` (agent-side pre-send phase) with the client repeating
+# the check on receipt (FEAT-011, MQ-003). The unused stream-validation helpers that
+# lived here were removed with the server-side component-name copy they relied on.
