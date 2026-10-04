@@ -59,6 +59,18 @@ final casesRepositoryProvider = Provider<CasesRepository>((ref) {
   return MockCasesRepository();
 });
 
+/// Record lookup grounding (FEAT-023; user-flow Flow 9). Composed from the
+/// receipt and case repositories so a lookup is always scoped to the owner's
+/// records and never invents one.
+final recordLookupRepositoryProvider = Provider<RecordLookupRepository>((ref) {
+  final receipts = ref.watch(receiptsRepositoryProvider);
+  final cases = ref.watch(casesRepositoryProvider);
+  if (ref.watch(apiConfigProvider).useLiveRepositories) {
+    return HttpRecordLookupRepository(receipts, cases);
+  }
+  return MockRecordLookupRepository(receipts: receipts, cases: cases);
+});
+
 /// Restores the persisted session cookie once at launch and verifies it with an
 /// authenticated C-008 call, so the session is resolved before the router
 /// chooses a destination and neither Welcome nor Home flashes. A 200 resolves

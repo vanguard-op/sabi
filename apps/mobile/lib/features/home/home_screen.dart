@@ -15,6 +15,7 @@ import '../../components/skeleton.dart';
 import '../../core/connectivity.dart';
 import '../../core/reauth.dart';
 import '../../data/providers.dart';
+import '../../data/repositories.dart';
 import '../../design_system/icons.dart';
 import '../../design_system/tokens.dart';
 import '../../l10n/sab_strings.dart';
@@ -88,6 +89,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openService(String serviceId) => context.push('/pay/$serviceId');
+
+  /// Opens the existing screen for a record the conversation rendered inline,
+  /// so the user may take either route to the same record (user-flow Flow 9).
+  void _openRecord(ResolvedRecord record) {
+    if (record.isReceipt) {
+      context.push('/receipts/${record.id}');
+    } else {
+      context.push('/cases/${record.id}');
+    }
+  }
+
+  /// Opens the existing identity screen for a payment that is held pending
+  /// verification; the inline surface carries the held state in the
+  /// conversation, and the ceremony resumes the task on return.
+  void _openVerification() =>
+      context.push('/account/verify?from=payment');
 
   Future<void> _showReauth() async {
     final ok = await showSabReauthDialog(
@@ -173,6 +190,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 state: state,
                 scrollController: _conversationScroll,
                 onOpenService: _openService,
+                onOpenRecord: _openRecord,
+                onOpenVerification: _openVerification,
                 onRetry: () =>
                     ref.read(homeControllerProvider.notifier).retry(),
                 onSupport: _showSupport,
@@ -197,6 +216,8 @@ class _Conversation extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.onOpenService,
+    required this.onOpenRecord,
+    required this.onOpenVerification,
     required this.onRetry,
     required this.onSupport,
   });
@@ -205,6 +226,8 @@ class _Conversation extends ConsumerWidget {
   final HomeState state;
   final ScrollController scrollController;
   final ValueChanged<String> onOpenService;
+  final ValueChanged<ResolvedRecord> onOpenRecord;
+  final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
 
@@ -249,6 +272,8 @@ class _Conversation extends ConsumerWidget {
             turn: state.turns[i],
             isLatest: i == state.turns.length - 1,
             onOpenService: onOpenService,
+            onOpenRecord: onOpenRecord,
+            onOpenVerification: onOpenVerification,
             onRetry: onRetry,
             onSupport: onSupport,
           ),
@@ -266,6 +291,8 @@ class _Turn extends ConsumerWidget {
     required this.turn,
     required this.isLatest,
     required this.onOpenService,
+    required this.onOpenRecord,
+    required this.onOpenVerification,
     required this.onRetry,
     required this.onSupport,
   });
@@ -276,6 +303,8 @@ class _Turn extends ConsumerWidget {
   /// failed turn is history, so it renders its notice without the action.
   final bool isLatest;
   final ValueChanged<String> onOpenService;
+  final ValueChanged<ResolvedRecord> onOpenRecord;
+  final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
 
@@ -319,6 +348,28 @@ class _Turn extends ConsumerWidget {
           HomePhase.discovery => _Discovery(
             candidates: turn.candidates,
             onOpenService: onOpenService,
+          ),
+          HomePhase.confirmation => _Confirmation(
+            turn: turn,
+            onOpenService: onOpenService,
+          ),
+          HomePhase.verifying => _Verifying(
+            turn: turn,
+            onOpenVerification: onOpenVerification,
+          ),
+          HomePhase.recovering => _Recovering(
+            turn: turn,
+            onOpenRecord: onOpenRecord,
+          ),
+          HomePhase.record => _RecordLookup(
+            turn: turn,
+            onOpenRecord: onOpenRecord,
+          ),
+          HomePhase.noRecord => _Notice(
+            title: strings.noRecordTitle,
+            body: assistantReplyFor(turn, strings),
+            actionLabel: strings.contactSupport,
+            onAction: onSupport,
           ),
           HomePhase.clarifying => _Clarification(
             question: turn.intent?.reply,
@@ -375,6 +426,308 @@ class _Discovery extends StatelessWidget {
       onFallbackAction: candidates.isEmpty
           ? null
           : () => onOpenService(candidates.first.serviceId),
+    );
+  }
+}
+
+/// The payment confirmation composed inline (FEAT-011, screens/03-home.md
+/// "Confirmation inline"). The confirmation surface carries the amount, payee,
+/// and reference; the payment screen stays an equal alternate route the user may
+/// choose instead, so the action names it rather than being the only way.
+class _Confirmation extends ConsumerWidget {
+  const _Confirmation({required this.turn, required this.onOpenService});
+
+  final ConversationTurn turn;
+  final ValueChanged<String> onOpenService;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
+    final intent = turn.intent;
+    final service = turn.selectedService;
+    final surface = ComposedSurface(
+      surfaceId: 'confirmation',
+      task: SurfaceTask.confirmation,
+      fallback: 'confirmation',
+      data: {
+        'amount': intent?.amount ?? 0,
+        'currency': intent?.currency ?? 'NGN',
+        'payee': service?.collectingBody ?? intent?.target ?? '',
+        'reference': intent?.reference,
+      },
+      components: const [
+        SurfaceComponent(type: 'confirmationSummary'),
+      ],
+    );
+    final serviceId = service?.serviceId;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (intent?.hasReply ?? false) ...[
+          _ConversationReply(text: intent!.reply!),
+          const SizedBox(height: SabSpacing.md),
+        ],
+        ComposedTaskSurface(
+          surface: surface,
+          fallbackPrompt: strings.confirmTitle,
+        ),
+        // The alternate route to the same task: the payment screen. A variable
+        // amount is confirmed there, so the inline surface never invents one.
+        if (serviceId != null)
+          SabButton(
+            label: strings.openPaymentScreen,
+            variant: SabButtonVariant.ghost,
+            onPressed: () => onOpenService(serviceId),
+          ),
+      ],
+    );
+  }
+}
+
+/// The identity-verification task composed inline (FEAT-011, screens/03-home.md
+/// "Verifying inline"). The task is held, not failed; the verification ceremony
+/// is completed on the existing Identity screen, which is the alternate route
+/// for the same task, and the conversation keeps the task's place.
+class _Verifying extends ConsumerWidget {
+  const _Verifying({required this.turn, required this.onOpenVerification});
+
+  final ConversationTurn turn;
+  final VoidCallback onOpenVerification;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
+    return _TaskCard(
+      title: strings.verifyInlineTitle,
+      body: assistantReplyFor(turn, strings),
+      actionLabel: strings.verifyInlineAction,
+      onAction: onOpenVerification,
+    );
+  }
+}
+
+/// The failed-payment or case recovery task composed inline (FEAT-011,
+/// screens/03-home.md "Recovering inline"). It shows the state and the next
+/// step; the case may also be opened on its screen, which is the alternate
+/// route for the same task.
+class _Recovering extends ConsumerWidget {
+  const _Recovering({
+    required this.turn,
+    required this.onOpenRecord,
+  });
+
+  final ConversationTurn turn;
+  final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
+    final caseId = turn.record?.caseSummary?.caseId;
+    final record = turn.record;
+    return _TaskCard(
+      title: strings.recoveringTitle,
+      body: assistantReplyFor(turn, strings),
+      actionLabel: caseId == null ? null : strings.openCase,
+      onAction: caseId == null || record == null
+          ? null
+          : () => onOpenRecord(record),
+    );
+  }
+}
+
+/// A resolved record lookup rendered inline (FEAT-003, FEAT-023; user-flow
+/// Flow 9): a single match as a composed record surface, several as candidates
+/// the user chooses from, each able to open the existing screen instead. No
+/// match renders no record surface (that is [HomePhase.noRecord]).
+class _RecordLookup extends ConsumerWidget {
+  const _RecordLookup({required this.turn, required this.onOpenRecord});
+
+  final ConversationTurn turn;
+  final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
+    final colors = SabColorTokens.of(context);
+
+    final single = turn.record;
+    if (single != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (turn.intent?.hasReply ?? false) ...[
+            _ConversationReply(text: turn.intent!.reply!),
+            const SizedBox(height: SabSpacing.md),
+          ],
+          _RecordSurface(record: single, onOpenRecord: onOpenRecord),
+          if (single.isReceipt) ...[
+            const SizedBox(height: SabSpacing.sm),
+            SabButton(
+              label: strings.openReceipt,
+              variant: SabButtonVariant.ghost,
+              onPressed: () => onOpenRecord(single),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Several matches: the user chooses which to open rather than the assistant
+    // guessing. Each is a real record from the owner's own records.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (turn.intent?.hasReply ?? false) ...[
+          _ConversationReply(text: turn.intent!.reply!),
+          const SizedBox(height: SabSpacing.md),
+        ],
+        Text(
+          strings.recordCandidatesTitle,
+          style: SabTypography.body.copyWith(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: SabSpacing.sm),
+        for (final record in turn.records) ...[
+          _RecordSurface(record: record, onOpenRecord: onOpenRecord),
+          const SizedBox(height: SabSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+/// One resolved record as a composed surface. A receipt renders the catalogue's
+/// Receipt Card; a case renders its reference and state from the catalogue's
+/// Text and Status Pill, so the record's own fields are shown, never a message.
+class _RecordSurface extends StatelessWidget {
+  const _RecordSurface({required this.record, required this.onOpenRecord});
+
+  final ResolvedRecord record;
+  final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final receipt = record.receipt;
+    if (receipt != null) {
+      final surface = ComposedSurface(
+        surfaceId: 'record_${record.id}',
+        task: SurfaceTask.receipt,
+        fallback: 'receipt',
+        data: {
+          'receipt': {
+            'id': receipt.id,
+            'reference': receipt.reference,
+            'payee': receipt.payee,
+            'amount': receipt.amount,
+            'currency': receipt.currency,
+            'issuedAt': receipt.issuedAt.toIso8601String(),
+            'kind': receipt.kind,
+            'status': receipt.status.name,
+          },
+        },
+        components: const [SurfaceComponent(type: 'receiptCard')],
+      );
+      return Semantics(
+        button: true,
+        label: receipt.payee,
+        child: ComposedTaskSurface(
+          surface: surface,
+          onFallbackAction: () => onOpenRecord(record),
+        ),
+      );
+    }
+    final paymentCase = record.caseSummary;
+    if (paymentCase != null) {
+      final surface = ComposedSurface(
+        surfaceId: 'record_${record.id}',
+        task: SurfaceTask.recovery,
+        fallback: 'recovery',
+        data: {
+          'text': '${paymentCase.type.wire} · ${paymentCase.paymentId}',
+          'status': _pillStatus(paymentCase.status.wire),
+        },
+        components: const [
+          SurfaceComponent(type: 'text'),
+          SurfaceComponent(type: 'statusPill'),
+        ],
+      );
+      return Semantics(
+        button: true,
+        label: paymentCase.caseId,
+        child: ComposedTaskSurface(
+          surface: surface,
+          onFallbackAction: () => onOpenRecord(record),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+/// Maps a case status to the Status Pill's vocabulary so the record surface
+/// pairs a colour with a label and a glyph (branding.md, "Accessibility").
+String _pillStatus(String wire) => switch (wire) {
+  'resolved' || 'closed' => 'settled',
+  'escalated' => 'failed',
+  'awaiting_provider' => 'awaiting_receipt',
+  _ => 'pending',
+};
+
+/// A prewritten inline task card: a titled state with a single next action.
+/// Used by the verification and recovery surfaces whose task state is text and
+/// whose completion action is a route to the equal screen.
+class _TaskCard extends StatelessWidget {
+  const _TaskCard({
+    required this.title,
+    required this.body,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final String body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SabColorTokens.of(context);
+    return Container(
+      padding: const EdgeInsets.all(SabSpacing.md),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(SabRadii.md),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: SabTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: SabSpacing.xs),
+          Text(
+            body,
+            style: SabTypography.bodySmall.copyWith(
+              color: colors.textSecondary,
+            ),
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: SabSpacing.sm),
+            SabButton(
+              label: actionLabel!,
+              variant: SabButtonVariant.ghost,
+              onPressed: onAction,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

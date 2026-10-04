@@ -840,3 +840,56 @@ class MockCasesRepository implements CasesRepository {
     updatedAt: d.paymentCase.updatedAt,
   );
 }
+
+/// Mock record lookup (FEAT-023; user-flow Flow 9). It grounds in the same
+/// receipt and case seeds the other mocks serve, so a lookup resolves to a real
+/// record the user can then open, or to nothing.
+class MockRecordLookupRepository implements RecordLookupRepository {
+  MockRecordLookupRepository({
+    required this.receipts,
+    required this.cases,
+    this.latency = _defaultLatency,
+  });
+
+  final ReceiptsRepository receipts;
+  final CasesRepository cases;
+  Duration latency;
+
+  @override
+  Future<List<ResolvedRecord>> lookup(String query, {int limit = 5}) async {
+    await Future<void>.delayed(latency);
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+
+    final matched = <ResolvedRecord>[];
+
+    // Receipts first: a record lookup such as "the receipt for my December
+    // NEPA payment" is grounded in the owner's receipts (FEAT-008/FEAT-023).
+    final receiptPage = await receipts.list(query: query, limit: limit);
+    for (final receipt in receiptPage.receipts) {
+      matched.add(
+        ResolvedRecord(kind: 'receipt', id: receipt.id, receipt: receipt),
+      );
+    }
+
+    // Cases: a payment-status lookup ("did my Airtel top-up go through") grounds
+    // in the owner's cases and their payment state.
+    final casePage = await cases.list(limit: limit);
+    for (final paymentCase in casePage.cases) {
+      final haystack =
+          '${paymentCase.caseId} ${paymentCase.paymentId} ${paymentCase.type.wire} ${paymentCase.status.wire}'
+              .toLowerCase();
+      if (haystack.contains(q)) {
+        matched.add(
+          ResolvedRecord(
+            kind: 'case',
+            id: paymentCase.caseId,
+            caseSummary: paymentCase,
+          ),
+        );
+      }
+    }
+
+    return matched.take(limit).toList(growable: false);
+  }
+}

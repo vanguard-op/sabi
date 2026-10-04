@@ -143,6 +143,24 @@ class SabStrings {
   String get sendFailed => _t('sendFailed');
   String get questionLabel => _t('questionLabel');
 
+  // Home inline tasks (FEAT-011, C-012 revision 1). A task the conversation
+  // resolves renders inline; the existing screen stays an alternate route the
+  // user may choose, so the action names the screen rather than being the only
+  // way to finish.
+  String get openPaymentScreen => _t('openPaymentScreen');
+  String get verifyInlineTitle => _t('verifyInlineTitle');
+  String get verifyInlineBody => _t('verifyInlineBody');
+  String get verifyInlineAction => _t('verifyInlineAction');
+  String get openVerificationScreen => _t('openVerificationScreen');
+  String get recoveringTitle => _t('recoveringTitle');
+  String get recoveringBody => _t('recoveringBody');
+  String get openCase => _t('openCase');
+  String get recordTitle => _t('recordTitle');
+  String get recordCandidatesTitle => _t('recordCandidatesTitle');
+  String get openReceipt => _t('openReceipt');
+  String get noRecordTitle => _t('noRecordTitle');
+  String get noRecordBody => _t('noRecordBody');
+
   // Status
   String get statusPending => _t('statusPending');
   String get statusSettled => _t('statusSettled');
@@ -354,6 +372,20 @@ class SabStrings {
     'sendFailed':
         'We couldn’t work that out. Check your connection and try again.',
     'questionLabel': 'Question',
+    'openPaymentScreen': 'Open payment screen',
+    'verifyInlineTitle': 'Verify your identity',
+    'verifyInlineBody': 'This payment needs your identity verified. It is held, not failed. Verify to continue, or open the identity screen.',
+    'verifyInlineAction': 'Verify now',
+    'openVerificationScreen': 'Open identity screen',
+    'recoveringTitle': 'This payment needs attention',
+    'recoveringBody': 'The payment didn’t complete as expected. We can show you the state and the next step here, or open the case for the full timeline.',
+    'openCase': 'Open case',
+    'recordTitle': 'Your record',
+    'recordCandidatesTitle': 'Which record?',
+    'openReceipt': 'Open in Receipts',
+    'noRecordTitle': 'No record found',
+    'noRecordBody':
+        'There’s no record matching that yet, so nothing has changed. Check the reference, the payee, or the date and tell me, and I’ll look again. You can also search your receipts yourself.',
     'statusPending': 'Pending',
     'statusSettled': 'Settled',
     'statusFailed': 'Failed',
@@ -533,6 +565,15 @@ class SabStrings {
     'caseContactSupport': 'Contact support',
     'caseViewReceipt': 'See the receipt',
     'caseOffline': 'You no get network. This na the last state we sabi.',
+    'verifyInlineTitle': 'Verify your identity',
+    'verifyInlineBody': 'This payment need your identity verify first. E dey hold, e no fail. Verify to continue, or open the identity screen.',
+    'verifyInlineAction': 'Verify now',
+    'openCase': 'Open case',
+    'recordTitle': 'Your record',
+    'openReceipt': 'Open for Receipts',
+    'noRecordTitle': 'No record found',
+    'noRecordBody':
+        'No record match that one yet, so nothing don change. Check the reference, who you pay, or the date come tell me, I go look again. You fit also search your receipts yourself.',
     'fallbackNote':
         'Some words still dey English while we finish this language.',
   };

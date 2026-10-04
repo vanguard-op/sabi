@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/connectivity.dart';
 import '../../data/providers.dart';
+import '../../data/repositories.dart';
 import '../../l10n/sab_strings.dart';
+import '../../models/composed_surface.dart';
 import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
@@ -13,15 +15,43 @@ import '../../models/service_summary.dart';
 /// `composing` covers a request in flight, `conversational` is a non-command
 /// message answered in kind, and the rest render a resolved result, a
 /// clarification, a coverage gap, or a failure.
+///
+/// The task-shaped states compose the matching surface inline, so every task is
+/// completable in the conversation and the existing screens remain an alternate
+/// route the user may choose instead:
+/// `confirmation` (service payment), `verifying` (identity), `recovering`
+/// (failed payment or case), `record` (a resolved record rendered inline), and
+/// `noRecord` (a record lookup that matched nothing).
 enum HomePhase {
   idle,
   queued,
   composing,
   discovery,
+  confirmation,
+  verifying,
+  recovering,
+  record,
+  noRecord,
   clarifying,
   conversational,
   notCovered,
   error,
+}
+
+/// The task a settled intent asks Home to compose inline (FEAT-011, C-012
+/// revision 1): the explicit `task` in the intent's constraints when the agent
+/// names one, else the task implied by the intent type. Null for a request that
+/// is not task-shaped, so it keeps the discovery and clarification path.
+SurfaceTask? surfaceTaskFor(IntentResult? intent) {
+  if (intent == null) return null;
+  final explicit = SurfaceTask.parse(intent.constraints['task']?.toString());
+  if (explicit != null) return explicit;
+  return switch (intent.intentType) {
+    'receipt_lookup' || 'status_check' => SurfaceTask.receipt,
+    'verification' => SurfaceTask.verification,
+    'recovery' => SurfaceTask.recovery,
+    _ => null,
+  };
 }
 
 /// One exchange in the Home conversation: the user's own words and the
@@ -35,8 +65,11 @@ class ConversationTurn {
     this.phase = HomePhase.composing,
     this.intent,
     this.candidates = const [],
+    this.selectedService,
     this.fromSearch = false,
     this.afterClarificationBound = false,
+    this.record,
+    this.records = const [],
   });
 
   /// The user's free-form request, verbatim.
@@ -51,6 +84,10 @@ class ConversationTurn {
   /// The selectable discovery results, whether resolved by intent or by search.
   final List<ServiceSummary> candidates;
 
+  /// The target the confirmation surface is composed for: the selected
+  /// discovery result. Null for a search result or a non-payment task.
+  final ServiceSummary? selectedService;
+
   /// True when the result came from a catalogue search fallback (FEAT-004)
   /// rather than from intent resolution.
   final bool fromSearch;
@@ -60,25 +97,44 @@ class ConversationTurn {
   /// (screens/03-home.md). False for a plain catalogue miss (No resolution).
   final bool afterClarificationBound;
 
+  /// The single record a record lookup resolved to, rendered inline
+  /// (user-flow Flow 9). Null unless [phase] is [HomePhase.record].
+  final ResolvedRecord? record;
+
+  /// The candidates a record lookup matched when more than one, so the user
+  /// chooses which to open rather than the assistant guessing.
+  final List<ResolvedRecord> records;
+
   /// True when any discovery result is not currently active, so the surface can
   /// warn before a payment is started (FEAT-004, stale catalogue data).
   bool get hasInactiveCandidate =>
       candidates.any((service) => service.status != 'active');
 
+  /// The composed task the settled payment intent asks Home to render inline:
+  /// the explicit task in the intent's constraints, else the intent type's
+  /// surface (FEAT-011, C-012 revision 1).
+  SurfaceTask? get surfaceTask => surfaceTaskFor(intent);
+
   ConversationTurn copyWith({
     HomePhase? phase,
     IntentResult? intent,
     List<ServiceSummary>? candidates,
+    ServiceSummary? selectedService,
     bool? fromSearch,
     bool? afterClarificationBound,
+    ResolvedRecord? record,
+    List<ResolvedRecord>? records,
   }) => ConversationTurn(
     request: request,
     phase: phase ?? this.phase,
     intent: intent ?? this.intent,
     candidates: candidates ?? this.candidates,
+    selectedService: selectedService ?? this.selectedService,
     fromSearch: fromSearch ?? this.fromSearch,
     afterClarificationBound:
         afterClarificationBound ?? this.afterClarificationBound,
+    record: record ?? this.record,
+    records: records ?? this.records,
   );
 }
 
@@ -93,6 +149,26 @@ String assistantReplyFor(ConversationTurn turn, SabStrings strings) =>
       HomePhase.discovery => turn.candidates
           .map((service) => service.collectingBody)
           .join(', '),
+      HomePhase.confirmation => _replyOrFallback(
+        turn.intent?.reply,
+        strings.confirmTitle,
+      ),
+      HomePhase.verifying => _replyOrFallback(
+        turn.intent?.reply,
+        strings.verifyInlineBody,
+      ),
+      HomePhase.recovering => _replyOrFallback(
+        turn.intent?.reply,
+        strings.recoveringBody,
+      ),
+      HomePhase.record => _replyOrFallback(
+        turn.intent?.reply,
+        strings.recordTitle,
+      ),
+      HomePhase.noRecord => _replyOrFallback(
+        turn.intent?.reply,
+        strings.noRecordBody,
+      ),
       HomePhase.clarifying => turn.intent?.reply ?? '',
       HomePhase.conversational =>
         _replyOrFallback(turn.intent?.reply, strings.conversationalReply),
@@ -136,6 +212,17 @@ class HomeState {
 
   bool get hasInactiveCandidate =>
       candidates.any((service) => service.status != 'active');
+
+  /// The service a confirmation surface is composed for, when the latest turn
+  /// is a payment awaiting authorisation.
+  ServiceSummary? get selectedService => current?.selectedService;
+
+  /// The single record a record lookup resolved to, when the latest turn is a
+  /// rendered record.
+  ResolvedRecord? get record => current?.record;
+
+  /// The record candidates when a lookup matched more than one.
+  List<ResolvedRecord> get records => current?.records ?? const [];
 }
 
 /// Recent activity for Home, loaded once and refreshable.
@@ -255,6 +342,53 @@ class HomeController extends Notifier<HomeState> {
       return null;
     }
 
+    // A task the settled intent names composes its surface inline: a record
+    // lookup, identity verification, failure recovery, or payment confirmation.
+    // The confidence gate below still governs an unresolved task-shaped request,
+    // so an uncertain result asks a follow-up question rather than composing a
+    // surface from an ungrounded target (FEAT-003/FEAT-011, C-012 revision 1).
+    if (intent.confidence >= intentServingConfidenceCutoff) {
+      final task = surfaceTaskFor(intent);
+      switch (task) {
+        case SurfaceTask.receipt:
+          return _lookupRecord(intent, request: request);
+        case SurfaceTask.verification:
+          _updateCurrent(
+            (turn) => turn.copyWith(
+              phase: HomePhase.verifying,
+              intent: intent,
+              candidates: const [],
+            ),
+          );
+          return null;
+        case SurfaceTask.recovery:
+          _updateCurrent(
+            (turn) => turn.copyWith(
+              phase: HomePhase.recovering,
+              intent: intent,
+              candidates: const [],
+            ),
+          );
+          return null;
+        case SurfaceTask.confirmation:
+          _updateCurrent(
+            (turn) => turn.copyWith(
+              phase: HomePhase.confirmation,
+              intent: intent,
+              candidates: intent.candidates,
+              selectedService: intent.candidates.isNotEmpty
+                  ? intent.candidates.first
+                  : null,
+            ),
+          );
+          return null;
+        case SurfaceTask.amountEntry:
+        case SurfaceTask.discovery:
+        case null:
+          break;
+      }
+    }
+
     // Below the serving cutoff the request is unresolved: the model asks a
     // follow-up question in `reply` (clarifying), and once the bound is reached
     // the client states the gap (Unresolved) instead of asking again
@@ -338,6 +472,48 @@ class HomeController extends Notifier<HomeState> {
         phase: HomePhase.notCovered,
         intent: intent,
         afterClarificationBound: afterClarificationBound,
+      ),
+    );
+    return null;
+  }
+
+  /// Resolves a record lookup against the owner's own records (FEAT-003,
+  /// FEAT-023; user-flow Flow 9). A single match renders inline; several matches
+  /// become candidates the user chooses from; no match is stated plainly and
+  /// composes no record surface. It never fabricates a record.
+  Future<List<ServiceSummary>?> _lookupRecord(
+    IntentResult intent, {
+    required String request,
+  }) async {
+    List<ResolvedRecord> records;
+    try {
+      records = await ref
+          .read(recordLookupRepositoryProvider)
+          .lookup(request);
+    } catch (_) {
+      _updateCurrent((turn) => turn.copyWith(phase: HomePhase.error));
+      return null;
+    }
+
+    if (records.isEmpty) {
+      // The honest answer: no record matched, so no surface is composed.
+      _updateCurrent(
+        (turn) => turn.copyWith(
+          phase: HomePhase.noRecord,
+          intent: intent,
+          candidates: const [],
+        ),
+      );
+      return null;
+    }
+
+    _updateCurrent(
+      (turn) => turn.copyWith(
+        phase: HomePhase.record,
+        intent: intent,
+        candidates: const [],
+        record: records.length == 1 ? records.first : null,
+        records: records,
       ),
     );
     return null;

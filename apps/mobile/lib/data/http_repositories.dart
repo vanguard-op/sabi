@@ -400,3 +400,48 @@ class HttpCasesRepository implements CasesRepository {
     }
   }
 }
+
+/// Live record lookup (FEAT-023; user-flow Flow 9). Grounds in the owner's own
+/// records by delegating to the receipt and case list endpoints; both are already
+/// scoped to the authenticated account, so a lookup can never disclose another
+/// account's record.
+class HttpRecordLookupRepository implements RecordLookupRepository {
+  HttpRecordLookupRepository(this.receipts, this.cases);
+
+  final ReceiptsRepository receipts;
+  final CasesRepository cases;
+
+  @override
+  Future<List<ResolvedRecord>> lookup(String query, {int limit = 5}) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+
+    final matched = <ResolvedRecord>[];
+    final receiptPage = await receipts.list(query: q, limit: limit);
+    for (final receipt in receiptPage.receipts) {
+      matched.add(
+        ResolvedRecord(kind: 'receipt', id: receipt.id, receipt: receipt),
+      );
+    }
+
+    // The case list endpoint does not search by text; fetch a bounded page and
+    // match on the record's own identifiers so a status lookup still grounds.
+    final casePage = await cases.list(limit: limit);
+    for (final paymentCase in casePage.cases) {
+      final haystack =
+          '${paymentCase.caseId} ${paymentCase.paymentId} ${paymentCase.type.wire} ${paymentCase.status.wire}'
+              .toLowerCase();
+      if (haystack.contains(q.toLowerCase())) {
+        matched.add(
+          ResolvedRecord(
+            kind: 'case',
+            id: paymentCase.caseId,
+            caseSummary: paymentCase,
+          ),
+        );
+      }
+    }
+
+    return matched.take(limit).toList(growable: false);
+  }
+}

@@ -338,3 +338,36 @@ class DuplicateDisputeException implements Exception {
 class CaseNotFoundException implements Exception {
   const CaseNotFoundException();
 }
+
+/// A record the user asked about (FEAT-023, user-flow Flow 9): a receipt or a
+/// payment case, grounded in the owner's own records and never constructed from
+/// model recall. The inline surface shows the record's own fields, so the record
+/// shape carries whichever fields its kind needs.
+@immutable
+class ResolvedRecord {
+  const ResolvedRecord({required this.kind, required this.id, this.receipt, this.caseSummary});
+
+  /// `receipt` or `case`.
+  final String kind;
+  final String id;
+
+  /// The receipt, when [kind] is `receipt`.
+  final ReceiptSummary? receipt;
+
+  /// The case, when [kind] is `case`.
+  final CaseSummary? caseSummary;
+
+  bool get isReceipt => kind == 'receipt';
+}
+
+/// A record lookup grounded in the owner's own records (FEAT-003, FEAT-023;
+/// user-flow Flow 9). A query such as "show me the receipt for my December NEPA
+/// payment" resolves to the matching record or to nothing; the caller renders it
+/// inline as a composed surface or routes the user to the existing screen, and
+/// the choice is the user's. It never fabricates a record.
+abstract class RecordLookupRepository {
+  /// Finds up to [limit] records matching [query] across the owner's receipts
+  /// and cases, newest first. An empty result is the honest answer: no matching
+  /// record was found, and no surface is composed.
+  Future<List<ResolvedRecord>> lookup(String query, {int limit = 5});
+}
