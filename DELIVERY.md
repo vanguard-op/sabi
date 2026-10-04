@@ -128,6 +128,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-079 | — | backend-engineer | Done | — |
 | T-080 | — | infra-engineer | Done | — |
 | T-081 | — | infra-engineer | Done | — |
+| T-082 | C-002, C-004, C-008 | frontend-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -171,6 +172,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-036 | `gcp-up` runs Terraform twice: a bootstrap apply that creates the platform (Artifact Registry, secrets, Cloud SQL, network, service accounts), then the image build and push, then a deploy apply that rolls Cloud Run onto the built tag | The first attempt pushed images before the registry existed and failed with `Repository "sabi" not found`; the registry is created by the apply, so the apply must come first | lead |
 | D-037 | Android status and navigation bars take the brand token `surface` (#FAF8F4 light / #17181A dark) in both modes, not a transparent bar | branding.md fixes the surface tokens but specifies no system-bar colour; transparent bars revealed Android's own window background (device white/black) below API 35. The brand surface matches the page background and keeps NFR-030 contrast via token luminance | user |
 | D-038 | Android passkey origins are derived from `android_cert_fingerprints` — the same certificates `assetlinks.json` names — and the separate `WEBAUTHN_NATIVE_ORIGINS` secret is retired | Staging never allowlisted the Android origin, and the secret was not injected into the API container, so every Android ceremony passed the OS prompt then failed verification. Deriving keeps the WebAuthn allowlist in step with the association file and survives destroy/up | user |
+| D-039 | The live client carries the session cookie itself and persists it in platform secure storage, restoring and verifying it on launch | Native Flutter has no browser cookie jar, so the HttpOnly session cookie set by C-002/C-004 was dropped and every authenticated call 401'd. Secure storage is the native equivalent of the browser jar and keeps NFR-026's 30-day session across app restarts | user |
 
 ## Definition of Done
 
