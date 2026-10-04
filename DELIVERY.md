@@ -138,11 +138,11 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-087 | C-009 | backend-engineer | Done | — |
 | T-088 | C-009 | ai-engineer | Done | — |
 | T-089 | C-009 | frontend-engineer | Done | — |
-| T-090 | FEAT-003 | product-shaper | Ready | — |
+| T-090 | FEAT-003 | product-shaper | Done | — |
 | T-091 | C-009 | frontend-engineer | Done | — |
 | T-092 | C-009 | backend-engineer | Done | — |
 | T-093 | C-009 | ai-engineer | Done | — |
-| T-094 | FEAT-003, FEAT-004 | product-shaper | In Progress | — |
+| T-094 | FEAT-003, FEAT-004 | product-shaper | Done | — |
 | T-095 | — | backend-engineer | Done | — |
 | T-096 | FEAT-003, FEAT-004 | product-shaper | Done | — |
 | T-097 | C-009 | backend-engineer | Done | — |
@@ -151,7 +151,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-100 | C-009 | qa-engineer | Done | — |
 | T-101 | FEAT-003, FEAT-004 | product-shaper | Done | — |
 | T-102 | FEAT-004 | backend-engineer | Done | — |
-| T-103 | FEAT-004 | backend-engineer | In Progress | — |
+| T-103 | FEAT-004 | backend-engineer | Done | — |
+| T-104 | FEAT-004 | infra-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -205,6 +206,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-046 | The non-resolving register is "there is no resolution for that service right now" (true of the request, forward-looking), not "I searched and found no match" (fixed and platform-limiting) | The user judged the drafted wording too fixed and limit-framing; the register must stay honest without reading as a dead end | user |
 | D-047 | The assistant never substitutes a different specific service for the one asked (never offers MTN for Airtel); it may ask a neutral disambiguating question or offer catalogue search, both of which let the user choose | Substituting a specific payee asserts ownership and risks sending money to the wrong place; asking or offering search does not | user |
 | D-048 | A repeatable, idempotent seeder loads real Nigerian services from a version-controlled data file so the owner never hand-enters the catalogue | The ungrounded-reply symptoms were partly an empty catalogue; a data file plus a script makes the catalogue reproducible per environment | user |
+| D-049 | The catalogue seed runs on every `gcp-up` from a Terraform-managed Cloud Run job, not as an ad-hoc manual job | The catalogue must exist for the assistant to ground, so it belongs to the deploy; a managed job is recreated by a fresh `up` and removed by `destroy`, unlike the hand-made job it replaces | user |
 
 ## Definition of Done
 
