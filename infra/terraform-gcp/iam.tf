@@ -105,10 +105,6 @@ resource "google_project_iam_member" "console_artifact_reader" {
 # run.invoker role is granted on each target service to the gateway account only,
 # never to allUsers, so the private services stay unreachable from the internet.
 resource "google_cloud_run_v2_service_iam_member" "api_invokes_ai" {
-  # Gated with the services themselves: an IAM binding on a service that does not
-  # exist yet is a 404 (D-036).
-  count = var.deploy_workloads ? 1 : 0
-
   project  = var.project_id
   location = var.region
   name     = local.service_names["ai"]
@@ -117,8 +113,6 @@ resource "google_cloud_run_v2_service_iam_member" "api_invokes_ai" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "api_invokes_payments" {
-  count = var.deploy_workloads ? 1 : 0
-
   project  = var.project_id
   location = var.region
   name     = local.service_names["payments"]
@@ -130,7 +124,7 @@ resource "google_cloud_run_v2_service_iam_member" "api_invokes_payments" {
 # Only the gateway and the console are public: end users and staff reach them
 # directly. allUsers is scoped per-service, never project-wide.
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  for_each = var.deploy_workloads ? { for k, v in local.services : k => v if v.public } : {}
+  for_each = { for k, v in local.services : k => v if v.public }
 
   project  = var.project_id
   location = var.region

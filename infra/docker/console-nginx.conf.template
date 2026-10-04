@@ -10,6 +10,14 @@ server {
     listen 8080;
     server_name _;
 
+    # Resolve proxied upstreams per request, not at startup. A literal
+    # `proxy_pass` host is resolved once when nginx boots, and a name that does
+    # not yet resolve (the gateway's DNS record is added by the operator after
+    # the first deploy) makes nginx exit before it can serve the health probe.
+    # Using a variable defers resolution to request time, so the container starts
+    # and its /health probe passes even while the gateway's DNS is pending.
+    resolver 169.254.169.254 valid=30s ipv6=off;
+
     root /usr/share/nginx/html;
     index index.html;
 
@@ -27,9 +35,12 @@ server {
     }
 
     # Proxy the API gateway. The path prefix is preserved: the backend contract
-    # base is /v1.
+    # base is /v1. The upstream is a variable so it is resolved per request (see
+    # the resolver above), and the URI part makes nginx treat it as a host:port
+    # rather than a path prefix to append.
     location /v1/ {
-        proxy_pass ${SABI_API_ORIGIN};
+        set $gateway ${SABI_API_ORIGIN};
+        proxy_pass $gateway$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

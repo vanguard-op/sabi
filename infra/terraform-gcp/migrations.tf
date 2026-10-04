@@ -8,10 +8,6 @@
 # transaction boundary (the primary store and the isolated payment store).
 
 resource "google_cloud_run_v2_job" "migrate_primary" {
-  # Created only once the api image exists (D-036); Cloud Run jobs, like
-  # services, reject an image that is not yet in Artifact Registry.
-  count = var.deploy_workloads ? 1 : 0
-
   name                = "${local.prefix}-migrate-primary"
   location            = var.region
   deletion_protection = false
@@ -70,9 +66,6 @@ resource "google_cloud_run_v2_job" "migrate_primary" {
 }
 
 resource "google_cloud_run_v2_job" "migrate_payments" {
-  # See migrate_primary: gated on the images existing (D-036).
-  count = var.deploy_workloads ? 1 : 0
-
   name                = "${local.prefix}-migrate-payments"
   location            = var.region
   deletion_protection = false

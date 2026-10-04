@@ -7,9 +7,7 @@
 # sabi.ahmadkhidir.com are mapped.
 
 resource "google_cloud_run_domain_mapping" "services" {
-  # A mapping whose route does not exist sits in Ready:False and fails the apply,
-  # so the mappings are created with the services (D-036).
-  for_each = var.deploy_workloads ? local.services : {}
+  for_each = local.services
 
   location = var.region
   name     = each.value.host
