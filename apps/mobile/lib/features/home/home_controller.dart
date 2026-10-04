@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/connectivity.dart';
 import '../../data/providers.dart';
+import '../../data/repositories.dart';
 import '../../l10n/sab_strings.dart';
 import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
@@ -10,9 +11,19 @@ import '../../models/service_summary.dart';
 
 /// The Home conversation states from screens.md (screen 3). `idle` is the
 /// neutral state before any request, `queued` is a request captured offline,
-/// `composing` covers a request in flight, and the rest render a resolved
-/// result, a single clarification, a coverage gap, or a failure.
-enum HomePhase { idle, queued, composing, discovery, clarifying, notCovered, error }
+/// `composing` covers a request in flight, `conversational` is a non-command
+/// message answered in kind, and the rest render a resolved result, a
+/// clarification, a coverage gap, or a failure.
+enum HomePhase {
+  idle,
+  queued,
+  composing,
+  discovery,
+  clarifying,
+  conversational,
+  notCovered,
+  error,
+}
 
 /// One exchange in the Home conversation: the user's own words and the
 /// assistant's outcome for them. Turns are immutable and appended in time
@@ -103,15 +114,25 @@ final recentReceiptsProvider = FutureProvider<List<ReceiptSummary>>(
 /// well-formed request is never sent just to be rejected.
 const int homeRequestMaxLength = 200;
 
+/// How many clarifying questions one conversation may ask before the assistant
+/// states the gap and offers catalogue search and human support (FEAT-003,
+/// MQ-001). A non-command message never consumes one of these turns.
+const int homeClarificationLimit = 3;
+
 /// Drives Home's conversation between idle, queued, composing, discovery,
-/// clarifying, not-covered, and error. Every request appends a turn and every
-/// turn is preserved, so the conversation builds up in time order.
+/// clarifying, conversational, not-covered, and error. Every request appends a
+/// turn and every turn is preserved, so the conversation builds up in time
+/// order.
 ///
-/// Discovery is reached two ways and both render the same selectable results:
-/// a resolved intent (FEAT-003/C-009) and, when intent resolution returns no
-/// candidate and asks no question, a catalogue search (FEAT-004/C-010). A
-/// clarification request from the model is honoured before the search fallback;
-/// a coverage miss is stated rather than invented.
+/// Each resolution carries the prior conversation as C-009 revision 3 `history`
+/// so a follow-up builds on the answers already given. Discovery is reached two
+/// ways and both render the same selectable results: a resolved intent
+/// (FEAT-003/C-009) and, when intent resolution returns no candidate and asks no
+/// question, a catalogue search (FEAT-004/C-010). A clarification request from
+/// the model is honoured before the search fallback; a non-command message is
+/// answered conversationally without being recorded; and once the clarification
+/// bound is reached the request is searched and, if still unmatched, stated as a
+/// coverage gap rather than guessed.
 class HomeController extends Notifier<HomeState> {
   @override
   HomeState build() => const HomeState();
@@ -120,7 +141,7 @@ class HomeController extends Notifier<HomeState> {
   ///
   /// Returns the selectable candidates when the caller should act on them
   /// (present the provider picker); null when the state moved to clarifying,
-  /// not-covered, queued, or error.
+  /// conversational, not-covered, queued, or error.
   Future<List<ServiceSummary>?> submit(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return null;
@@ -132,51 +153,101 @@ class HomeController extends Notifier<HomeState> {
       return null;
     }
 
-    // A second submission while a question is on screen is the answer to that
-    // question, so the next low-confidence result escalates instead of asking
-    // again (MQ-001: exactly one clarifying question). The question itself
-    // stays in the conversation as its own turn.
-    final answeringQuestion = state.phase == HomePhase.clarifying;
-
     _append(ConversationTurn(request: trimmed));
 
     try {
-      final intent = await ref
-          .read(catalogueRepositoryProvider)
-          .resolveIntent(text: trimmed, locale: ref.read(localeProvider));
-      return await _settle(
-        intent,
-        request: trimmed,
-        answeringQuestion: answeringQuestion,
-      );
+      final intent = await _resolve(trimmed);
+      return await _settle(intent, request: trimmed);
     } catch (_) {
       _updateCurrent((turn) => turn.copyWith(phase: HomePhase.error));
       return null;
     }
   }
 
+  /// Resolves [text] with the conversation so far attached. The in-flight turn
+  /// is already on the state, so [_history] drops it and sends only what came
+  /// before (C-009 revision 3).
+  Future<IntentResult> _resolve(String text) {
+    final locale = ref.read(localeProvider);
+    final history = _history();
+    final Object catalogue = ref.read(catalogueRepositoryProvider);
+    if (catalogue is HistoryAwareCatalogueRepository) {
+      return catalogue.resolveIntentWithHistory(
+        text: text,
+        locale: locale,
+        history: history,
+      );
+    }
+    return (catalogue as CatalogueRepository).resolveIntent(
+      text: text,
+      locale: locale,
+    );
+  }
+
+  /// The prior user and assistant turns, oldest first, bounded to
+  /// [intentHistoryMaxEntries]. The in-flight turn (the last one) is excluded.
+  List<IntentHistoryTurn> _history() {
+    if (state.turns.length <= 1) return const [];
+    final strings = ref.read(sabStringsProvider);
+    final entries = <IntentHistoryTurn>[];
+    for (final turn in state.turns.take(state.turns.length - 1)) {
+      entries.add(IntentHistoryTurn(role: 'user', text: turn.request));
+      final reply = _assistantReply(turn, strings);
+      if (reply != null && reply.isNotEmpty) {
+        entries.add(IntentHistoryTurn(role: 'assistant', text: reply));
+      }
+    }
+    if (entries.length > intentHistoryMaxEntries) {
+      entries.removeRange(0, entries.length - intentHistoryMaxEntries);
+    }
+    return entries;
+  }
+
+  /// The assistant's own words for a settled turn, so the model sees the
+  /// question it asked or the result it gave. Turns with no assistant reply
+  /// (queued, in flight, failed) contribute only the user's side.
+  String? _assistantReply(ConversationTurn turn, SabStrings strings) =>
+      switch (turn.phase) {
+        HomePhase.discovery =>
+          turn.candidates.map((service) => service.collectingBody).join(', '),
+        HomePhase.clarifying => turn.intent?.clarifyingQuestion,
+        HomePhase.conversational => strings.conversationalReply,
+        HomePhase.notCovered => strings.notCoveredBody,
+        _ => null,
+      };
+
   Future<List<ServiceSummary>?> _settle(
     IntentResult intent, {
     required String request,
-    required bool answeringQuestion,
   }) async {
+    // A non-command message is answered conversationally, never searched,
+    // never recorded, and never counted as a clarification turn (FEAT-003,
+    // user-flow Flow 2 Alternate Path K).
+    if (intent.isNonCommand) {
+      _updateCurrent(
+        (turn) => turn.copyWith(
+          phase: HomePhase.conversational,
+          intent: intent,
+          candidates: const [],
+        ),
+      );
+      return null;
+    }
+
     // A question from the model takes precedence over the catalogue search
     // fallback: when the request is too ambiguous to resolve, the honest next
     // step is the question even if the model offered no candidates
     // (FEAT-003/MQ-001, Flow 2 alternate path A). A resolution with no question
     // still falls through to search below.
     if (intent.needsClarification) {
-      if (answeringQuestion) {
-        // The one question was already asked and the answer still did not
-        // resolve: state the gap and offer search or support (MQ-001).
-        _updateCurrent(
-          (turn) => turn.copyWith(
-            phase: HomePhase.notCovered,
-            intent: intent,
-            candidates: intent.candidates,
-          ),
-        );
-        return null;
+      final asked = state.turns
+          .where((turn) => turn.phase == HomePhase.clarifying)
+          .length;
+      if (asked >= homeClarificationLimit) {
+        // Three questions in one conversation and still unresolved: search the
+        // catalogue once, then state the gap with human support rather than
+        // asking again or guessing (FEAT-003, MQ-001).
+        return _searchFallback(request, intent: intent);
       }
       _updateCurrent(
         (turn) => turn.copyWith(
@@ -227,10 +298,7 @@ class HomeController extends Notifier<HomeState> {
     }
     // No result and no invention: state that the service is not covered.
     _updateCurrent(
-      (turn) => turn.copyWith(
-        phase: HomePhase.notCovered,
-        intent: intent,
-      ),
+      (turn) => turn.copyWith(phase: HomePhase.notCovered, intent: intent),
     );
     return null;
   }
@@ -242,10 +310,8 @@ class HomeController extends Notifier<HomeState> {
     if (request == null) return;
     _updateCurrent((turn) => turn.copyWith(phase: HomePhase.composing));
     try {
-      final intent = await ref
-          .read(catalogueRepositoryProvider)
-          .resolveIntent(text: request, locale: ref.read(localeProvider));
-      await _settle(intent, request: request, answeringQuestion: false);
+      final intent = await _resolve(request);
+      await _settle(intent, request: request);
     } catch (_) {
       _updateCurrent((turn) => turn.copyWith(phase: HomePhase.error));
     }

@@ -33,4 +33,47 @@ void main() {
       expect(intentServingConfidenceCutoff, 0.70);
     });
   });
+
+  group('IntentResult.isNonCommand', () {
+    test('a non_command intent is recognised from either wire key', () {
+      expect(
+        IntentResult.fromJson({'intent_type': 'non_command'}).isNonCommand,
+        isTrue,
+      );
+      expect(
+        IntentResult.fromJson({'intentType': 'non_command'}).isNonCommand,
+        isTrue,
+      );
+    });
+
+    test('an ordinary intent is not a non-command', () {
+      expect(
+        IntentResult.fromJson({'intentType': 'gov_payment'}).isNonCommand,
+        isFalse,
+      );
+      expect(
+        IntentResult.fromJson({'intentType': 'unknown'}).isNonCommand,
+        isFalse,
+      );
+    });
+
+    test('a non-command never asks a clarifying question', () {
+      final intent = IntentResult.fromJson({
+        'intentType': 'non_command',
+        'confidence': 0.1,
+      });
+      expect(intent.needsClarification, isFalse);
+    });
+  });
+
+  group('IntentHistoryTurn', () {
+    test('serialises as the contract {role, text} shape', () {
+      const turn = IntentHistoryTurn(role: 'user', text: 'pay my rent');
+      expect(turn.toJson(), {'role': 'user', 'text': 'pay my rent'});
+    });
+
+    test('the history bound is six entries', () {
+      expect(intentHistoryMaxEntries, 6);
+    });
+  });
 }

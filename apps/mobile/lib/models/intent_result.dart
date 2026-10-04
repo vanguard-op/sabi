@@ -1,11 +1,47 @@
 import 'package:flutter/foundation.dart';
 
+import '../l10n/sab_strings.dart';
 import 'service_summary.dart';
 
-/// The serving confidence cutoff below which the model asks exactly one
-/// clarifying question rather than resolving a payment intent, and below which
-/// catalogue ranking reports no match (MQ-001/MQ-002, D-017/D-019).
+/// The serving confidence cutoff below which the model asks a clarifying
+/// question rather than resolving a payment intent, and below which catalogue
+/// ranking reports no match (MQ-001/MQ-002, D-017/D-019).
 const double intentServingConfidenceCutoff = 0.70;
+
+/// The `non_command` intent type: a greeting, thanks, or small talk. Answered
+/// conversationally and never recorded as a coverage miss (FEAT-003, C-009).
+const String intentTypeNonCommand = 'non_command';
+
+/// The most prior turns the client may include in one resolution request. C-009
+/// bounds `history` at six entries; the client trims older entries first.
+const int intentHistoryMaxEntries = 6;
+
+/// One prior exchange in the Home conversation, carried to intent resolution as
+/// C-009 revision 3 `history`. `role` is `user` or `assistant`.
+@immutable
+class IntentHistoryTurn {
+  const IntentHistoryTurn({required this.role, required this.text});
+
+  final String role;
+  final String text;
+
+  Map<String, dynamic> toJson() => {'role': role, 'text': text};
+}
+
+/// A catalogue repository that can resolve an intent with the conversation
+/// attached. The base `CatalogueRepository.resolveIntent` is left unchanged so
+/// every existing implementation and test double stays valid; a repository opts
+/// in by implementing this and the controller passes history when it can.
+///
+/// Fold this onto `CatalogueRepository.resolveIntent` the next time that
+/// interface is revised.
+abstract class HistoryAwareCatalogueRepository {
+  Future<IntentResult> resolveIntentWithHistory({
+    required String text,
+    required AppLocale locale,
+    required List<IntentHistoryTurn> history,
+  });
+}
 
 /// A resolved request from the assistant (CONTRACTS.md C-009).
 ///
@@ -45,6 +81,10 @@ class IntentResult {
   bool get needsClarification =>
       confidence < intentServingConfidenceCutoff &&
       (clarifyingQuestion?.isNotEmpty ?? false);
+
+  /// A greeting, thanks, or small talk. Answered conversationally, never
+  /// recorded as a coverage miss, and never counted as a clarification turn.
+  bool get isNonCommand => intentType == intentTypeNonCommand;
 
   factory IntentResult.fromJson(Map<String, dynamic> json) {
     final amount = json['amount'];

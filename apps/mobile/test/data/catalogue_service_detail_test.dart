@@ -18,13 +18,15 @@ import 'package:sabi_mobile/models/intent_result.dart';
 const _config = ApiConfig(baseUrl: 'http://10.0.2.2:8000/v1');
 
 class _StubClient extends http.BaseClient {
-  _StubClient(this.statusCode, this.body);
+  _StubClient(this.statusCode, this.body, {this.capture});
 
   final int statusCode;
   final String body;
+  final void Function(http.BaseRequest request)? capture;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    capture?.call(request);
     return http.StreamedResponse(
       Stream.value(utf8.encode(body)),
       statusCode,
@@ -83,6 +85,67 @@ ProviderContainer _liveContainer(CatalogueService service) {
 }
 
 void main() {
+  group('HttpCatalogueRepository.resolveIntent history (C-009 rev 3)', () {
+    test('carries the prior conversation oldest first', () async {
+      http.BaseRequest? captured;
+      final repo = HttpCatalogueRepository(
+        SabApiClient(
+          config: _config,
+          httpClient: _StubClient(
+            200,
+            jsonEncode({
+              'intent': {'intentType': 'unknown', 'confidence': 0.5},
+              'candidates': const [],
+              'source': 'model',
+            }),
+            capture: (request) => captured = request,
+          ),
+        ),
+      );
+      await repo.resolveIntentWithHistory(
+        text: 'the second turn',
+        locale: AppLocale.english,
+        history: const [
+          IntentHistoryTurn(role: 'user', text: 'the first turn'),
+          IntentHistoryTurn(role: 'assistant', text: 'Which one?'),
+        ],
+      );
+      final body =
+          jsonDecode((captured as http.Request).body) as Map<String, dynamic>;
+      expect(body['history'], [
+        {'role': 'user', 'text': 'the first turn'},
+        {'role': 'assistant', 'text': 'Which one?'},
+      ]);
+    });
+
+    test('omits history when there is none', () async {
+      http.BaseRequest? captured;
+      final repo = HttpCatalogueRepository(
+        SabApiClient(
+          config: _config,
+          httpClient: _StubClient(
+            200,
+            jsonEncode({
+              'intent': {'intentType': 'non_command', 'confidence': 0.2},
+              'candidates': const [],
+              'source': 'model',
+            }),
+            capture: (request) => captured = request,
+          ),
+        ),
+      );
+      final intent = await repo.resolveIntentWithHistory(
+        text: 'Hello',
+        locale: AppLocale.english,
+        history: const [],
+      );
+      expect(intent.isNonCommand, isTrue);
+      final body =
+          jsonDecode((captured as http.Request).body) as Map<String, dynamic>;
+      expect(body.containsKey('history'), isFalse);
+    });
+  });
+
   group('HttpCatalogueRepository.serviceDetail (C-011)', () {
     test('a 200 parses the full Service', () async {
       final repo = HttpCatalogueRepository(

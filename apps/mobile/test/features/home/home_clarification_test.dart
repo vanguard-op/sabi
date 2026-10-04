@@ -156,7 +156,7 @@ void main() {
   });
 
   test(
-    'answering the question with another unresolved result states the gap',
+    'a second unresolved answer asks a second question, not the gap',
     () async {
       final catalogue = _ScriptedCatalogue(
         intents: const [
@@ -179,9 +179,13 @@ void main() {
         container.read(homeControllerProvider).phase,
         HomePhase.clarifying,
       );
+      // The conversation may ask up to three questions, so the second
+      // low-confidence answer is narrowed into a second question rather than
+      // abandoned to the not-covered state (FEAT-003).
       await controller.submit('not sure');
       final state = container.read(homeControllerProvider);
-      expect(state.phase, HomePhase.notCovered);
+      expect(state.phase, HomePhase.clarifying);
+      expect(state.intent?.clarifyingQuestion, 'Still which one?');
       expect(state.turns, hasLength(2));
     },
   );

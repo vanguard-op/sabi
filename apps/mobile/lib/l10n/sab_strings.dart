@@ -127,6 +127,7 @@ class SabStrings {
   String get recent => _t('recent');
   String get clarifyingTitle => _t('clarifyingTitle');
   String get candidates => _t('candidates');
+  String get conversationalReply => _t('conversationalReply');
   String get notCoveredTitle => _t('notCoveredTitle');
   String get notCoveredBody => _t('notCoveredBody');
   String get contactSupport => _t('contactSupport');
@@ -288,10 +289,8 @@ class SabStrings {
     'passkeyUnsupportedTitle': 'This device can’t use a passkey',
     'passkeyUnsupportedBody': 'You can still create an account with a recovery code and email. That is less secure than a passkey, so save the code carefully.',
     'passkeySetupUnavailableTitle': 'Passkey setup isn’t available here',
-    'passkeySetupUnavailableBody':
-        'This build can’t set up a passkey on this device yet, so passkeys won’t work right now. You can create an account with a recovery code instead. Nothing you entered was rejected.',
-    'passkeySetupUnavailableSignIn':
-        'Passkeys aren’t available on this build. Sign in with a recovery code instead.',
+    'passkeySetupUnavailableBody': 'This build can’t set up a passkey on this device yet, so passkeys won’t work right now. You can create an account with a recovery code instead. Nothing you entered was rejected.',
+    'passkeySetupUnavailableSignIn': 'Passkeys aren’t available on this build. Sign in with a recovery code instead.',
     'passkeyRetry': 'The passkey prompt didn’t finish. Give it another try.',
     'useRecoveryInstead': 'Create account with a recovery code',
     'offlineQueue': 'You’re offline. Account creation is queued and will finish when you reconnect.',
@@ -334,6 +333,7 @@ class SabStrings {
     'recent': 'Recent',
     'clarifyingTitle': 'Just to confirm',
     'candidates': 'Closest matches',
+    'conversationalReply': 'I can pay government obligations and everyday bills for you. Tell me what you need to pay, and I’ll take it from there.',
     'notCoveredTitle': 'Not covered yet',
     'notCoveredBody': 'We don’t have that service yet. We’ve recorded your request and can connect you to support.',
     'contactSupport': 'Contact support',
@@ -394,18 +394,17 @@ class SabStrings {
         'Some text is shown in English while we finish this language.',
     'receiptsTitle': 'Receipts',
     'receiptsEmptyTitle': 'No receipts yet',
-    'receiptsEmptyBody':
-        'Receipts from your payments will appear here. Make a payment to keep the first one.',
+    'receiptsEmptyBody': 'Receipts from your payments will appear here. Make a payment to keep the first one.',
     'receiptsEmptyAction': 'Make a payment',
     'offlineReceipts':
         'Showing your saved receipts. New ones arrive when you reconnect.',
     'searchReceiptsHint': 'Search by reference, agency, or date',
     'searchReceiptsLabel': 'Search receipts',
     'noResultsTitle': 'No matches',
-    'noResultsBody': 'Nothing matched “{query}”. Try a reference, an agency, or a date.',
+    'noResultsBody':
+        'Nothing matched “{query}”. Try a reference, an agency, or a date.',
     'clearSearch': 'Clear search',
-    'storageWarning':
-        'We couldn’t save this receipt yet. Keep the transaction reference until it appears.',
+    'storageWarning': 'We couldn’t save this receipt yet. Keep the transaction reference until it appears.',
     'loadMore': 'Load more',
     'receiptDetailTitle': 'Receipt',
     'receiptPayeeLabel': 'Payee',
@@ -444,10 +443,8 @@ class SabStrings {
     'caseContactSupport': 'Contact support',
     'caseViewReceipt': 'View the receipt',
     'caseNotFound': 'This case couldn’t be found.',
-    'caseOffline':
-        'You’re offline. This is the last known state; we’ll update it when you reconnect.',
-    'caseRefundBlocked':
-        'A refund for this reference is already in progress, so we didn’t send a second one.',
+    'caseOffline': 'You’re offline. This is the last known state; we’ll update it when you reconnect.',
+    'caseRefundBlocked': 'A refund for this reference is already in progress, so we didn’t send a second one.',
     'caseRefundSubmitted': 'Refund started. We’ll keep this case updated.',
     'caseSupportBody':
         'Quote your case reference so support can pick it up straight away.',
@@ -487,11 +484,9 @@ class SabStrings {
     'signIn': 'Sign in',
     'dataHandling': 'How Sabi dey handle your data',
     'passkeyUnsupportedTitle': 'This device no fit use passkey',
-    'passkeyUnsupportedBody':
-        'You still fit create account with recovery code and email. That one no strong like passkey, so keep the code well.',
+    'passkeyUnsupportedBody': 'You still fit create account with recovery code and email. That one no strong like passkey, so keep the code well.',
     'passkeySetupUnavailableTitle': 'Passkey setup no dey work here',
-    'passkeySetupUnavailableBody':
-        'This build never set up passkey on this device yet, so passkey no go work right now. You fit create account with recovery code instead. Nothing you enter no dey rejected.',
+    'passkeySetupUnavailableBody': 'This build never set up passkey on this device yet, so passkey no go work right now. You fit create account with recovery code instead. Nothing you enter no dey rejected.',
     'passkeySetupUnavailableSignIn':
         'Passkey no dey this build. Use recovery code take sign in.',
     'passkeyRetry': 'The passkey prompt no finish. Try am again.',
@@ -500,6 +495,7 @@ class SabStrings {
     'emptyTitle': 'You never pay anything',
     'emptyBody': 'Tell Sabi wetin you need to pay to start.',
     'composerHint': 'Wetin you wan pay?',
+    'conversationalReply': 'I fit pay government levy and everyday bills for you. Tell me wetin you wan pay, I go handle am.',
     'send': 'Send',
     'retry': 'Try again',
     'signOut': 'Comot',

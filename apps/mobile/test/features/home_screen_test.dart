@@ -21,10 +21,7 @@ import '../helpers.dart';
 /// independently, so the search fallback (FEAT-004) can be exercised even when
 /// intent resolution finds nothing.
 class _Catalogue implements CatalogueRepository {
-  _Catalogue({
-    this.intents = const [],
-    this.searchResults = const [],
-  });
+  _Catalogue({this.intents = const [], this.searchResults = const []});
 
   final List<IntentResult> intents;
   final List<ServiceSummary> searchResults;
@@ -36,7 +33,9 @@ class _Catalogue implements CatalogueRepository {
     required String text,
     required AppLocale locale,
   }) async {
-    final index = intentCalls < intents.length ? intentCalls : intents.length - 1;
+    final index = intentCalls < intents.length
+        ? intentCalls
+        : intents.length - 1;
     intentCalls++;
     return intents[index];
   }
@@ -353,7 +352,7 @@ void main() {
     expect(find.text('Onitsha North LGA'), findsOneWidget);
   });
 
-  testWidgets('a second miss states the gap instead of asking again', (
+  testWidgets('a second unresolved answer narrows into a second question', (
     tester,
   ) async {
     final catalogue = _Catalogue(
@@ -368,20 +367,18 @@ void main() {
       overrides: _overrides(receipts: const [], catalogue: catalogue),
     );
     await tester.pumpAndSettle();
-    final controller = containerOf(tester).read(
-      homeControllerProvider.notifier,
-    );
+    final controller = containerOf(tester)
+        .read(homeControllerProvider.notifier);
     await controller.submit('I wan pay my electricity');
     await tester.pumpAndSettle();
     expect(find.text('Just to confirm'), findsOneWidget);
-    // Answering the one question with another unresolved request escalates
-    // rather than asking a second question (MQ-001). The first question stays
-    // in the conversation; the second low-confidence prompt is never rendered.
+    // The conversation may ask up to three questions, so a second unresolved
+    // answer is narrowed into a second question rather than abandoned to the
+    // not-covered state (FEAT-003).
     await controller.submit('Ikeja');
     await tester.pumpAndSettle();
-    expect(find.text('Which one do you mean?'), findsNothing);
-    expect(find.text('Just to confirm'), findsOneWidget);
-    expect(find.text('Not covered yet'), findsOneWidget);
+    expect(find.text('Which one do you mean?'), findsOneWidget);
+    expect(find.text('Not covered yet'), findsNothing);
     // Both requests remain in the conversation, oldest first.
     expect(find.text('I wan pay my electricity'), findsOneWidget);
     expect(find.text('Ikeja'), findsOneWidget);
@@ -463,9 +460,8 @@ void main() {
       overrides: _overrides(receipts: const []),
     );
     await tester.pumpAndSettle();
-    final controller = containerOf(tester).read(
-      homeControllerProvider.notifier,
-    );
+    final controller = containerOf(tester)
+        .read(homeControllerProvider.notifier);
     controller.submit('pay my land use charge');
     await tester.pumpAndSettle();
     // A second, unrelated request must not clear the first exchange.
@@ -536,13 +532,13 @@ void main() {
     // The request is preserved as a turn and the banner explains it is queued.
     expect(find.text('pay my land use charge'), findsOneWidget);
     expect(
-      find.text('Your request is queued and will send when you’re back online.'),
+      find.text(
+        'Your request is queued and will send when you’re back online.',
+      ),
       findsOneWidget,
     );
     // A later, second queued request appends without discarding the first.
-    await container
-        .read(homeControllerProvider.notifier)
-        .submit('buy airtime');
+    await container.read(homeControllerProvider.notifier).submit('buy airtime');
     await tester.pumpAndSettle();
     expect(find.text('pay my land use charge'), findsOneWidget);
     expect(find.text('buy airtime'), findsOneWidget);
@@ -569,6 +565,9 @@ void main() {
     expect(find.text('Lagos State Government'), findsOneWidget);
     // The request bubble is not duplicated by the retry.
     expect(find.text('pay my land use charge'), findsOneWidget);
-    expect(containerOf(tester).read(homeControllerProvider).turns, hasLength(1));
+    expect(
+      containerOf(tester).read(homeControllerProvider).turns,
+      hasLength(1),
+    );
   });
 }

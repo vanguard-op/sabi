@@ -143,7 +143,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 receipts: receipts,
                 state: state,
                 onOpenService: _openService,
-                onRetry: () => ref.read(homeControllerProvider.notifier).retry(),
+                onRetry: () =>
+                    ref.read(homeControllerProvider.notifier).retry(),
                 onSupport: _showSupport,
               ),
             ),
@@ -291,6 +292,9 @@ class _Turn extends ConsumerWidget {
             candidates: turn.candidates,
             onOpenService: onOpenService,
           ),
+          HomePhase.conversational => _ConversationReply(
+            text: strings.conversationalReply,
+          ),
           HomePhase.notCovered => _Notice(
             title: strings.notCoveredTitle,
             body: strings.notCoveredBody,
@@ -313,10 +317,7 @@ class _Turn extends ConsumerWidget {
 /// components; an unknown component is refused and the fallback form keeps the
 /// task completable.
 class _Discovery extends StatelessWidget {
-  const _Discovery({
-    required this.candidates,
-    required this.onOpenService,
-  });
+  const _Discovery({required this.candidates, required this.onOpenService});
 
   final List<ServiceSummary> candidates;
   final ValueChanged<String> onOpenService;
@@ -402,6 +403,39 @@ class _Clarification extends ConsumerWidget {
             ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The assistant's conversational reply to a non-command message, mirroring the
+/// user bubble on the opposite side so the reply reads as one exchange
+/// (screens.md, Home "Conversational").
+class _ConversationReply extends StatelessWidget {
+  const _ConversationReply({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SabColorTokens.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: SabSizes.contentMaxWidth),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SabSpacing.md,
+          vertical: SabSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: colors.surfaceSecondary,
+          borderRadius: BorderRadius.circular(SabRadii.lg),
+          border: Border.all(color: colors.border),
+        ),
+        child: Text(
+          text,
+          style: SabTypography.body.copyWith(color: colors.textPrimary),
+        ),
       ),
     );
   }
@@ -535,9 +569,7 @@ class _Composer extends ConsumerWidget {
                   maxLength: homeRequestMaxLength,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
-                  style: SabTypography.body.copyWith(
-                    color: colors.textPrimary,
-                  ),
+                  style: SabTypography.body.copyWith(color: colors.textPrimary),
                   // The bound only matters as it approaches; until then the
                   // counter is noise, so it stays hidden (screens.md, very
                   // long free-form input).
@@ -555,9 +587,7 @@ class _Composer extends ConsumerWidget {
                             color: colors.textSecondary,
                           ),
                         ),
-                  decoration: InputDecoration(
-                    hintText: strings.composerHint,
-                  ),
+                  decoration: InputDecoration(hintText: strings.composerHint),
                 ),
               ),
             ),

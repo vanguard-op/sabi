@@ -13,7 +13,8 @@ import 'repositories.dart';
 
 /// Live catalogue and intent resolution against the gateway (FEAT-003,
 /// FEAT-004; C-009, C-010).
-class HttpCatalogueRepository implements CatalogueRepository {
+class HttpCatalogueRepository
+    implements CatalogueRepository, HistoryAwareCatalogueRepository {
   HttpCatalogueRepository(this._api);
 
   final SabApiClient _api;
@@ -22,11 +23,26 @@ class HttpCatalogueRepository implements CatalogueRepository {
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
+  }) => resolveIntentWithHistory(text: text, locale: locale, history: const []);
+
+  @override
+  Future<IntentResult> resolveIntentWithHistory({
+    required String text,
+    required AppLocale locale,
+    required List<IntentHistoryTurn> history,
   }) async {
     try {
       final body = await _api.post(
         '/agent/intents',
-        body: {'text': text, 'locale': locale.code, 'channel': 'app'},
+        body: {
+          'text': text,
+          'locale': locale.code,
+          'channel': 'app',
+          // C-009 revision 3: the prior conversation, oldest first, bounded by
+          // the caller. Omitted when there is nothing to carry.
+          if (history.isNotEmpty)
+            'history': [for (final turn in history) turn.toJson()],
+        },
       );
       // The envelope carries the intent, its candidates, and `source` as
       // siblings; fold them into the one model the surface renders so a
@@ -49,10 +65,7 @@ class HttpCatalogueRepository implements CatalogueRepository {
   @override
   Future<CatalogueSearchResult> search(String query) async {
     try {
-      final body = await _api.get(
-        '/catalogue/search',
-        query: {'q': query},
-      );
+      final body = await _api.get('/catalogue/search', query: {'q': query});
       final results = (body['results'] as List? ?? const [])
           .whereType<Map>()
           .map((e) => ServiceSummary.fromJson(e.cast<String, dynamic>()))
@@ -209,7 +222,11 @@ class HttpReceiptsRepository implements ReceiptsRepository {
   final SabApiClient _api;
 
   @override
-  Future<ReceiptPage> list({String? query, String? cursor, int limit = 20}) async {
+  Future<ReceiptPage> list({
+    String? query,
+    String? cursor,
+    int limit = 20,
+  }) async {
     try {
       final body = await _api.get(
         '/receipts',
@@ -279,7 +296,11 @@ class HttpCasesRepository implements CasesRepository {
   final SabApiClient _api;
 
   @override
-  Future<CasePage> list({String? status, String? cursor, int limit = 20}) async {
+  Future<CasePage> list({
+    String? status,
+    String? cursor,
+    int limit = 20,
+  }) async {
     try {
       final body = await _api.get(
         '/cases',
@@ -334,9 +355,11 @@ class HttpCasesRepository implements CasesRepository {
         paymentId: '',
         type: CaseType.disputed,
         status: CaseStatus.parse((body['status'] ?? 'open').toString()),
-        openedAt: DateTime.tryParse(body['openedAt']?.toString() ?? '') ??
+        openedAt:
+            DateTime.tryParse(body['openedAt']?.toString() ?? '') ??
             DateTime(0),
-        updatedAt: DateTime.tryParse(body['openedAt']?.toString() ?? '') ??
+        updatedAt:
+            DateTime.tryParse(body['openedAt']?.toString() ?? '') ??
             DateTime(0),
       );
     } on ApiConflict {
