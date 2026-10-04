@@ -149,6 +149,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-098 | C-009 | ai-engineer | Done | — |
 | T-099 | C-009 | frontend-engineer | Done | — |
 | T-100 | C-009 | qa-engineer | Done | — |
+| T-101 | FEAT-003, FEAT-004 | product-shaper | In Progress | — |
+| T-102 | FEAT-004 | backend-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -200,6 +202,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-044 | The assistant's non-resolving replies are honest and specific (a plain reason plus a concrete next step), never framed as the platform being limited, always inviting the user back, and category-neutral; the BPRD sanctions the copy before the client strings and prompt examples change | The user rejected the "Not covered yet" dead-end and the electricity-shaped "meter number" follow-up as examples of a tone that blames the platform and biases one category | user |
 | D-045 | The assistant is conversational: the model authors its user-facing replies (greeting, clarifying questions, refusals, no-resolution) naturally, and structured output is reserved for the machine-actionable intent the client acts on (target, amount, reference, candidates, action); locale is bound into the model context rather than fixed client strings; only static chrome (buttons, labels, in-app text) stays prewritten for latency. Supersedes the structured-output-only and determinism assumptions; C-009 moves to a reply field and a reduced structured intent | The product owner's purpose for the AI is a representative that converses like ChatGPT/Gemini; a rigid schema-and-template design limits a capable model and is why "Hello" and unmapped requests read as canned. This is a spec-first change to FEAT-003, MQ-001, and C-009 | user |
 | D-046 | The non-resolving register is "there is no resolution for that service right now" (true of the request, forward-looking), not "I searched and found no match" (fixed and platform-limiting) | The user judged the drafted wording too fixed and limit-framing; the register must stay honest without reading as a dead end | user |
+| D-047 | The assistant never substitutes a different specific service for the one asked (never offers MTN for Airtel); it may ask a neutral disambiguating question or offer catalogue search, both of which let the user choose | Substituting a specific payee asserts ownership and risks sending money to the wrong place; asking or offering search does not | user |
+| D-048 | A repeatable, idempotent seeder loads real Nigerian services from a version-controlled data file so the owner never hand-enters the catalogue | The ungrounded-reply symptoms were partly an empty catalogue; a data file plus a script makes the catalogue reproducible per environment | user |
 
 ## Definition of Done
 
