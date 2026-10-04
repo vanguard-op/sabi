@@ -49,7 +49,7 @@ docs/                 source of truth (git submodule)
 
 ## Contracts
 
-`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044).
+`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044). C-009 at revision 3 (multi-turn intent context, `non_command`).
 
 ## Token map
 
@@ -91,7 +91,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 ## Behavior rules
 
 - No payment executes without an explicit, signed authorisation bound to amount and payee.
-- Below the confidence threshold, ask exactly one clarifying question; never invent a target, amount, or reference.
+- Below the confidence threshold, ask follow-up questions that build on the conversation, up to three; never invent a target, amount, or reference. A greeting or non-command message is answered conversationally and is never recorded as a coverage miss.
 - A catalogue miss records the query; never fabricate a service or collecting body.
 - Provider or model failure degrades to keyword and search resolution with mandatory confirmation.
 - Offline: authorisation unavailable; queued requests reconcile by idempotency key, never double-pay.
@@ -130,8 +130,9 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-081 | — | infra-engineer | Done | — |
 | T-082 | C-002, C-004, C-008 | frontend-engineer | Done | — |
 | T-083 | C-009, C-012 | backend-engineer | Done | — |
-| T-084 | C-009 | frontend-engineer | In Progress | — |
-| T-085 | FEAT-003 | product-shaper | In Progress | — |
+| T-084 | C-009 | frontend-engineer | Done | — |
+| T-085 | FEAT-003 | product-shaper | Done | — |
+| T-086 | C-009 | frontend-engineer | In Progress | — |
 
 ## Decisions log
 
