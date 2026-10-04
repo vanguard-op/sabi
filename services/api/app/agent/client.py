@@ -75,6 +75,7 @@ class AgentAIClient(Protocol):
         locale: str,
         channel: str,
         history: list[dict[str, str]] | None = None,
+        candidates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]: ...
 
     def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]: ...
@@ -106,12 +107,18 @@ class HttpAgentAIClient:
         locale: str,
         channel: str,
         history: list[dict[str, str]] | None = None,
+        candidates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {"text": text, "locale": locale, "channel": channel}
         # An omitted history stays omitted on the wire; the AI service applies its
         # own default. A present history is forwarded exactly as validated.
         if history is not None:
             body["history"] = history
+        # The catalogue candidates are an internal grounding set, not part of the
+        # client-facing C-009 request; an empty set stays off the wire so the AI
+        # service falls back to its own index rather than grounding on nothing.
+        if candidates:
+            body["candidates"] = candidates
         return self._post("/v1/agent/intents", json=body)
 
     def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:

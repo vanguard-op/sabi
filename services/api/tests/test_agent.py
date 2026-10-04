@@ -2,8 +2,9 @@
 
 They exercise what the gateway owns: the authenticated account-owner gate, rate
 limiting, the contract's request bounds, the pass-through of the AI service body,
-and the mapping of an upstream 4xx and an unreachable service. The model-backed
-behaviour itself is covered by the AI service's own tests, not here.
+the catalogue candidates it forwards for grounding, and the mapping of an upstream
+4xx and an unreachable service. The model-backed behaviour itself is covered by
+the AI service's own tests, not here.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from app.core.errors import APIError, register_exception_handlers
 from app.core.ids import new_id
 from app.core.rate_limit import InMemoryRateLimitStore, RateLimiter
 from app.core.sessions import SessionKind, SessionManager
+from app.db.models import Service
 
 INTENT_BODY = {
     "intentType": "bill_payment",
@@ -82,10 +84,13 @@ class FakeAgentClient:
         locale: str,
         channel: str,
         history: list[dict[str, Any]] | None = None,
+        candidates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         call: dict[str, Any] = {"text": text, "locale": locale, "channel": channel}
         if history is not None:
             call["history"] = history
+        if candidates:
+            call["candidates"] = candidates
         self.intent_calls.append(call)
         if self.intent_error is not None:
             raise self.intent_error
@@ -129,6 +134,31 @@ def app(
 def api_client(app: FastAPI) -> Iterator[TestClient]:
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def seed_service(db_session_factory: sessionmaker):
+    """Insert a catalogue service into the isolated store the gateway reads."""
+
+    def add(**overrides: object) -> Service:
+        values: dict[str, object] = {
+            "type": "government",
+            "name": "Ikeja Local Government Council",
+            "collecting_body": "Ikeja LGA",
+            "category": "levy",
+            "aliases": ["Ikeja Council"],
+            "currency": "NGN",
+            "status": "active",
+        }
+        values.update(overrides)
+        with db_session_factory() as db:
+            service = Service(**values)
+            db.add(service)
+            db.commit()
+            db.refresh(service)
+            return service
+
+    return add
 
 
 def _sign_in(client: TestClient, manager: SessionManager, *, kind: SessionKind = SessionKind.USER):
@@ -213,6 +243,82 @@ def test_intents_forwards_history_intact(
             "history": HISTORY,
         }
     ]
+
+
+def test_intents_forwards_catalogue_candidates(
+    api_client: TestClient,
+    session_manager: SessionManager,
+    agent_client: FakeAgentClient,
+    seed_service,
+) -> None:
+    _sign_in(api_client, session_manager)
+    service = seed_service()
+    seed_service(
+        name="Airtime Topup",
+        collecting_body="Telco",
+        category="airtime",
+        aliases=["Airtime"],
+    )
+
+    response = api_client.post("/v1/agent/intents", json={"text": "Ikeja levy"})
+
+    assert response.status_code == 200
+    calls = agent_client.intent_calls
+    assert len(calls) == 1
+    candidates = calls[0]["candidates"]
+    # Only the ranking match for the request text is forwarded, and it carries the
+    # ServiceSummary fields the AI service grounds on.
+    assert candidates == [
+        {
+            "serviceId": service.id,
+            "name": "Ikeja Local Government Council",
+            "collectingBody": "Ikeja LGA",
+            "category": "levy",
+            "knownAmount": None,
+            "currency": "NGN",
+            "status": "active",
+        }
+    ]
+
+
+def test_intents_candidate_set_is_bounded(
+    api_client: TestClient,
+    session_manager: SessionManager,
+    agent_client: FakeAgentClient,
+    seed_service,
+) -> None:
+    _sign_in(api_client, session_manager)
+    for index in range(25):
+        seed_service(name=f"Levy Office {index:02d}", collecting_body="Levy")
+
+    response = api_client.post("/v1/agent/intents", json={"text": "levy"})
+
+    assert response.status_code == 200
+    assert len(agent_client.intent_calls[0]["candidates"]) == 20
+
+
+def test_intents_forwards_no_candidates_when_the_catalogue_is_empty(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    _sign_in(api_client, session_manager)
+    response = api_client.post("/v1/agent/intents", json={"text": "Ikeja levy"})
+    assert response.status_code == 200
+    # An empty catalogue forwards no candidates rather than an empty array.
+    assert agent_client.intent_calls == [{"text": "Ikeja levy", "locale": "en", "channel": "app"}]
+
+
+def test_intents_response_is_unchanged_when_candidates_are_forwarded(
+    api_client: TestClient,
+    session_manager: SessionManager,
+    agent_client: FakeAgentClient,
+    seed_service,
+) -> None:
+    _sign_in(api_client, session_manager)
+    seed_service()
+    response = api_client.post("/v1/agent/intents", json={"text": "Ikeja levy"})
+    # The forwarded grounding set is internal; the C-009 response is the AI body.
+    assert response.status_code == 200
+    assert response.json() == INTENT_RESPONSE
 
 
 @pytest.mark.parametrize(
@@ -422,6 +528,26 @@ def test_http_client_omits_an_absent_history_from_the_c009_body() -> None:
 
     body = json.loads(transport.requests[0].content)
     assert body == {"text": "pay", "locale": "en", "channel": "app"}
+
+
+def test_http_client_forwards_candidates_in_the_c009_body() -> None:
+    client, transport = _capturing_client()
+    candidates = [{"serviceId": "svc-1", "name": "Ikeja LGA", "currency": "NGN"}]
+
+    client.resolve_intent(text="pay", locale="en", channel="app", candidates=candidates)
+
+    body = json.loads(transport.requests[0].content)
+    assert body["candidates"] == candidates
+
+
+def test_http_client_omits_empty_candidates_from_the_c009_body() -> None:
+    client, transport = _capturing_client()
+
+    client.resolve_intent(text="pay", locale="en", channel="app", candidates=[])
+
+    # An empty set stays off the wire so the AI service uses its own index.
+    body = json.loads(transport.requests[0].content)
+    assert "candidates" not in body
 
 
 def test_endpoint_prefers_an_explicit_base_url() -> None:

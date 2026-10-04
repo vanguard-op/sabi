@@ -12,6 +12,12 @@ oversized text, an unsupported locale or channel, and an unknown surface task ar
 400 with the shared envelope; rate limiting is 429. An AI service that cannot be
 reached is 503 with ``ai_unavailable``, since the gateway has no grounded answer
 of its own to give.
+
+The gateway owns the primary catalogue, so it grounds the intent call: before
+forwarding, it ranks the catalogue for the request text and sends a bounded set
+of candidate services as an internal ``candidates`` array. That set is not part
+of the frozen C-009 request or response; the AI service grounds on it rather
+than its own retrieval index (D-043).
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.agent.client import AgentAIClient
 from app.agent.deps import get_agent_client
@@ -29,9 +36,12 @@ from app.agent.schemas import (
     SurfaceResponse,
 )
 from app.api.deps import current_user, get_rate_limiter
+from app.catalogue import repository
+from app.catalogue.search import rank
 from app.core.errors import APIError, ErrorCode
 from app.core.rate_limit import RateLimiter
 from app.core.sessions import SessionData
+from app.db.session import get_db
 
 router = APIRouter(tags=["agent"])
 
@@ -43,9 +53,40 @@ _CHANNELS = frozenset({"app", "ussd", "sms", "whatsapp"})
 _HISTORY_ROLES = frozenset({"user", "assistant"})
 _HISTORY_INVALID = "That conversation history is not valid."
 
+# Grounding candidates forwarded to the AI service are bounded so a request can
+# never grow the prompt without limit. The cap matches the AI service's own
+# retrieval breadth.
+_MAX_CANDIDATES = 20
+
 AccountOwner = Annotated[SessionData, Depends(current_user)]
 AgentClient = Annotated[AgentAIClient, Depends(get_agent_client)]
 Limiter = Annotated[RateLimiter, Depends(get_rate_limiter)]
+DbSession = Annotated[Session, Depends(get_db)]
+
+
+def _forwarded_candidates(db: Session, query: str) -> list[dict[str, Any]]:
+    """Rank the gateway catalogue for ``query`` and serialise the top matches.
+
+    The records are the C-009 ``ServiceSummary`` fields the AI service grounds on
+    (camelCase, D-018). An empty catalogue or no match yields no candidates, so
+    nothing is forwarded and the AI service falls back to its own index. Retrieved
+    content is untrusted, so this is only a relevance-ranked set, never an
+    instruction.
+    """
+
+    matches = rank(repository.candidates(db), query, _MAX_CANDIDATES)
+    return [
+        {
+            "serviceId": service.id,
+            "name": service.name,
+            "collectingBody": service.collecting_body,
+            "category": service.category,
+            "knownAmount": service.known_amount,
+            "currency": service.currency,
+            "status": service.status,
+        }
+        for service, _confidence in matches
+    ]
 
 
 def _validated_history(raw: Any) -> list[dict[str, str]] | None:
@@ -81,6 +122,7 @@ def resolve_intent(
     session: AccountOwner,
     client: AgentClient,
     limiter: Limiter,
+    db: DbSession,
 ) -> dict:
     # Limit before validation so a burst of malformed requests cannot outrun it.
     limiter.check(f"agent:intents:{session.user_id}")
@@ -96,8 +138,16 @@ def resolve_intent(
         raise APIError(400, ErrorCode.INVALID_REQUEST, "That channel is not supported.")
     history = _validated_history(payload.history)
 
+    # Ground the AI call in the gateway's own catalogue; the AI's retrieval index
+    # is not installed, so an ungrounded call cannot resolve a real service.
+    candidates = _forwarded_candidates(db, text)
+
     return client.resolve_intent(
-        text=text, locale=payload.locale, channel=payload.channel, history=history
+        text=text,
+        locale=payload.locale,
+        channel=payload.channel,
+        history=history,
+        candidates=candidates,
     )
 
 
