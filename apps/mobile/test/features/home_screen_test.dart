@@ -32,6 +32,7 @@ class _Catalogue implements CatalogueRepository {
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
+    List<IntentHistoryTurn> history = const [],
   }) async {
     final index = intentCalls < intents.length
         ? intentCalls

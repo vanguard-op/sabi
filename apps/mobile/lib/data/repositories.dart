@@ -154,9 +154,13 @@ class ServiceNotFoundException implements Exception {
 /// the service it is about to pay from the catalogue rather than a hardcoded
 /// sandbox entry.
 abstract class CatalogueRepository {
+  /// Resolves a free-form request. [history] carries the prior conversation,
+  /// oldest first, bounded to [intentHistoryMaxEntries] and omitted from the
+  /// wire when empty (C-009 revision 3).
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
+    List<IntentHistoryTurn> history = const [],
   });
 
   Future<CatalogueSearchResult> search(String query);

@@ -13,8 +13,7 @@ import 'repositories.dart';
 
 /// Live catalogue and intent resolution against the gateway (FEAT-003,
 /// FEAT-004; C-009, C-010).
-class HttpCatalogueRepository
-    implements CatalogueRepository, HistoryAwareCatalogueRepository {
+class HttpCatalogueRepository implements CatalogueRepository {
   HttpCatalogueRepository(this._api);
 
   final SabApiClient _api;
@@ -23,13 +22,7 @@ class HttpCatalogueRepository
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
-  }) => resolveIntentWithHistory(text: text, locale: locale, history: const []);
-
-  @override
-  Future<IntentResult> resolveIntentWithHistory({
-    required String text,
-    required AppLocale locale,
-    required List<IntentHistoryTurn> history,
+    List<IntentHistoryTurn> history = const [],
   }) async {
     try {
       final body = await _api.post(

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/connectivity.dart';
 import '../../data/providers.dart';
-import '../../data/repositories.dart';
 import '../../l10n/sab_strings.dart';
 import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
@@ -169,18 +168,10 @@ class HomeController extends Notifier<HomeState> {
   /// before (C-009 revision 3).
   Future<IntentResult> _resolve(String text) {
     final locale = ref.read(localeProvider);
-    final history = _history();
-    final Object catalogue = ref.read(catalogueRepositoryProvider);
-    if (catalogue is HistoryAwareCatalogueRepository) {
-      return catalogue.resolveIntentWithHistory(
-        text: text,
-        locale: locale,
-        history: history,
-      );
-    }
-    return (catalogue as CatalogueRepository).resolveIntent(
+    return ref.read(catalogueRepositoryProvider).resolveIntent(
       text: text,
       locale: locale,
+      history: _history(),
     );
   }
 

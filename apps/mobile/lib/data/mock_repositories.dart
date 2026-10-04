@@ -181,6 +181,7 @@ class MockCatalogueRepository implements CatalogueRepository {
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
+    List<IntentHistoryTurn> history = const [],
   }) async {
     await Future<void>.delayed(latency);
     if (failNext) {

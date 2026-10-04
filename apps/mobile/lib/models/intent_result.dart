@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../l10n/sab_strings.dart';
 import 'service_summary.dart';
 
 /// The serving confidence cutoff below which the model asks a clarifying
@@ -26,21 +25,6 @@ class IntentHistoryTurn {
   final String text;
 
   Map<String, dynamic> toJson() => {'role': role, 'text': text};
-}
-
-/// A catalogue repository that can resolve an intent with the conversation
-/// attached. The base `CatalogueRepository.resolveIntent` is left unchanged so
-/// every existing implementation and test double stays valid; a repository opts
-/// in by implementing this and the controller passes history when it can.
-///
-/// Fold this onto `CatalogueRepository.resolveIntent` the next time that
-/// interface is revised.
-abstract class HistoryAwareCatalogueRepository {
-  Future<IntentResult> resolveIntentWithHistory({
-    required String text,
-    required AppLocale locale,
-    required List<IntentHistoryTurn> history,
-  });
 }
 
 /// A resolved request from the assistant (CONTRACTS.md C-009).

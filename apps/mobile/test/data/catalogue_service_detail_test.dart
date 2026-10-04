@@ -53,6 +53,7 @@ class _FixedCatalogue implements CatalogueRepository {
   Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
+    List<IntentHistoryTurn> history = const [],
   }) async => throw UnimplementedError();
 
   @override
@@ -102,7 +103,7 @@ void main() {
           ),
         ),
       );
-      await repo.resolveIntentWithHistory(
+      await repo.resolveIntent(
         text: 'the second turn',
         locale: AppLocale.english,
         history: const [
@@ -134,7 +135,7 @@ void main() {
           ),
         ),
       );
-      final intent = await repo.resolveIntentWithHistory(
+      final intent = await repo.resolveIntent(
         text: 'Hello',
         locale: AppLocale.english,
         history: const [],

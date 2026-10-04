@@ -14,8 +14,7 @@ import '../../helpers.dart';
 
 /// A catalogue double that records the `history` it is handed, so the
 /// conversation carried to C-009 can be asserted directly.
-class _HistoryCatalogue
-    implements CatalogueRepository, HistoryAwareCatalogueRepository {
+class _HistoryCatalogue implements CatalogueRepository {
   _HistoryCatalogue({this.intents = const [], this.searchResults = const []});
 
   final List<IntentResult> intents;
@@ -25,10 +24,10 @@ class _HistoryCatalogue
   int searchCalls = 0;
 
   @override
-  Future<IntentResult> resolveIntentWithHistory({
+  Future<IntentResult> resolveIntent({
     required String text,
     required AppLocale locale,
-    required List<IntentHistoryTurn> history,
+    List<IntentHistoryTurn> history = const [],
   }) async {
     histories.add(List.of(history));
     final index = intentCalls < intents.length
@@ -36,16 +35,6 @@ class _HistoryCatalogue
         : intents.length - 1;
     intentCalls++;
     return intents[index];
-  }
-
-  @override
-  Future<IntentResult> resolveIntent({
-    required String text,
-    required AppLocale locale,
-  }) async {
-    // Home must always take the history-aware path when the repository offers
-    // one; falling back here would silently drop the conversation.
-    throw StateError('history-aware resolution expected');
   }
 
   @override
