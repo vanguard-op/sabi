@@ -5,27 +5,29 @@ import 'tokens.dart';
 
 /// The system status and navigation bar style for a token palette.
 ///
-/// Both bars are made transparent and their icon brightness is chosen to
-/// contrast with [SabColorTokens.surface]. Android draws the bars edge-to-edge
-/// from API 35 on, where a bar colour is ignored and the app surface shows
-/// through; on older levels the surface behind the transparent bar reads the
-/// same way. The status and navigation bar contrast scrims are disabled so the
-/// surface is never toned to a different colour, and every field is token-
-/// derived rather than Material's default black bar (branding.md, "Color
-/// Palette"; NFR-030).
+/// Both bars carry [SabColorTokens.surface] rather than a transparent bar:
+/// below API 35, without enforced edge-to-edge, Android paints its own window
+/// background behind a transparent bar, so it read white or black by device
+/// theme instead of the brand surface. On API 35+ the bar colour is ignored
+/// under enforced edge-to-edge, and the theme's [ThemeData.scaffoldBackgroundColor]
+/// shows the same token surface behind the bar. Icon brightness follows the
+/// surface luminance, the contrast scrims are disabled so the surface is never
+/// toned to a different colour, and every field is token-derived rather than
+/// Material's default black bar (branding.md, "Color Palette"; NFR-030;
+/// decision D-037).
 SystemUiOverlayStyle sabSystemOverlayStyle(SabColorTokens colors) {
   // Light surfaces take dark icons and dark surfaces light icons, so the icon
   // brightness follows the surface luminance rather than the theme flag.
   final surfaceIsLight = colors.surface.computeLuminance() > 0.5;
   final iconBrightness = surfaceIsLight ? Brightness.dark : Brightness.light;
   return SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
+    statusBarColor: colors.surface,
     // iOS reads the background brightness, which is the inverse of its icons.
     statusBarBrightness: surfaceIsLight ? Brightness.light : Brightness.dark,
     statusBarIconBrightness: iconBrightness,
     systemStatusBarContrastEnforced: false,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarColor: colors.surface,
+    systemNavigationBarDividerColor: colors.surface,
     systemNavigationBarIconBrightness: iconBrightness,
     systemNavigationBarContrastEnforced: false,
   );

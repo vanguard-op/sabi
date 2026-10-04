@@ -5,29 +5,48 @@ import 'package:sabi_mobile/design_system/theme.dart';
 import 'package:sabi_mobile/design_system/tokens.dart';
 
 /// Guards the system status and navigation bars against both Flutter's default
-/// black navigation bar and Material's default per-screen colour: the bars read
-/// the theme surface with icons that contrast it, in both modes (NFR-030).
+/// black navigation bar, Material's default per-screen colour, and a
+/// transparent bar that lets Android's device-themed window background show
+/// through: the bars carry the theme surface with icons that contrast it, in
+/// both modes (NFR-030; D-037).
 void main() {
   final light = SabColorTokens.light;
   final dark = SabColorTokens.dark;
 
   group('token system bar style', () {
-    test('light mode uses dark icons on the light surface', () {
+    test('light mode paints the light surface with dark icons', () {
       final style = sabSystemOverlayStyle(light);
-      expect(style.statusBarColor, Colors.transparent);
-      expect(style.systemNavigationBarColor, Colors.transparent);
-      expect(style.systemNavigationBarDividerColor, Colors.transparent);
+      expect(style.statusBarColor, light.surface);
+      expect(style.systemNavigationBarColor, light.surface);
+      expect(style.systemNavigationBarDividerColor, light.surface);
       expect(style.statusBarIconBrightness, Brightness.dark);
       expect(style.systemNavigationBarIconBrightness, Brightness.dark);
       // iOS reads the background brightness, which is the inverse of its icons.
       expect(style.statusBarBrightness, Brightness.light);
     });
 
-    test('dark mode uses light icons on the dark surface', () {
+    test('dark mode paints the dark surface with light icons', () {
       final style = sabSystemOverlayStyle(dark);
+      expect(style.statusBarColor, dark.surface);
+      expect(style.systemNavigationBarColor, dark.surface);
+      expect(style.systemNavigationBarDividerColor, dark.surface);
       expect(style.statusBarIconBrightness, Brightness.light);
       expect(style.systemNavigationBarIconBrightness, Brightness.light);
       expect(style.statusBarBrightness, Brightness.dark);
+    });
+
+    test('bars are opaque so the device window cannot show through', () {
+      // A transparent bar let Android paint its own device-themed window
+      // background behind it below API 35 (D-037).
+      for (final colors in [light, dark]) {
+        final style = sabSystemOverlayStyle(colors);
+        expect(style.statusBarColor, isNot(Colors.transparent));
+        expect(style.systemNavigationBarColor, isNot(Colors.transparent));
+        expect(
+          style.systemNavigationBarDividerColor,
+          isNot(Colors.transparent),
+        );
+      }
     });
 
     test('never falls back to the default black bar', () {
@@ -56,6 +75,19 @@ void main() {
       expect(
         buildSabTheme(Brightness.dark).appBarTheme.systemOverlayStyle,
         sabSystemOverlayStyle(dark),
+      );
+    });
+
+    test('the scaffold surface is the token surface behind the bars', () {
+      // On API 35+ the bar colour is ignored under enforced edge-to-edge, so
+      // the scaffold background is what shows behind the bar (D-037).
+      expect(
+        buildSabTheme(Brightness.light).scaffoldBackgroundColor,
+        light.surface,
+      );
+      expect(
+        buildSabTheme(Brightness.dark).scaffoldBackgroundColor,
+        dark.surface,
       );
     });
   });

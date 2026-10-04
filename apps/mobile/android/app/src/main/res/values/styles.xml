@@ -17,6 +17,10 @@
 
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- The brand surface (grey-50, #FAF8F4). Using ?android:colorBackground
+             here let the device theme paint the window while Flutter
+             initialised, flashing white before the first frame. Mirrors the
+             mobile `surface` token (branding.md, "Color Palette"; D-037). -->
+        <item name="android:windowBackground">#FAF8F4</item>
     </style>
 </resources>
