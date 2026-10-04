@@ -1,19 +1,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Passkey relying party (FEAT-001, D-004, D-028).
-         The RP origin must serve https://<webauthn_rp_id>/.well-known/assetlinks.json
+         The RP origin serves https://<webauthn_rp_id>/.well-known/assetlinks.json
          naming this app as a target:
            { "relation": ["delegate_permission/common.get_login_creds"],
              "target": { "namespace": "android_app",
                          "package_name": "ng.sabi.sabi_mobile",
                          "sha256_cert_fingerprints": ["<signing cert SHA-256>"] } }
          It is served without redirects, as application/json, and must list every
-         signing certificate (debug, upload, and Play App Signing). The file is
-         backend-hosted, so there is no app manifest entry for passkeys beyond
-         the package identity declared below. -->
+         signing certificate (debug, upload, and Play App Signing). The gateway
+         serves the file itself (`app/api/well_known.py`).
+
+         The `asset_statements` entry below tells Android which origin to check
+         the app against; without it Credential Manager cannot associate the app
+         with the RP domain and a ceremony fails with `domain-not-associated`.
+         The origin here must equal the backend's `webauthn_origin`. -->
     <application
         android:label="Sabi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

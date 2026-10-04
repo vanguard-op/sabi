@@ -20,3 +20,16 @@ api_max_instances   = 4
 ai_max_instances    = 3
 payments_max_instances = 3
 console_max_instances  = 2
+
+# Passkey association (FEAT-001). The gateway serves these from
+# /.well-known/ so each platform can verify the app belongs to the domain.
+# Add every signing certificate: a build signed with an unlisted key cannot
+# complete a ceremony. The value below is the local debug keystore's SHA-256
+# (`keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey`);
+# replace or extend it for upload and Play App Signing certificates.
+android_package_name      = "ng.sabi.sabi_mobile"
+android_cert_fingerprints = ["51:60:03:F2:CC:9B:70:47:52:A5:EE:4E:DF:A7:0C:5E:29:F9:77:04:41:CE:5F:B9:6A:23:8B:1D:35:12:5E:99"]
+
+# iOS: <TeamID>.<bundle id>. Left empty until the Apple Developer team id is
+# known; the AASA file then returns 404 rather than advertising an unverified app.
+apple_app_id = ""

@@ -110,6 +110,13 @@ locals {
       WEBAUTHN_RP_ID   = local.services["api"].host
       WEBAUTHN_RP_NAME = "Sabi"
       WEBAUTHN_ORIGIN  = "https://${local.services["api"].host}"
+      # Association files served from this origin (FEAT-001). Android needs the
+      # app package and every signing-certificate SHA-256; iOS needs the
+      # <TeamID>.<bundle> app id. Empty values make the file 404 rather than
+      # advertise an app the origin cannot vouch for.
+      ANDROID_PACKAGE_NAME      = var.android_package_name
+      ANDROID_CERT_FINGERPRINTS = jsonencode(var.android_cert_fingerprints)
+      APPLE_APP_ID              = var.apple_app_id
     },
     local.store_env,
   )

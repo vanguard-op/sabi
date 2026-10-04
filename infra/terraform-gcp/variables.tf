@@ -99,3 +99,31 @@ variable "container_image_tag" {
   type        = string
   default     = "latest"
 }
+
+# --- Passkey association (FEAT-001) ------------------------------------------
+# The RP origin serves /.well-known/assetlinks.json and
+# /.well-known/apple-app-site-association so each platform can verify the app
+# belongs to the domain. Without a match a ceremony fails with
+# `domain-not-associated` before any credential is created.
+
+variable "android_package_name" {
+  description = "Android application id the relying-party origin vouches for."
+  type        = string
+  default     = "ng.sabi.sabi_mobile"
+}
+
+variable "android_cert_fingerprints" {
+  description = <<-EOT
+    SHA-256 fingerprint of every certificate the Android app is signed with
+    (debug, upload, and Play App Signing), uppercase, colon-separated. A build
+    signed with a key that is not listed here cannot complete a ceremony.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
+variable "apple_app_id" {
+  description = "Apple app identifier for webcredentials, as <TeamID>.<bundle id>."
+  type        = string
+  default     = ""
+}

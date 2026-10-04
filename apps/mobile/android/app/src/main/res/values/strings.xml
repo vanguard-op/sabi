@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Passkey domain association (FEAT-001).
+
+     Android reads this to learn which origin should vouch for the app. The
+     origin must equal the backend's `webauthn_origin`, and that origin serves
+     /.well-known/assetlinks.json naming this package and its signing
+     certificate. A mismatch is a `domain-not-associated` failure at the first
+     ceremony.
+
+     Only one origin is declared per build: a passkey is bound to the relying
+     party it was created against, so development and staging are separate
+     installs rather than one app trusting both. Override this value for a
+     build that targets a different environment. -->
+<resources>
+    <string name="asset_statements" translatable="false">[
+        {
+            "include": "https://api.sabi.ahmadkhidir.com/.well-known/assetlinks.json"
+        }
+    ]</string>
+</resources>

@@ -81,6 +81,18 @@ class Settings(BaseSettings):
     # not in this list is refused, so an unrecognised origin cannot slip through.
     webauthn_native_origins: list[str] = Field(default_factory=list)
 
+    # Android app identity for Digital Asset Links (FEAT-001). The RP origin
+    # serves /.well-known/assetlinks.json naming the app package and the SHA-256
+    # fingerprints of every certificate it is signed with (debug, upload, and
+    # Play App Signing), or Android refuses to associate the app with the domain
+    # and every ceremony fails with `domain-not-associated`.
+    android_package_name: str = "ng.sabi.sabi_mobile"
+    android_cert_fingerprints: list[str] = Field(default_factory=list)
+
+    # iOS app identity for the Apple App Site Association file. The
+    # `webcredentials.apps` entries are `<TeamID>.<bundle id>`.
+    apple_app_id: str = ""
+
     # Session and recovery secrets (NFR-021, NFR-024, NFR-026).
     session_cookie_name: str = "sabi_session"
     session_secret: SecretStr = SecretStr(DEV_PLACEHOLDER)
