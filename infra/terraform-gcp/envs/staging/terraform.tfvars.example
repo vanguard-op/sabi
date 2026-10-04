@@ -15,9 +15,9 @@ db_disk_type         = "PD_HDD"
 
 # Private services scale to zero while stopped; the `up` workflow raises the API
 # minimum when it deploys (D-033).
-api_min_instances   = 0
-api_max_instances   = 4
-ai_max_instances    = 3
+api_min_instances      = 0
+api_max_instances      = 4
+ai_max_instances       = 3
 payments_max_instances = 3
 console_max_instances  = 2
 
