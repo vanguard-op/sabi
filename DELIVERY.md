@@ -49,7 +49,7 @@ docs/                 source of truth (git submodule)
 
 ## Contracts
 
-`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044). C-009 at revision 3 (multi-turn intent context, `non_command`).
+`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044). C-009 at revision 4 (conversational `reply`, reduced machine-actionable intent, `non_command`).
 
 ## Token map
 
@@ -92,6 +92,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 
 - No payment executes without an explicit, signed authorisation bound to amount and payee.
 - Below the confidence threshold, ask follow-up questions that build on the conversation, up to three; never invent a target, amount, or reference. A greeting or non-command message is answered conversationally and is never recorded as a coverage miss.
+- The assistant's replies are model-authored natural language in the user's locale; structured output carries only the machine-actionable intent the client acts on. Every fact (amount, reference, service id, collecting body) comes from retrieved context, never the reply's own invention.
+- Static chrome (buttons, labels, in-app text) is prewritten; conversational replies are not.
 - A catalogue miss records the query; never fabricate a service or collecting body.
 - Provider or model failure degrades to keyword and search resolution with mandatory confirmation.
 - Offline: authorisation unavailable; queued requests reconcile by idempotency key, never double-pay.
@@ -142,7 +144,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-093 | C-009 | ai-engineer | Done | — |
 | T-094 | FEAT-003, FEAT-004 | product-shaper | In Progress | — |
 | T-095 | — | backend-engineer | Done | — |
-| T-096 | FEAT-003, FEAT-004 | product-shaper | In Progress | — |
+| T-096 | FEAT-003, FEAT-004 | product-shaper | Done | — |
+| T-097 | C-009 | backend-engineer | In Progress | — |
+| T-098 | C-009 | ai-engineer | In Progress | — |
+| T-099 | C-009 | frontend-engineer | In Progress | — |
 
 ## Decisions log
 

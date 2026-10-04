@@ -60,10 +60,10 @@ Response 200: id: string, displayName: string|null, locale: string, preferredCha
 Errors: 401 (unauthenticated)
 
 ### C-009: POST /v1/agent/intents
-Status: Frozen (revision 3)
+Status: Frozen (revision 4)
 Auth: Session cookie (authenticated account owner)
 Request: text: string (non-empty, max 200 chars), locale: string (en|pcm), channel: string (app|ussd|sms|whatsapp), history: object[] (optional, oldest first, max 6, each {role: user|assistant, text: string})
-Response 200: intent: object (intentType: string (gov_payment|bill_payment|discovery|status_check|receipt_lookup|non_command|unknown), target: string|null, amount: integer|null (minor units, kobo), currency: string, reference: string|null, constraints: object, confidence: number, language: string, clarifyingQuestion: string|null), candidates: ServiceSummary[], source: string (model|fallback)
+Response 200: reply: string|null (the model-authored user-facing message in `locale`; null when none was produced), intent: object (intentType: string (gov_payment|bill_payment|discovery|status_check|receipt_lookup|non_command|unknown), target: string|null, amount: integer|null (minor units, kobo), currency: string, reference: string|null, constraints: object, confidence: number, detectedLanguage: string (en|pcm|ha|yo|ig|null)), candidates: ServiceSummary[], source: string (model|fallback)
 Errors: 400 (empty or oversized text; malformed or oversized history), 429 (rate limited)
 
 ### C-010: GET /v1/catalogue/search
