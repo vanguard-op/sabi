@@ -1,10 +1,10 @@
 """Unit tests for the gateway agent module (C-009, C-012).
 
 They exercise what the gateway owns: the authenticated account-owner gate, rate
-limiting, the contract's request bounds, the pass-through of the AI service body,
-the catalogue candidates it forwards for grounding, and the mapping of an upstream
-4xx and an unreachable service. The model-backed behaviour itself is covered by
-the AI service's own tests, not here.
+limiting, the contract's request bounds, the pass-through of the AI service body
+(including the model-authored ``reply``), the catalogue candidates it forwards for
+grounding, and the mapping of an upstream 4xx and an unreachable service. The
+model-backed behaviour itself is covered by the AI service's own tests, not here.
 """
 
 from __future__ import annotations
@@ -45,11 +45,11 @@ INTENT_BODY = {
     "reference": None,
     "constraints": {},
     "confidence": 0.9,
-    "language": "en",
-    "clarifyingQuestion": None,
+    "detectedLanguage": None,
 }
 
 INTENT_RESPONSE = {
+    "reply": "Which electricity biller are you paying?",
     "intent": INTENT_BODY,
     "candidates": [],
     "source": "model",
@@ -188,6 +188,63 @@ def test_intents_forwards_and_returns_the_ai_body(
     assert agent_client.intent_calls == [
         {"text": "pay my land use charge", "locale": "pcm", "channel": "ussd"}
     ]
+
+
+def test_intents_carries_the_reply_and_the_reduced_intent(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    # The revision-4 wire shape: a top-level model-authored reply, and an intent
+    # that keeps only the machine-actionable fields.
+    _sign_in(api_client, session_manager)
+    agent_client.intent_response = {
+        "reply": "Sure — which electricity biller do you use?",
+        "intent": {
+            "intentType": "bill_payment",
+            "target": None,
+            "amount": None,
+            "currency": "NGN",
+            "reference": None,
+            "constraints": {"category": "electricity"},
+            "confidence": 0.42,
+            "detectedLanguage": "pcm",
+        },
+        "candidates": [],
+        "source": "model",
+    }
+    response = api_client.post("/v1/agent/intents", json={"text": "I wan pay my light"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reply"] == "Sure — which electricity biller do you use?"
+    assert body["intent"]["detectedLanguage"] == "pcm"
+    # The folded-away fields are gone from the wire entirely.
+    assert "clarifyingQuestion" not in body["intent"]
+    assert "language" not in body["intent"]
+
+
+def test_intents_passes_through_a_null_reply(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    # A null reply is valid: the client renders its prewritten fallback rather
+    # than being shown a blank turn. The gateway must not invent one.
+    _sign_in(api_client, session_manager)
+    agent_client.intent_response = {**INTENT_RESPONSE, "reply": None}
+    response = api_client.post("/v1/agent/intents", json={"text": "pay electricity"})
+    assert response.status_code == 200
+    assert response.json()["reply"] is None
+
+
+def test_intents_does_not_reshape_the_model_reply(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    # The reply is the model's, in the user's locale; the gateway forwards the
+    # exact string and never rewrites or substitutes it.
+    _sign_in(api_client, session_manager)
+    reply = "No wahala — wetin you wan make I help you pay?"
+    agent_client.intent_response = {**INTENT_RESPONSE, "reply": reply}
+    response = api_client.post("/v1/agent/intents", json={"text": "hello", "locale": "pcm"})
+    assert response.status_code == 200
+    assert response.json()["reply"] == reply
 
 
 @pytest.mark.parametrize(

@@ -35,7 +35,15 @@ class IntentRequest(BaseModel):
 
 
 class IntentOut(BaseModel):
-    """The resolved structured intent (C-009 ``intent``)."""
+    """The reduced, machine-actionable intent (C-009 ``intent``).
+
+    The model authors its user-facing message as the response's top-level
+    ``reply``; the clarifying question and the greeting are part of that reply,
+    so the intent carries only the fields the client acts on. ``detectedLanguage``
+    is the language the model detected or served, a machine-actionable signal the
+    client and analytics consume (MQ-001, MQ-004); it is null when none was
+    detected.
+    """
 
     intentType: str
     target: str | None
@@ -44,8 +52,7 @@ class IntentOut(BaseModel):
     reference: str | None
     constraints: dict[str, Any]
     confidence: float
-    language: str
-    clarifyingQuestion: str | None
+    detectedLanguage: str | None
 
 
 class ServiceSummaryOut(BaseModel):
@@ -62,8 +69,15 @@ class ServiceSummaryOut(BaseModel):
 
 
 class IntentResponse(BaseModel):
-    """The C-009 response body, exactly as the AI service returns it."""
+    """The C-009 response body, exactly as the AI service returns it.
 
+    ``reply`` is the model-authored message in ``locale``; it is null when none
+    was produced and the client renders its prewritten fallback. The gateway
+    forwards the AI service's body unchanged, so this model is the wire shape it
+    validates rather than authors.
+    """
+
+    reply: str | None
     intent: IntentOut
     candidates: list[ServiceSummaryOut]
     source: str
