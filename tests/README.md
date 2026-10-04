@@ -24,5 +24,6 @@ separate processes:
 own directory. Nothing here needs Postgres, Redis, or a model provider.
 
 `tests/ai/test_model_quality_attestation.py` intentionally fails: it records that
-the MQ-001/MQ-002/MQ-003 golden-set evaluation harness required by
-model-quality.md is not present in this delivery, so the judged bars are unverified.
+the MQ-001/MQ-001R/MQ-002/MQ-002R/MQ-003/MQ-004 golden-set and reply-rubric
+evaluation harness required by model-quality.md is not present in this delivery,
+so the judged bars are unverified.

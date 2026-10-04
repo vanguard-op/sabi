@@ -108,9 +108,18 @@ class FakeAgentAIClient:
         self.intent_calls: list[dict] = []
         self.surface_calls: list[dict] = []
 
-    def resolve_intent(self, *, text: str, locale: str, channel: str) -> dict:
+    def resolve_intent(
+        self,
+        *,
+        text: str,
+        locale: str,
+        channel: str,
+        history: list[dict] | None = None,
+        candidates: list[dict] | None = None,
+    ) -> dict:
         self.intent_calls.append({"text": text, "locale": locale, "channel": channel})
         return {
+            "reply": "I've got Ikeja Electric. Confirm and I'll prepare it.",
             "intent": {
                 "intentType": "bill_payment",
                 "target": "svc-electric",
@@ -119,8 +128,7 @@ class FakeAgentAIClient:
                 "reference": None,
                 "constraints": {},
                 "confidence": 0.95,
-                "language": locale,
-                "clarifyingQuestion": None,
+                "detectedLanguage": "pcm",
             },
             "candidates": [],
             "source": "model",

@@ -347,7 +347,9 @@ def test_intent_resolution_is_reachable_through_the_gateway(
 
     architecture.md makes the gateway the client's sole entry point, so the
     assembled app must expose C-009 there and return the frozen camelCase body,
-    forwarding the request unchanged to the AI service.
+    forwarding the request unchanged to the AI service. The response carries the
+    model-authored ``reply`` alongside the reduced machine-actionable intent; the
+    clarifying question and the language are no longer separate fields.
     """
 
     response = api_client.post(
@@ -356,7 +358,7 @@ def test_intent_resolution_is_reachable_through_the_gateway(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"intent", "candidates", "source"}
+    assert set(body) == {"reply", "intent", "candidates", "source"}
     assert set(body["intent"]) == {
         "intentType",
         "target",
@@ -365,9 +367,10 @@ def test_intent_resolution_is_reachable_through_the_gateway(
         "reference",
         "constraints",
         "confidence",
-        "language",
-        "clarifyingQuestion",
+        "detectedLanguage",
     }
+    assert "clarifyingQuestion" not in body["intent"]
+    assert "language" not in body["intent"]
     assert body["source"] == "model"
     assert agent_ai_client.intent_calls == [
         {"text": "I wan pay my electricity", "locale": "pcm", "channel": "app"}

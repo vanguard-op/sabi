@@ -20,7 +20,15 @@ def scripted(responses):
 
 
 def intent_payload(**overrides) -> dict:
+    """The MQ-001 model output: an authored ``reply`` plus the reduced intent.
+
+    Revision 4 folds the clarifying question and the greeting into ``reply`` and
+    carries only machine-actionable fields on the intent. ``detected_language`` stays
+    in the structured output as the language signal the client and MQ-004 consume.
+    """
+
     payload = {
+        "reply": "I've got Ikeja Electric. Confirm and I'll prepare it.",
         "intent_type": "bill_payment",
         "target": "svc-electric",
         "amount": None,
@@ -28,8 +36,6 @@ def intent_payload(**overrides) -> dict:
         "reference": None,
         "constraints": {},
         "confidence": 0.95,
-        "language": "en",
-        "clarifying_question": None,
         "detected_language": None,
     }
     payload.update(overrides)
@@ -85,24 +91,41 @@ def test_request_naming_a_known_levy_resolves_to_the_agency(
 def test_unmappable_request_asks_one_question_and_does_not_pay(
     ai_client_factory, intent_service
 ) -> None:
-    """MQ-001 / FEAT-003: below 0.70, ask exactly one question, no payment intent."""
+    """MQ-001 / FEAT-003: below 0.70, one question, no payment intent.
+
+    The clarifying question is the model-authored ``reply`` in revision 4, not a
+    separate field, so the "at most one question" assertion reads the reply.
+    """
 
     service, provider = intent_service
-    provider._responses.append(json_response(intent_payload(confidence=0.2)))
+    provider._responses.append(
+        json_response(
+            intent_payload(
+                confidence=0.2,
+                reply="Which service or biller do you want to pay?",
+            )
+        )
+    )
     with ai_client_factory(intent=service) as client:
-        intent = client.post("/v1/agent/intents", json={"text": "help me"}).json()["intent"]
-    assert intent["intentType"] not in {"gov_payment", "bill_payment"}
-    assert intent["clarifyingQuestion"]
-    assert intent["clarifyingQuestion"].count("?") == 1
+        body = client.post("/v1/agent/intents", json={"text": "help me"}).json()
+    assert body["intent"]["intentType"] not in {"gov_payment", "bill_payment"}
+    assert body["reply"]
+    assert body["reply"].count("?") == 1
+    assert "clarifyingQuestion" not in body["intent"]
 
 
 def test_confidence_just_below_the_cutoff_is_refused(ai_client_factory, intent_service) -> None:
     service, provider = intent_service
-    provider._responses.append(json_response(intent_payload(confidence=0.69)))
+    provider._responses.append(
+        json_response(intent_payload(confidence=0.69, reply="Which one did you mean?"))
+    )
     with ai_client_factory(intent=service) as client:
-        intent = client.post("/v1/agent/intents", json={"text": "pay electricity"}).json()["intent"]
-    assert intent["intentType"] == "unknown"
-    assert intent["clarifyingQuestion"] is not None
+        body = client.post("/v1/agent/intents", json={"text": "pay electricity"}).json()
+    assert body["intent"]["intentType"] == "unknown"
+    # The follow-up travels in the reply; the refusal register is honest about the
+    # request rather than framing the platform as limited (D-046).
+    assert body["reply"] is not None
+    assert "question" not in body["intent"]
 
 
 def test_invented_target_is_dropped_and_no_payment_starts(
@@ -119,7 +142,12 @@ def test_invented_target_is_dropped_and_no_payment_starts(
 
 
 def test_provider_failure_degrades_to_keyword_fallback(ai_client_factory, intent_service) -> None:
-    """NFR degradation / FEAT-003 fallback: no 5xx, keyword result, confirmation."""
+    """NFR degradation / FEAT-003 fallback: no 5xx, keyword result, confirmation.
+
+    The degraded path authors no reply, so the client renders its prewritten
+    fallback for the state; the keyword match still travels as candidates for
+    confirmation (MQ-001 Fallback).
+    """
 
     service, provider = intent_service
     provider._responses.append(ProviderUnavailable("down"))
@@ -127,8 +155,43 @@ def test_provider_failure_degrades_to_keyword_fallback(ai_client_factory, intent
         body = client.post("/v1/agent/intents", json={"text": "pay my electricity"}).json()
     assert body["source"] == "fallback"
     assert body["intent"]["intentType"] == "unknown"
-    assert body["intent"]["clarifyingQuestion"] is not None
+    assert body["reply"] is None
     assert [c["serviceId"] for c in body["candidates"]] == ["svc-electric"]
+
+
+def test_non_command_greeting_is_not_a_coverage_miss(ai_client_factory, intent_service) -> None:
+    """MQ-001 / FEAT-003: a greeting is ``non_command``, answered conversationally,
+    with no payment field, no clarifying question, and no candidates recorded."""
+
+    service, provider = intent_service
+    provider._responses.append(
+        json_response(
+            intent_payload(
+                intent_type="non_command",
+                target=None,
+                confidence=1.0,
+                reply="I can help you pay levies and bills. What would you like to do?",
+            )
+        )
+    )
+    with ai_client_factory(intent=service) as client:
+        body = client.post("/v1/agent/intents", json={"text": "Hello"}).json()
+    assert body["intent"]["intentType"] == "non_command"
+    assert body["intent"]["target"] is None
+    assert body["intent"]["amount"] is None
+    assert body["candidates"] == []
+    assert body["reply"] == "I can help you pay levies and bills. What would you like to do?"
+
+
+def test_a_null_reply_reaches_the_client_unchanged(ai_client_factory, intent_service) -> None:
+    """A missing model reply is null so the client renders its prewritten fallback."""
+
+    service, provider = intent_service
+    provider._responses.append(json_response(intent_payload(reply=None)))
+    with ai_client_factory(intent=service) as client:
+        body = client.post("/v1/agent/intents", json={"text": "pay electricity"}).json()
+    assert body["reply"] is None
+    assert body["source"] == "model"
 
 
 def test_intent_wire_fields_are_camel_case(ai_client_factory, intent_service) -> None:
@@ -136,7 +199,7 @@ def test_intent_wire_fields_are_camel_case(ai_client_factory, intent_service) ->
     provider._responses.append(json_response(intent_payload()))
     with ai_client_factory(intent=service) as client:
         body = client.post("/v1/agent/intents", json={"text": "pay electricity"}).json()
-    assert set(body) == {"intent", "candidates", "source"}
+    assert set(body) == {"reply", "intent", "candidates", "source"}
     assert set(body["intent"]) == {
         "intentType",
         "target",
@@ -145,10 +208,12 @@ def test_intent_wire_fields_are_camel_case(ai_client_factory, intent_service) ->
         "reference",
         "constraints",
         "confidence",
-        "language",
-        "clarifyingQuestion",
+        "detectedLanguage",
     }
     assert "intent_type" not in body["intent"]
+    # Revision 4 removed the separate language and clarifyingQuestion fields.
+    assert "language" not in body["intent"]
+    assert "clarifyingQuestion" not in body["intent"]
 
 
 # --------------------------------------------------------------------------- #

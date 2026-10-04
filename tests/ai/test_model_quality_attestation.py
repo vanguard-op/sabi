@@ -1,7 +1,8 @@
 """Model-quality attestation for the Phase 1 gate.
 
-The judged bars (MQ-001, MQ-002, MQ-003) cannot be measured by a deterministic
-test: they need the golden datasets and judge that model-quality.md states. What
+The judged bars (MQ-001, MQ-001R, MQ-002, MQ-002R, MQ-003, MQ-004) cannot be
+measured by a deterministic test: they need the golden datasets, judges, and
+reply-rubric review that model-quality.md states. What
 this module *can* verify is the reproducible substrate the bars are measured
 against -- the pinned model build and decoding settings -- and it records, as an
 explicit failure, that the measurement harness is not present in this delivery. A
@@ -78,9 +79,11 @@ def test_golden_set_and_evaluation_harness_are_absent_from_this_delivery() -> No
     """The MQ bars have no dataset or harness in the repo, so they cannot be run.
 
     model-quality.md requires an evaluation run before every release against stated
-    datasets (1,000 utterances; 500 queries; 300 flows). No such dataset, harness,
-    or scored run exists under ``services/ai`` in this delivery, so the MQ bars are
-    unverified. This test fails to surface that gap rather than imply a pass.
+    datasets, and a capability that authors a reply carries two bars: a structured
+    bar (MQ-001/MQ-002) and a reply-rubric bar (MQ-001R/MQ-002R). No such dataset,
+    harness, judge, or scored run exists under ``services/ai`` in this delivery, so
+    every MQ bar is unverified, including the reply-rubric rows. This test fails to
+    surface that gap rather than imply a pass.
     """
 
     candidates = [
@@ -99,7 +102,8 @@ def test_golden_set_and_evaluation_harness_are_absent_from_this_delivery() -> No
         f"{[str(p.relative_to(_ROOT)) for p in candidates]}"
     )
     pytest.fail(
-        "MQ-001/MQ-002/MQ-003 quality bars are unverified: model-quality.md requires "
-        "golden-set evaluation runs (1,000 utterances / 500 queries / 300 flows) but this "
-        "delivery ships no dataset, harness, or scored result. Reported as a doc/DoD gap."
+        "MQ-001, MQ-001R, MQ-002, MQ-002R, MQ-003, and MQ-004 quality bars are unverified: "
+        "model-quality.md requires golden-set evaluation runs (1,000 utterances / 500 queries "
+        "/ 300 flows) plus reply-rubric review on the reply-bearing sets, but this delivery "
+        "ships no dataset, harness, judge, or scored result. Reported as a doc/DoD gap."
     )
