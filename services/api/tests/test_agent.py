@@ -480,8 +480,11 @@ def test_surfaces_forwards_task_and_context(
     assert agent_client.surface_calls == [{"task": "confirmation", "context": {"amount": 50000}}]
 
 
-@pytest.mark.parametrize("task", [None, "", "   "])
-def test_surfaces_rejects_a_missing_task_with_400(
+@pytest.mark.parametrize(
+    "task",
+    [None, "", "   ", "run_payment", "surfaces", "CONFIRMATION"],
+)
+def test_surfaces_rejects_an_unknown_task_with_400(
     api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient, task
 ) -> None:
     _sign_in(api_client, session_manager)
@@ -489,6 +492,45 @@ def test_surfaces_rejects_a_missing_task_with_400(
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_request"
     assert agent_client.surface_calls == []
+
+
+@pytest.mark.parametrize(
+    "task",
+    ["confirmation", "amount_entry", "receipt", "discovery", "verification", "recovery"],
+)
+def test_surfaces_accepts_every_contract_task(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient, task
+) -> None:
+    """C-012 revision 1: every task type, including verification and recovery."""
+
+    _sign_in(api_client, session_manager)
+    response = api_client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
+    assert response.status_code == 200
+    assert agent_client.surface_calls == [{"task": task, "context": {}}]
+
+
+def test_surfaces_passes_through_a_resolved_record_receipt_context(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    """A resolved record reference rides in ``context`` and is forwarded unchanged.
+
+    The record lookup resolves the record; the client then asks for a ``receipt``
+    surface with the resolved record's fields as context. The gateway validates the
+    task and forwards the context exactly, composing nothing itself.
+    """
+
+    _sign_in(api_client, session_manager)
+    context = {
+        "recordReference": "rcpt_01J1",
+        "receiptId": "rcpt_01J1",
+        "payee": "Ikeja Electric",
+        "amount": 120000,
+        "currency": "NGN",
+        "issuedAt": "2025-12-04T09:00:00Z",
+    }
+    response = api_client.post("/v1/agent/surfaces", json={"task": "receipt", "context": context})
+    assert response.status_code == 200
+    assert agent_client.surface_calls == [{"task": "receipt", "context": context}]
 
 
 def test_surfaces_passes_through_the_fallback_shape(
@@ -605,6 +647,17 @@ def test_http_client_omits_empty_candidates_from_the_c009_body() -> None:
     # An empty set stays off the wire so the AI service uses its own index.
     body = json.loads(transport.requests[0].content)
     assert "candidates" not in body
+
+
+def test_http_client_forwards_the_c012_task_and_context_unchanged() -> None:
+    client, transport = _capturing_client()
+    context = {"recordReference": "rcpt_01J1", "amount": 120000, "currency": "NGN"}
+
+    client.compose_surface(task="recovery", context=context)
+
+    assert transport.requests[0].url.path == "/v1/agent/surfaces"
+    body = json.loads(transport.requests[0].content)
+    assert body == {"task": "recovery", "context": context}
 
 
 def test_endpoint_prefers_an_explicit_base_url() -> None:

@@ -8,10 +8,10 @@ The response body is the AI service's, unchanged: the gateway neither reshapes
 nor fabricates it.
 
 Auth and errors are the frozen contract: a missing session is 401; empty or
-oversized text, an unsupported locale or channel, and an unknown surface task are
-400 with the shared envelope; rate limiting is 429. An AI service that cannot be
-reached is 503 with ``ai_unavailable``, since the gateway has no grounded answer
-of its own to give.
+oversized text, an unsupported locale or channel, an unknown surface task, and a
+malformed or oversized history are 400 with the shared envelope; rate limiting is
+429. An AI service that cannot be reached is 503 with ``ai_unavailable``, since
+the gateway has no grounded answer of its own to give.
 
 The gateway owns the primary catalogue, so it grounds the intent call: before
 forwarding, it ranks the catalogue for the request text and sends a bounded set
@@ -52,6 +52,15 @@ _LOCALES = frozenset({"en", "pcm"})
 _CHANNELS = frozenset({"app", "ussd", "sms", "whatsapp"})
 _HISTORY_ROLES = frozenset({"user", "assistant"})
 _HISTORY_INVALID = "That conversation history is not valid."
+
+# C-012 task vocabulary. Every task has a client fallback form, so the gateway
+# accepts exactly the composed task types the contract names; anything else is the
+# contract's unknown-task 400. ``receipt`` covers both a post-payment receipt and a
+# resolved record the user asked about: the task is the same, and the resolved
+# record reference rides in ``context``, which is forwarded unchanged.
+_SURFACE_TASKS = frozenset(
+    {"confirmation", "amount_entry", "receipt", "discovery", "verification", "recovery"}
+)
 
 # Grounding candidates forwarded to the AI service are bounded so a request can
 # never grow the prompt without limit. The cap matches the AI service's own
@@ -161,9 +170,12 @@ def compose_surface(
     limiter.check(f"agent:surfaces:{session.user_id}")
 
     task = (payload.task or "").strip()
-    if not task:
+    if task not in _SURFACE_TASKS:
         # An unknown (including missing) task is a client error (C-012). The input
         # is never echoed back.
         raise APIError(400, ErrorCode.INVALID_REQUEST, "That task is not supported.")
 
+    # The context is untrusted, free-form task data; a resolved record reference for
+    # a ``receipt`` task is carried here and forwarded exactly as received. The
+    # gateway neither composes nor reshapes: the AI service owns composition.
     return client.compose_surface(task=task, context=payload.context)

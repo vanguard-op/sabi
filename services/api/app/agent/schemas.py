@@ -87,8 +87,11 @@ class SurfaceRequest(BaseModel):
     """The C-012 request body.
 
     ``task`` is optional at the schema layer so the router can return the
-    contract's 400 for an unknown task rather than the framework's 422; context
-    is untrusted, free-form task context.
+    contract's 400 for an unknown task rather than the framework's 422; the router
+    accepts the contract's task vocabulary. ``context`` is untrusted, free-form
+    task context and is forwarded unchanged; for a ``receipt`` task it may carry a
+    resolved record reference from a record lookup instead of a post-payment
+    service payment.
     """
 
     model_config = ConfigDict(extra="ignore")
