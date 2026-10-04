@@ -172,6 +172,16 @@ jobs:
             --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
             --wait
 
+      - name: Seed the service catalogue
+        # The catalogue must exist for the assistant to ground a resolution
+        # (FEAT-004), so the seed belongs to the deploy. The job upserts by
+        # `name + collecting_body`, so it is safe to run on every `up` (D-048).
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute "sabi-staging-seed-catalogue" \
+            --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
+            --wait
+
       - name: Print the mapped URLs and DNS records
         run: |
           set -euo pipefail
