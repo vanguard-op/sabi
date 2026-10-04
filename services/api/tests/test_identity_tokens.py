@@ -4,7 +4,8 @@ The gateway attaches a Google-signed identity token when it calls the private
 AI and payment services on Cloud Run, and only then. These tests pin the
 presence and audience of the token on both clients, its absence on a local or
 test transport, that the token is not logged, and that the Google provider
-mints an audience-scoped token from the service account signer.
+mints an audience-scoped token through the Cloud Run ID-token path, which needs
+no private key and resolves its credential once per audience.
 """
 
 from __future__ import annotations
@@ -149,75 +150,74 @@ def test_payment_client_never_logs_the_token(caplog: pytest.LogCaptureFixture) -
 # --------------------------------------------------------------------------- #
 # The Google provider itself
 # --------------------------------------------------------------------------- #
-def test_google_provider_mints_an_audience_scoped_token(monkeypatch: pytest.MonkeyPatch) -> None:
+class FakeIdTokenCredentials:
+    """An ID-token credential double: records refreshes, yields a token."""
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+        self.refresh_requests: list[Any] = []
+
+    def refresh(self, request: Any) -> None:
+        self.refresh_requests.append(request)
+
+    @property
+    def token(self) -> str:
+        return self._value
+
+
+def test_google_provider_mints_an_audience_scoped_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.core import identity
 
     events: dict[str, Any] = {}
+    credentials = FakeIdTokenCredentials("id-token-for-ai")
 
-    class _Credentials:
-        signer = object()
+    def _fetch(audience: str, request: Any = None) -> FakeIdTokenCredentials:
+        events["audience"] = audience
+        events["request"] = request
+        return credentials
 
-        def refresh(self, request: Any) -> None:
-            events["refreshed_with"] = request
+    from google.oauth2 import id_token as google_id_token
 
-    def _default() -> tuple[Any, Any]:
-        events["default"] = True
-        return _Credentials(), "project"
-
-    def _encode(signer: Any, credentials: Any, audience: str) -> str:
-        events["encode"] = (signer, credentials, audience)
-        return "signed-token"
-
-    import google.auth
-    from google.auth import jwt as google_jwt
-
-    monkeypatch.setattr(google.auth, "default", _default)
-    monkeypatch.setattr(google_jwt, "encode", _encode)
+    monkeypatch.setattr(google_id_token, "fetch_id_token_credentials", _fetch)
 
     provider = identity.GoogleIdentityTokenProvider()
     token = provider.token("https://ai.internal")
 
-    assert token == "signed-token"
-    assert events["default"] is True
-    signer, credentials, audience = events["encode"]
-    assert audience == "https://ai.internal"
-    assert signer is _Credentials.signer
-    # The provider refreshes through its own httpx-backed request adapter, not
-    # google-auth's `requests` transport (which this service does not depend on).
-    assert isinstance(events["refreshed_with"], identity._HttpxRequest)
-    assert credentials is events["refreshed_with"] or isinstance(credentials, _Credentials)
+    assert token == "id-token-for-ai"
+    # The audience reaches the ID-token fetch unchanged: Cloud Run verifies it.
+    assert events["audience"] == "https://ai.internal"
+    # Resolution goes through the httpx-backed adapter, not google-auth's
+    # `requests` transport (which this service does not depend on), and the
+    # refresh mints through the same adapter.
+    assert events["request"] is provider._request
+    assert isinstance(events["request"], identity._HttpxRequest)
+    assert credentials.refresh_requests == [provider._request]
 
 
-def test_google_provider_resolves_credentials_once(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_google_provider_resolves_credentials_once_per_audience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.core import identity
 
-    calls: dict[str, int] = {"default": 0, "refresh": 0}
+    calls: dict[str, int] = {"fetch": 0}
 
-    class _Credentials:
-        signer = object()
+    def _fetch(audience: str, request: Any = None) -> FakeIdTokenCredentials:
+        calls["fetch"] += 1
+        return FakeIdTokenCredentials(f"token-{audience}")
 
-        def refresh(self, request: Any) -> None:
-            calls["refresh"] += 1
+    from google.oauth2 import id_token as google_id_token
 
-    def _default() -> tuple[Any, Any]:
-        calls["default"] += 1
-        return _Credentials(), "project"
-
-    def _encode(signer: Any, credentials: Any, audience: str) -> str:
-        return f"token-{audience}"
-
-    import google.auth
-    from google.auth import jwt as google_jwt
-
-    monkeypatch.setattr(google.auth, "default", _default)
-    monkeypatch.setattr(google_jwt, "encode", _encode)
+    monkeypatch.setattr(google_id_token, "fetch_id_token_credentials", _fetch)
 
     provider = identity.GoogleIdentityTokenProvider()
     assert provider.token("https://ai.internal") == "token-https://ai.internal"
     assert provider.token("https://payments.internal") == "token-https://payments.internal"
-    # Credentials are resolved once and reused; each call still refreshes a token.
-    assert calls["default"] == 1
-    assert calls["refresh"] == 2
+    assert provider.token("https://ai.internal") == "token-https://ai.internal"
+    # The audience-bound credential is resolved once per audience and reused;
+    # repeated calls still mint a token through the same credential.
+    assert calls["fetch"] == 2
 
 
 def test_httpx_transport_implements_the_google_response_interface(

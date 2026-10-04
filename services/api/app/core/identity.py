@@ -15,7 +15,7 @@ The token is a credential and is never logged.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from google.auth.transport import Response as _GoogleResponse
 
@@ -92,27 +92,34 @@ class _HttpxRequest:
 class GoogleIdentityTokenProvider:
     """Mints a Cloud Run identity token for the calling service account.
 
-    ``google.auth.default`` resolves the service account from the runtime
-    metadata server (or ``GOOGLE_APPLICATION_CREDENTIALS``); refreshing it and
-    encoding an identity token with the target origin as the JWT audience is
-    what Cloud Run's IAM check validates. The transport request and the
-    credentials are created once and reused, so repeated calls do not re-resolve
-    the account or rebuild the transport.
+    Cloud Run's documented method for service-to-service auth resolves an
+    ID-token credential from the environment -- the runtime metadata server on
+    Cloud Run, or a service-account JSON file when
+    ``GOOGLE_APPLICATION_CREDENTIALS`` is set -- and refreshes it with the target
+    origin as the token audience. That path needs no private key: on Cloud Run
+    ``google.auth.default`` returns compute-engine credentials with no
+    ``.signer``, so signing a JWT by hand cannot mint the token.
+
+    The credential is audience-bound, so it is resolved once per audience and
+    reused; only the token is minted afresh on each call. The transport request
+    is built once as well.
     """
 
     def __init__(self) -> None:
         self._request = _HttpxRequest()
-        self._credentials = None
+        self._credentials: dict[str, Any] = {}
 
     def token(self, audience: str) -> str:
-        import google.auth
-        from google.auth import jwt as google_jwt
+        from google.oauth2 import id_token as google_id_token
 
-        if self._credentials is None:
-            credentials, _ = google.auth.default()
-            self._credentials = credentials
-        self._credentials.refresh(self._request)
-        return google_jwt.encode(self._credentials.signer, self._credentials, audience)
+        credentials = self._credentials.get(audience)
+        if credentials is None:
+            credentials = google_id_token.fetch_id_token_credentials(
+                audience, request=self._request
+            )
+            self._credentials[audience] = credentials
+        credentials.refresh(self._request)
+        return credentials.token
 
 
 def build_identity_token_provider() -> GoogleIdentityTokenProvider:
