@@ -17,7 +17,7 @@ from types import ModuleType
 from fastapi import FastAPI
 
 from app.agent.client import build_agent_client
-from app.api import health
+from app.api import health, well_known
 from app.core.audit import AuditLog
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
@@ -208,6 +208,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(health.router)
+    # Association files live at the root, not under /v1: Android and Apple fetch
+    # the exact `/.well-known/` URL (FEAT-001).
+    app.include_router(well_known.router)
     _include_module_routers(app)
     return app
 
