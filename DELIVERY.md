@@ -122,6 +122,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-073 | — | infra-engineer | Done | — |
 | T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
 | T-075 | — | infra-engineer | Done | — |
+| T-076 | — | infra-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -162,6 +163,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-033 | GCP lifecycle is three manual GitHub Actions: `up` (build, migrate, deploy), `stop` (suspend Cloud SQL and scale Cloud Run to zero), `destroy` (`terraform destroy`, retaining the state bucket) | The user needs to bring the staging environment down quickly when unused. Idle cost is storage and registry, not compute: ~$2–3/mo stopped, ~$0.05/mo destroyed | user |
 | D-034 | Terraform remote state lives in `gs://sabi-hq-tfstate` (us-central1, versioning on, uniform access) | Shared state is required for the CI-driven lifecycle; the bucket survives `destroy` so the environment can be rebuilt | lead |
 | D-035 | Staging Cloud SQL is a single zonal shared-core instance on HDD, so NFR-011's 99.9% availability is not met there; the target applies to production only | Staging is pre-release and must stay cheap to run and tear down (D-032/D-033); HA doubles the instance cost and would defeat the stop/destroy story | lead |
+| D-036 | `gcp-up` runs Terraform twice: a bootstrap apply that creates the platform (Artifact Registry, secrets, Cloud SQL, network, service accounts), then the image build and push, then a deploy apply that rolls Cloud Run onto the built tag | The first attempt pushed images before the registry existed and failed with `Repository "sabi" not found`; the registry is created by the apply, so the apply must come first | lead |
 
 ## Definition of Done
 

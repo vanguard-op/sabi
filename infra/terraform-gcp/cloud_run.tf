@@ -100,6 +100,7 @@ locals {
 
 # The gateway's environment, resolved after the private services exist. Kept in
 # its own local so it can name their Cloud Run URLs without a cycle.
+#
 locals {
   api_env = merge(
     {

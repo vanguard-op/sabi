@@ -58,11 +58,43 @@ resource "google_cloud_run_v2_job" "migrate_primary" {
             }
           }
         }
+        # `alembic` imports `app.core.config.get_settings()`, which validates the
+        # whole application configuration, not just the database URL. The job
+        # therefore carries the same session secrets and explicit store selection
+        # the API service does, or the settings validator refuses to build.
+        env {
+          name = "SESSION_SECRET"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.app["SESSION_SECRET"].secret_id
+              version = "latest"
+            }
+          }
+        }
+        env {
+          name = "RECOVERY_CODE_PEPPER"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.app["RECOVERY_CODE_PEPPER"].secret_id
+              version = "latest"
+            }
+          }
+        }
+        dynamic "env" {
+          for_each = local.store_env
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
       }
     }
   }
 
-  depends_on = [google_secret_manager_secret_version.database_url]
+  depends_on = [
+    google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.generated,
+  ]
 }
 
 resource "google_cloud_run_v2_job" "migrate_payments" {

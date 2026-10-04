@@ -3,9 +3,19 @@
 # Manual by design (D-033). Bringing the staging environment up costs money, so
 # this workflow never runs on push: an operator dispatches it explicitly.
 #
-# It authenticates to GCP, builds and pushes the four images, applies the
-# Terraform stack, runs the Alembic migrations inside the VPC, and prints the
-# mapped URLs and the DNS records to add at Namecheap.
+# It authenticates to GCP, applies the Terraform stack once to create the
+# platform (Artifact Registry, Secret Manager, Cloud SQL, network, and service
+# accounts), builds and pushes the four images into the now-existing registry,
+# applies a second time to deploy the built tag, runs the Alembic migrations
+# inside the VPC, and prints the mapped URLs and the DNS records to add at
+# Namecheap.
+#
+# The apply runs twice on purpose: the first `up` run pushed to
+# `us-central1-docker.pkg.dev/sabi-hq/sabi` before `terraform apply` had created
+# that Artifact Registry repository, so the push failed with
+# `Repository "sabi" not found`. The registry — and every other platform
+# resource — must exist before any push. See the two apply steps for the
+# ordering detail and the transient placeholder-revision note.
 #
 # Auth is Workload Identity Federation (NFR-024): no long-lived service-account
 # key is committed. Set these repository variables:
@@ -26,9 +36,9 @@ on:
         required: false
         type: string
       api_min_instances:
-        description: "Minimum API instances (0 keeps idle cost near zero)."
+        description: "Minimum API instances (0 keeps idle cost near zero; the default)."
         required: false
-        default: "1"
+        default: "0"
         type: string
 
 permissions:
@@ -70,6 +80,36 @@ jobs:
           fi
           echo "image_tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
+          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
+
+      - name: Ensure the image repository exists
+        # Cloud Run refuses a service or job whose image is not yet in Artifact
+        # Registry, and the provider leaves such a half-created service un-State'd
+        # (hashicorp/terraform-provider-google#14493). So the registry is created
+        # here, out of band, and the images are pushed before the single apply:
+        # every resource — platform and workloads — then lands together, which is
+        # the ordering the provider requires.
+        run: |
+          set -euo pipefail
+          if ! gcloud artifacts repositories describe sabi \
+              --project="${{ vars.GCP_PROJECT_ID }}" \
+              --location="${{ vars.GCP_REGION }}" >/dev/null 2>&1; then
+            gcloud artifacts repositories create sabi \
+              --project="${{ vars.GCP_PROJECT_ID }}" \
+              --location="${{ vars.GCP_REGION }}" \
+              --repository-format=docker \
+              --description="Sabi staging service images (api, ai, payments, console)."
+          fi
+
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
@@ -95,27 +135,10 @@ jobs:
             docker push "${REGISTRY}/${svc}:latest"
           done
 
-      - name: Write the secret Terraform cannot generate
-        # The model provider key is written to Secret Manager here, never to the
-        # repo or Terraform state (NFR-024). Terraform created the container.
-        run: |
-          set -euo pipefail
-          printf '%s' '${{ secrets.GEMINI_API_KEY }}' \
-            | gcloud secrets versions add "sabi-staging-gemini-api-key" \
-                --project="${{ vars.GCP_PROJECT_ID }}" --data-file=-
-
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
-
-      - name: Terraform init
-        run: |
-          set -euo pipefail
-          cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
-          terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
-
       - name: Terraform apply
+        # One apply. The images now exist, so the Cloud Run services, jobs, their
+        # IAM, and the domain mappings are created in the same pass as the
+        # platform (D-036).
         env:
           TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
@@ -124,6 +147,16 @@ jobs:
           cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
           terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
             -var-file=envs/staging/terraform.tfvars
+
+      - name: Write the secret Terraform cannot generate
+        # The model provider key is written to Secret Manager here, never to the
+        # repo or Terraform state (NFR-024). The apply created the container, so
+        # the version lands before the migration jobs run.
+        run: |
+          set -euo pipefail
+          printf '%s' '${{ secrets.GEMINI_API_KEY }}' \
+            | gcloud secrets versions add "sabi-staging-gemini-api-key" \
+                --project="${{ vars.GCP_PROJECT_ID }}" --data-file=-
 
       - name: Run the primary-store migrations
         run: |
@@ -146,7 +179,7 @@ jobs:
             echo "## Sabi staging is up"
             echo
             echo "### Service URLs"
-            terraform -chdir="${TF_DIR}" output -raw urls
+            terraform -chdir="${TF_DIR}" output -json urls
             echo
             echo "### DNS records to add at Namecheap"
             terraform -chdir="${TF_DIR}" output -json dns_records
@@ -155,4 +188,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show the service URLs in the log
-        run: terraform -chdir="${TF_DIR}" output -raw urls
+        # `urls` is an object, so it needs -json; -raw only accepts a scalar.
+        run: terraform -chdir="${TF_DIR}" output -json urls

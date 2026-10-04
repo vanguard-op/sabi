@@ -28,6 +28,9 @@ locals {
 }
 
 resource "google_secret_manager_secret" "app" {
+  # Secret Manager must be enabled before the containers are created.
+  depends_on = [google_project_service.required]
+
   for_each = local.app_secrets
 
   secret_id = "${local.prefix}-${lower(replace(each.key, "_", "-"))}"
@@ -76,16 +79,21 @@ resource "google_secret_manager_secret_version" "generated" {
 
 # Placeholder versions for the secrets only a human can supply. Cloud Run refuses
 # to create a revision that references a secret with no enabled version, so each
-# container gets a valid empty value so a fresh environment can boot; the real
-# values are written out-of-band (or by the `up` workflow for the model key) and
-# become the latest version. An empty model key makes the AI service use its
-# keyword fallback; the native-origin list is a JSON array the settings parser
-# accepts as empty.
+# container gets a valid value so a fresh environment can boot; the real values
+# are written out-of-band (or by the `up` workflow for the model key) and become
+# the latest version.
+#
+# Secret Manager rejects an empty payload ("Secret Payload cannot be empty"), so
+# an unset secret carries a single space rather than "". The application trims
+# its configuration (`ModelSettings.from_env` and the API settings both strip
+# whitespace), so a space reads as unset: the AI service uses its keyword
+# fallback, and the rail credential is treated as absent. The native-origin list
+# is a JSON array and is valid as `[]`.
 resource "google_secret_manager_secret_version" "placeholder" {
   for_each = {
-    GEMINI_API_KEY          = ""
+    GEMINI_API_KEY          = " "
     WEBAUTHN_NATIVE_ORIGINS = "[]"
-    PAYMENT_RAIL_CREDENTIAL = ""
+    PAYMENT_RAIL_CREDENTIAL = " "
   }
 
   secret      = google_secret_manager_secret.app[each.key].id
