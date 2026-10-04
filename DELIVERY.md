@@ -157,7 +157,11 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-106 | C-012 | ai-engineer | Done | — |
 | T-107 | C-012 | frontend-engineer | Done | — |
 | T-108 | C-012 | backend-engineer | Done | — |
-| T-109 | FEAT-011 | product-shaper | In Progress | — |
+| T-109 | FEAT-011 | product-shaper | Done | — |
+| T-110 | C-012 | frontend-engineer | In Progress | — |
+| T-111 | C-012 | ai-engineer | Ready | — |
+| T-112 | C-012 | backend-engineer | Ready | — |
+| T-113 | C-012 | qa-engineer | Ready | — |
 
 ## Decisions log
 
