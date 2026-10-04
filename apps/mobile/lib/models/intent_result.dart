@@ -2,6 +2,11 @@ import 'package:flutter/foundation.dart';
 
 import 'service_summary.dart';
 
+/// The serving confidence cutoff below which the model asks exactly one
+/// clarifying question rather than resolving a payment intent, and below which
+/// catalogue ranking reports no match (MQ-001/MQ-002, D-017/D-019).
+const double intentServingConfidenceCutoff = 0.70;
+
 /// A resolved request from the assistant (CONTRACTS.md C-009).
 ///
 /// The client renders confirmations from this structure, never from raw text
@@ -38,7 +43,8 @@ class IntentResult {
   final String source;
 
   bool get needsClarification =>
-      confidence < 0.6 && (clarifyingQuestion?.isNotEmpty ?? false);
+      confidence < intentServingConfidenceCutoff &&
+      (clarifyingQuestion?.isNotEmpty ?? false);
 
   factory IntentResult.fromJson(Map<String, dynamic> json) {
     final amount = json['amount'];

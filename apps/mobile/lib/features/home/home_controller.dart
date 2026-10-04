@@ -109,8 +109,9 @@ const int homeRequestMaxLength = 200;
 ///
 /// Discovery is reached two ways and both render the same selectable results:
 /// a resolved intent (FEAT-003/C-009) and, when intent resolution returns no
-/// candidate, a catalogue search (FEAT-004/C-010). A coverage miss is stated
-/// rather than invented.
+/// candidate and asks no question, a catalogue search (FEAT-004/C-010). A
+/// clarification request from the model is honoured before the search fallback;
+/// a coverage miss is stated rather than invented.
 class HomeController extends Notifier<HomeState> {
   @override
   HomeState build() => const HomeState();
@@ -159,11 +160,11 @@ class HomeController extends Notifier<HomeState> {
     required String request,
     required bool answeringQuestion,
   }) async {
-    if (intent.candidates.isEmpty) {
-      // Intent resolution found nothing; search the catalogue directly so a
-      // plain service query still reaches discovery (FEAT-004).
-      return _searchFallback(request, intent: intent);
-    }
+    // A question from the model takes precedence over the catalogue search
+    // fallback: when the request is too ambiguous to resolve, the honest next
+    // step is the question even if the model offered no candidates
+    // (FEAT-003/MQ-001, Flow 2 alternate path A). A resolution with no question
+    // still falls through to search below.
     if (intent.needsClarification) {
       if (answeringQuestion) {
         // The one question was already asked and the answer still did not
@@ -185,6 +186,12 @@ class HomeController extends Notifier<HomeState> {
         ),
       );
       return null;
+    }
+    if (intent.candidates.isEmpty) {
+      // No question and no candidate: resolution found nothing, so search the
+      // catalogue directly in case a plain service query still reaches
+      // discovery (FEAT-004).
+      return _searchFallback(request, intent: intent);
     }
     _updateCurrent(
       (turn) => turn.copyWith(
