@@ -18,6 +18,7 @@ from intent.service import IntentService
 
 def _intent(**overrides):
     payload = {
+        "reply": "I've got Ikeja Electric. Confirm and I'll prepare it.",
         "intent_type": "bill_payment",
         "target": "svc-electric",
         "amount": None,
@@ -25,8 +26,6 @@ def _intent(**overrides):
         "reference": None,
         "constraints": {},
         "confidence": 0.95,
-        "language": "en",
-        "clarifying_question": None,
         "detected_language": None,
     }
     payload.update(overrides)
@@ -94,11 +93,27 @@ def test_unparseable_output_marks_the_outcome_as_fallback(catalogue):
 
 
 def test_low_confidence_flag_is_surfaced(catalogue):
-    service, _ = _service(catalogue, [json_response(_intent(confidence=0.2))])
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent(confidence=0.2, reply="Which biller do you mean?"))],
+    )
     outcome = service.resolve("pay my electricity")
     assert "low_confidence" in outcome.flags
     assert outcome.response.intent.intentType == "unknown"
-    assert outcome.response.intent.clarifyingQuestion is not None
+    assert outcome.response.reply == "Which biller do you mean?"
+
+
+def test_model_reply_reaches_the_response_unchanged(catalogue):
+    service, _ = _service(catalogue, [json_response(_intent(reply="I found Ikeja Electric."))])
+    outcome = service.resolve("pay my electricity")
+    assert outcome.response.reply == "I found Ikeja Electric."
+
+
+def test_provider_failure_sends_a_null_reply(catalogue):
+    service, _ = _service(catalogue, [ProviderUnavailable("down")])
+    outcome = service.resolve("pay my electricity")
+    assert outcome.source == "fallback"
+    assert outcome.response.reply is None
 
 
 def test_history_reaches_the_serving_prompt(catalogue):
@@ -120,7 +135,7 @@ def test_non_command_outcome_has_no_candidates(catalogue):
     outcome = service.resolve("Hello")
     assert outcome.response.intent.intentType == "non_command"
     assert outcome.response.candidates == []
-    assert outcome.response.intent.clarifyingQuestion is None
+    assert outcome.response.reply == "I've got Ikeja Electric. Confirm and I'll prepare it."
 
 
 def test_bound_is_honoured_on_the_fallback_path(catalogue):
@@ -138,7 +153,6 @@ def test_bound_is_honoured_on_the_fallback_path(catalogue):
     outcome = service.resolve("yes", history=history)
     assert outcome.source == "fallback"
     assert outcome.response.intent.intentType == "unknown"
-    assert outcome.response.intent.clarifyingQuestion is None
     assert outcome.response.intent.constraints.get("clarificationLimitReached") is True
 
 
@@ -220,7 +234,7 @@ def test_forwarded_candidate_resolves_a_novel_target_over_the_index(catalogue):
     )
     assert outcome.response.intent.target is None
     assert outcome.response.intent.intentType == "unknown"
-    assert outcome.response.intent.clarifyingQuestion is not None
+    assert "low_confidence" in outcome.flags or "unresolved" in outcome.flags
 
 
 def test_empty_candidates_fall_back_to_the_local_index(catalogue):

@@ -42,6 +42,18 @@ def test_intent_prompt_carries_grounding_and_refusal_rules():
     assert "untrusted" in text.lower()
 
 
+def test_intent_prompt_asks_for_the_reply_and_binds_the_locale():
+    text = load_prompt(Capability.INTENT_RESOLUTION).text
+    # The model authors the user-facing message; the locale is an instruction to reply
+    # in that language, not a fixed client string.
+    assert "reply" in text
+    assert "[[locale]]" in text
+    assert 'Write the "reply" in that language' in text
+    # The reply boundaries the guardrails enforce are stated to the model.
+    assert "no URLs" in text or "no code and no URLs" in text
+    assert "another user's data" in text
+
+
 def test_intent_prompt_carries_the_conversation_rules():
     from core.config import INTENT_PROMPT_VERSION
 
@@ -63,29 +75,31 @@ def test_intent_prompt_states_the_pinned_cutoff():
     assert "0.80" not in text
 
 
-def test_intent_prompt_v3_carries_the_richer_instruction_and_few_shots():
+def test_intent_prompt_v4_carries_the_conversational_instruction_and_few_shots():
     from core.config import INTENT_PROMPT_VERSION
 
     prompt = load_prompt(Capability.INTENT_RESOLUTION)
-    assert prompt.version == INTENT_PROMPT_VERSION == "v3"
+    assert prompt.version == INTENT_PROMPT_VERSION == "v4"
     text = prompt.text
-    # The richer template keeps the token mechanism and the untrusted-data
-    # delimiters and security rules.
+    # The template keeps the token mechanism and the untrusted-data delimiters and
+    # security rules.
     assert "[[user_message]]" in text
     assert "[[retrieved_data]]" in text
     assert "[[conversation_history]]" in text
+    assert "[[locale]]" in text
     assert "END RETRIEVED DATA" in text
     assert "untrusted" in text.lower()
-    # Explicit failure behavior, the exact output contract, reasoning guidance, and
-    # the few-shot examples the capability requires.
+    # The conversational reply, explicit failure behavior, the exact output contract,
+    # reasoning guidance, and the few-shot examples the capability requires.
     assert "EXAMPLES" in text
     assert "HOW TO DECIDE" in text
+    assert "THE REPLY" in text
     assert "non_command" in text
     assert "unknown" in text
     assert "OUTPUT" in text
 
 
-def test_intent_prompt_v3_keeps_the_pinned_cutoff_and_no_v2_only_marker():
+def test_intent_prompt_v4_keeps_the_pinned_cutoff_and_example_shapes():
     from core.config import INTENT_CONFIDENCE_CUTOFF
 
     text = load_prompt(Capability.INTENT_RESOLUTION).text

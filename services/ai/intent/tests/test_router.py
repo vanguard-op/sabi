@@ -28,6 +28,7 @@ ENDPOINT = "/v1/agent/intents"
 
 def _intent_payload(**overrides):
     payload = {
+        "reply": "I've got Ikeja Electric. Confirm and I'll prepare it.",
         "intent_type": "bill_payment",
         "target": "svc-electric",
         "amount": None,
@@ -35,8 +36,6 @@ def _intent_payload(**overrides):
         "reference": None,
         "constraints": {},
         "confidence": 0.95,
-        "language": "en",
-        "clarifying_question": None,
         "detected_language": None,
     }
     payload.update(overrides)
@@ -70,8 +69,9 @@ def test_resolves_a_grounded_intent_with_camel_case_fields(catalogue):
         )
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"intent", "candidates", "source"}
+    assert set(body) == {"reply", "intent", "candidates", "source"}
     assert body["source"] == "model"
+    assert body["reply"] == "I've got Ikeja Electric. Confirm and I'll prepare it."
     intent = body["intent"]
     assert set(intent) == {
         "intentType",
@@ -81,17 +81,19 @@ def test_resolves_a_grounded_intent_with_camel_case_fields(catalogue):
         "reference",
         "constraints",
         "confidence",
-        "language",
-        "clarifyingQuestion",
+        "detectedLanguage",
     }
     assert intent["intentType"] == "bill_payment"
     assert intent["target"] == "svc-electric"
     assert intent["amount"] == 500000
     assert intent["currency"] == "NGN"
     assert intent["confidence"] == 0.95
-    assert intent["clarifyingQuestion"] is None
-    # The model-internal snake_case schema never crosses the boundary (D-018).
+    assert intent["detectedLanguage"] is None
+    # The reply, the clarifying question, and the language are no longer in the intent
+    # object; the model-internal snake_case schema never crosses the boundary (D-018).
     assert "intent_type" not in intent
+    assert "clarifyingQuestion" not in intent
+    assert "language" not in intent
     assert provider.last_request.prompt_version == INTENT_PROMPT_VERSION
 
 
@@ -298,7 +300,16 @@ def test_oversized_candidate_set_is_rejected_400(catalogue):
 def test_greeting_resolves_as_non_command(catalogue):
     service, _ = _service(
         catalogue,
-        [json_response(_intent_payload(intent_type="non_command", target=None, confidence=1.0))],
+        [
+            json_response(
+                _intent_payload(
+                    intent_type="non_command",
+                    target=None,
+                    confidence=1.0,
+                    reply="I can help you pay levies and bills.",
+                )
+            )
+        ],
     )
     with _client(service) as client:
         body = client.post(ENDPOINT, json={"text": "Hello"}).json()
@@ -306,7 +317,7 @@ def test_greeting_resolves_as_non_command(catalogue):
     assert intent["intentType"] == "non_command"
     assert intent["target"] is None
     assert intent["amount"] is None
-    assert intent["clarifyingQuestion"] is None
+    assert body["reply"] == "I can help you pay levies and bills."
     assert body["candidates"] == []
 
 
@@ -314,21 +325,32 @@ def test_greeting_resolves_as_non_command(catalogue):
 
 
 def test_second_turn_still_asks_a_question(catalogue):
-    service, _ = _service(catalogue, [json_response(_intent_payload(confidence=0.2))])
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent_payload(confidence=0.2, reply="Which biller do you mean?"))],
+    )
     history = [
         {"role": "user", "text": "pay something"},
         {"role": "assistant", "text": "Which biller do you mean?"},
     ]
     with _client(service) as client:
-        intent = client.post(ENDPOINT, json={"text": "the light one", "history": history}).json()[
-            "intent"
-        ]
-    assert intent["clarifyingQuestion"] is not None
-    assert intent["intentType"] == "unknown"
+        body = client.post(ENDPOINT, json={"text": "the light one", "history": history}).json()
+    assert body["reply"] == "Which biller do you mean?"
+    assert body["intent"]["intentType"] == "unknown"
 
 
 def test_third_turn_declines_and_offers_support(catalogue):
-    service, _ = _service(catalogue, [json_response(_intent_payload(confidence=0.2))])
+    service, _ = _service(
+        catalogue,
+        [
+            json_response(
+                _intent_payload(
+                    confidence=0.2,
+                    reply="Three answers in and I still can't tell which service you mean.",
+                )
+            )
+        ],
+    )
     history = [
         {"role": "user", "text": "pay something"},
         {"role": "assistant", "text": "Which biller do you mean?"},
@@ -338,10 +360,10 @@ def test_third_turn_declines_and_offers_support(catalogue):
         {"role": "assistant", "text": "Do you mean Ikeja Electric?"},
     ]
     with _client(service) as client:
-        intent = client.post(ENDPOINT, json={"text": "yes", "history": history}).json()["intent"]
-    assert intent["intentType"] == "unknown"
-    assert intent["clarifyingQuestion"] is None
-    assert intent["constraints"].get("clarificationLimitReached") is True
+        body = client.post(ENDPOINT, json={"text": "yes", "history": history}).json()
+    assert body["intent"]["intentType"] == "unknown"
+    assert body["intent"]["constraints"].get("clarificationLimitReached") is True
+    assert body["reply"] is not None
 
 
 def test_over_length_text_is_a_contract_error_not_a_model_call(catalogue):
@@ -365,30 +387,53 @@ def test_validation_error_uses_the_shared_envelope(catalogue):
 # --- Refusal: the 0.70 cutoff -----------------------------------------------------
 
 
-def test_low_confidence_payment_asks_exactly_one_question_and_does_not_pay(catalogue):
-    service, _ = _service(catalogue, [json_response(_intent_payload(confidence=0.3))])
+def test_low_confidence_payment_asks_and_does_not_pay(catalogue):
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent_payload(confidence=0.3, reply="Which biller do you mean?"))],
+    )
     with _client(service) as client:
-        intent = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()["intent"]
-    assert intent["intentType"] == "unknown"
-    assert intent["clarifyingQuestion"] is not None
-    assert intent["clarifyingQuestion"].count("?") == 1
-    assert intent["intentType"] not in {"gov_payment", "bill_payment"}
+        body = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()
+    assert body["intent"]["intentType"] == "unknown"
+    assert body["reply"] == "Which biller do you mean?"
+    assert body["intent"]["intentType"] not in {"gov_payment", "bill_payment"}
 
 
 def test_confidence_just_below_the_cutoff_is_refused(catalogue):
-    service, _ = _service(catalogue, [json_response(_intent_payload(confidence=0.69))])
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent_payload(confidence=0.69, reply="Which one did you mean?"))],
+    )
     with _client(service) as client:
-        intent = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()["intent"]
-    assert intent["intentType"] == "unknown"
-    assert intent["clarifyingQuestion"] is not None
+        body = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()
+    assert body["intent"]["intentType"] == "unknown"
+    assert body["reply"] is not None
 
 
 def test_confidence_at_the_cutoff_resolves(catalogue):
     service, _ = _service(catalogue, [json_response(_intent_payload(confidence=0.70))])
     with _client(service) as client:
-        intent = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()["intent"]
-    assert intent["intentType"] == "bill_payment"
-    assert intent["clarifyingQuestion"] is None
+        body = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()
+    assert body["intent"]["intentType"] == "bill_payment"
+
+
+def test_unsafe_reply_is_nulled_so_the_client_renders_its_fallback(catalogue):
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent_payload(reply="Pay now at https://evil.example/pay"))],
+    )
+    with _client(service) as client:
+        body = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()
+    assert body["source"] == "model"
+    assert body["reply"] is None
+
+
+def test_missing_reply_is_allowed_and_does_not_crash(catalogue):
+    service, _ = _service(catalogue, [json_response(_intent_payload(reply=None))])
+    with _client(service) as client:
+        response = client.post(ENDPOINT, json={"text": "pay my electricity"})
+    assert response.status_code == 200
+    assert response.json()["reply"] is None
 
 
 # --- No invention -----------------------------------------------------------------
@@ -400,7 +445,6 @@ def test_invented_target_is_dropped_and_payment_collapses(catalogue):
         intent = client.post(ENDPOINT, json={"text": "pay my electricity"}).json()["intent"]
     assert intent["target"] is None
     assert intent["intentType"] == "unknown"
-    assert intent["clarifyingQuestion"] is not None
 
 
 def test_untraceable_amount_is_dropped(catalogue):
@@ -429,7 +473,8 @@ def test_provider_unavailable_degrades_to_keyword_fallback(catalogue):
     assert body["source"] == "fallback"
     assert body["intent"]["intentType"] == "unknown"
     assert body["intent"]["confidence"] == 0.0
-    assert body["intent"]["clarifyingQuestion"] is not None
+    # No model reply: the client renders its prewritten fallback for the state.
+    assert body["reply"] is None
     assert [item["serviceId"] for item in body["candidates"]] == ["svc-electric"]
 
 
@@ -456,4 +501,4 @@ def test_fallback_never_invents_a_target_when_the_catalogue_misses(catalogue):
     assert body["source"] == "fallback"
     assert body["candidates"] == []
     assert body["intent"]["target"] is None
-    assert body["intent"]["clarifyingQuestion"] is not None
+    assert body["reply"] is None

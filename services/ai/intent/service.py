@@ -7,8 +7,13 @@ A thin adapter over :class:`~core.serving.ModelServing`:
   the conversation, lets the pinned flash model resolve the structured intent, grounds
   target, amount, and reference against the retrieved facts, and applies the refusal
   guardrail;
-* below the 0.70 confidence cutoff the intent is unresolved and asks one clarifying
-  question that builds on the earlier turns, up to three in one conversation, and
+* the model authors the user-facing ``reply`` in the request locale (greeting,
+  clarifying question, refusal, or non-resolving reply) alongside the reduced
+  machine-actionable intent; the reply is not pinned or rewritten, and it is dropped
+  to null when it is missing, empty, unsafe, or ungrounded so the client renders its
+  prewritten fallback;
+* below the 0.70 confidence cutoff the intent is unresolved and asks its follow-up in
+  the reply, building on the earlier turns, up to three in one conversation, and
   never presents a payment type; at the bound it declines instead of asking again;
 * a greeting or other non-command message resolves to ``non_command`` with no
   clarifying question, no payment field, and nothing recorded for coverage;

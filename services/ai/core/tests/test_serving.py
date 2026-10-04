@@ -14,6 +14,7 @@ def _serving(catalogue, responses=None, *, responder=None):
 
 def _intent(**overrides):
     payload = {
+        "reply": "I've got Ikeja Electric. Confirm and I'll prepare it.",
         "intent_type": "bill_payment",
         "target": "svc-electric",
         "amount": None,
@@ -21,8 +22,6 @@ def _intent(**overrides):
         "reference": None,
         "constraints": {},
         "confidence": 0.95,
-        "language": "en",
-        "clarifying_question": None,
         "detected_language": None,
     }
     payload.update(overrides)
@@ -48,6 +47,8 @@ def test_resolve_intent_returns_a_grounded_model_result(catalogue):
     assert result.citations == ("svc-electric",)
     assert result.model_id == FLASH_MODEL_ID
     assert result.cost is not None and result.cost.within_ceiling
+    # The model authors the user-facing reply; it is passed through, not pinned.
+    assert result.reply == "I've got Ikeja Electric. Confirm and I'll prepare it."
 
 
 def test_resolve_intent_uses_the_pinned_prompt_and_model(catalogue):
@@ -69,7 +70,8 @@ def test_resolve_intent_falls_back_when_the_provider_is_unavailable(catalogue):
     assert result.used_fallback is True
     assert result.intent.intent_type == "unknown"
     assert result.intent.confidence == 0.0
-    assert result.intent.clarifying_question is not None
+    # The degraded path sends no reply: the client renders its prewritten fallback.
+    assert result.reply is None
     assert [item.service_id for item in result.candidates] == ["svc-electric"]
 
 
@@ -81,12 +83,32 @@ def test_resolve_intent_falls_back_on_unparseable_output(catalogue):
 
 
 def test_low_confidence_model_answer_is_refused(catalogue):
-    serving, _ = _serving(catalogue, [json_response(_intent(confidence=0.3))])
+    serving, _ = _serving(
+        catalogue,
+        [json_response(_intent(confidence=0.3, reply="Which biller do you mean?"))],
+    )
     result = serving.resolve_intent("pay my electricity")
     assert result.intent.intent_type == "unknown"
-    assert result.intent.clarifying_question is not None
-    assert result.intent.clarifying_question.count("?") == 1
+    assert result.reply == "Which biller do you mean?"
     assert "low_confidence" in result.flags
+
+
+def test_unsafe_reply_is_dropped_to_null(catalogue):
+    serving, _ = _serving(
+        catalogue,
+        [json_response(_intent(reply="Pay at https://example.com/pay"))],
+    )
+    result = serving.resolve_intent("pay my electricity")
+    assert result.source == "model"
+    assert result.reply is None
+    assert "unsafe_reply" in result.flags
+
+
+def test_missing_reply_does_not_crash(catalogue):
+    serving, _ = _serving(catalogue, [json_response(_intent(reply=None))])
+    result = serving.resolve_intent("pay my electricity")
+    assert result.source == "model"
+    assert result.reply is None
 
 
 def test_invented_target_is_removed_before_it_reaches_the_client(catalogue):
@@ -123,17 +145,29 @@ def test_history_is_rendered_into_the_prompt(catalogue):
 def test_non_command_has_no_candidates_or_payment_fields(catalogue):
     serving, _ = _serving(
         catalogue,
-        [json_response(_intent(intent_type="non_command", target=None, confidence=1.0))],
+        [
+            json_response(
+                _intent(
+                    intent_type="non_command",
+                    target=None,
+                    confidence=1.0,
+                    reply="I can help you pay levies and bills.",
+                )
+            )
+        ],
     )
     result = serving.resolve_intent("Hello")
     assert result.intent.intent_type == "non_command"
     assert result.intent.target is None
-    assert result.intent.clarifying_question is None
+    assert result.reply == "I can help you pay levies and bills."
     assert result.candidates == ()
 
 
 def test_third_clarification_turn_declines(catalogue):
-    serving, _ = _serving(catalogue, [json_response(_intent(confidence=0.2))])
+    serving, _ = _serving(
+        catalogue,
+        [json_response(_intent(confidence=0.2, reply="Three answers in and I still can't tell."))],
+    )
     history = (
         ConversationTurn("user", "pay something"),
         ConversationTurn("assistant", "Which biller?"),
@@ -144,20 +178,21 @@ def test_third_clarification_turn_declines(catalogue):
     )
     result = serving.resolve_intent("yes", history=history)
     assert result.intent.intent_type == "unknown"
-    assert result.intent.clarifying_question is None
     assert result.intent.constraints.get("clarificationLimitReached") is True
     assert "clarification_limit_reached" in result.flags
 
 
 def test_second_clarification_turn_still_asks(catalogue):
-    serving, _ = _serving(catalogue, [json_response(_intent(confidence=0.2))])
+    serving, _ = _serving(
+        catalogue, [json_response(_intent(confidence=0.2, reply="Which biller do you mean?"))]
+    )
     history = (
         ConversationTurn("user", "pay something"),
         ConversationTurn("assistant", "Which biller?"),
     )
     result = serving.resolve_intent("the light one", history=history)
     assert result.intent.intent_type == "unknown"
-    assert result.intent.clarifying_question is not None
+    assert result.reply == "Which biller do you mean?"
     assert "clarification_limit_reached" not in result.flags
 
 

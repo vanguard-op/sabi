@@ -29,3 +29,14 @@ def test_fallback_intent_without_candidates_still_asks(catalogue):
     intent = fallback_intent("unknown thing", resolution)
     assert intent.intent_type == "unknown"
     assert "biller or agency" in intent.clarifying_question
+
+
+def test_fallback_intent_is_not_the_structured_intent(catalogue):
+    from core.fallback import FallbackIntent
+
+    resolution = keyword_resolution("electricity bill", catalogue)
+    result = fallback_intent("electricity bill", resolution)
+    # The degraded path's shape is its own, so the MQ-001 structured intent can drop
+    # the structured clarifying question without breaking this consumer.
+    assert isinstance(result, FallbackIntent)
+    assert not hasattr(result, "detected_language")

@@ -62,6 +62,7 @@ from core.schemas import (
     NON_COMMAND_INTENT_TYPE,
     RANKING_RESPONSE_SCHEMA,
     Intent,
+    IntentModelOutput,
     RankingResult,
     ServiceSummary,
 )
@@ -74,8 +75,10 @@ FALLBACK_SOURCE = "fallback"
 
 _SYSTEM_INSTRUCTIONS: Mapping[Capability, str] = {
     Capability.INTENT_RESOLUTION: (
-        "You resolve Nigerian payment and discovery requests into the pinned JSON "
-        "schema. Facts come only from the provided catalogue records."
+        "You are Sabi's assistant. You converse with one Nigerian user: you author "
+        "their user-facing reply in natural language and, alongside it, resolve the "
+        "message into the pinned machine-actionable JSON intent. Facts come only from "
+        "the provided catalogue records."
     ),
     Capability.DISCOVERY_RANKING: (
         "You rank catalogue records for a discovery query. You never invent a "
@@ -90,11 +93,18 @@ _SYSTEM_INSTRUCTIONS: Mapping[Capability, str] = {
 
 @dataclass(frozen=True)
 class IntentResolution:
-    """The result of MQ-001 intent resolution, shaped for C-009."""
+    """The result of MQ-001 intent resolution, shaped for C-009.
+
+    ``reply`` is the model-authored user-facing message in the request locale, or
+    null when it was absent, empty, unsafe, or ungrounded; the client renders its
+    prewritten fallback on null. The wording is non-deterministic and is never pinned
+    or rewritten.
+    """
 
     intent: Intent
     candidates: tuple[ServiceSummary, ...]
     source: str
+    reply: str | None = None
     citations: tuple[str, ...] = ()
     model_id: str | None = None
     prompt_version: str = PROMPT_VERSION
@@ -201,9 +211,10 @@ class ModelServing:
             response = self._provider.generate(request)
             task_cost.record(response.usage)
             payload = parse_json(response.text) if response.parsed is None else response.parsed
-            intent = Intent.from_mapping(payload)
+            output = IntentModelOutput.from_mapping(payload)
             outcome = apply_intent_guardrails(
-                intent,
+                output.intent,
+                reply=output.reply,
                 user_text=text,
                 context=context,
                 locale=locale,
@@ -222,6 +233,7 @@ class ModelServing:
                 intent=outcome.intent,
                 candidates=candidates,
                 source=MODEL_SOURCE,
+                reply=outcome.reply,
                 citations=outcome.citations,
                 model_id=request.model_id,
                 prompt_version=prompt.version,
@@ -288,16 +300,22 @@ class ModelServing:
             intent = Intent(
                 intent_type="unknown",
                 confidence=0.0,
-                language=locale,
-                clarifying_question=None,
                 constraints={CLARIFICATION_LIMIT_KEY: True},
             )
         else:
-            intent = fallback_intent(text, resolution, locale=locale)
+            # The degraded path sends no reply: the client renders its prewritten
+            # fallback string for the state (MQ-001). The keyword match still offers
+            # candidates for confirmation, and carries no claimed language.
+            unresolved = fallback_intent(text, resolution, locale=locale)
+            intent = Intent(
+                intent_type=unresolved.intent_type,
+                confidence=unresolved.confidence,
+            )
         return IntentResolution(
             intent=intent,
             candidates=candidates,
             source=FALLBACK_SOURCE,
+            reply=None,
             model_id=None,
             prompt_version=self._version_for(Capability.INTENT_RESOLUTION),
             used_fallback=True,

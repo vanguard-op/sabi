@@ -3,11 +3,12 @@ from __future__ import annotations
 import pytest
 
 from core.errors import OutputValidationError
-from core.schemas import Intent, RankingResult, ServiceSummary
+from core.schemas import Intent, IntentModelOutput, RankingResult, ServiceSummary
 
 
 def _intent_payload(**overrides):
     payload = {
+        "reply": "I've got Ikeja Electric. Tell me the amount and I'll get it ready.",
         "intent_type": "bill_payment",
         "target": "svc-electric",
         "amount": 500000,
@@ -15,8 +16,6 @@ def _intent_payload(**overrides):
         "reference": None,
         "constraints": {},
         "confidence": 0.95,
-        "language": "en",
-        "clarifying_question": None,
         "detected_language": None,
     }
     payload.update(overrides)
@@ -68,6 +67,37 @@ def test_intent_round_trips_to_the_contract_shape():
     mapping = Intent.from_mapping(_intent_payload()).to_mapping()
     assert mapping["intent_type"] == "bill_payment"
     assert mapping["amount"] == 500000
+
+
+def test_intent_carries_only_machine_actionable_fields():
+    mapping = Intent.from_mapping(_intent_payload()).to_mapping()
+    # The reply and the greeting/clarifying question are not part of the structured
+    # intent; ``language`` and ``clarifying_question`` are gone (C-009 revision 4).
+    assert set(mapping) == {
+        "intent_type",
+        "target",
+        "amount",
+        "currency",
+        "reference",
+        "constraints",
+        "confidence",
+        "detected_language",
+    }
+
+
+def test_intent_output_parses_the_reply_alongside_the_intent():
+    output = IntentModelOutput.from_mapping(_intent_payload())
+    assert output.reply.startswith("I've got Ikeja Electric")
+    assert output.intent.intent_type == "bill_payment"
+    assert output.intent.detected_language is None
+
+
+def test_intent_output_allows_a_null_reply():
+    output = IntentModelOutput.from_mapping(_intent_payload(reply=None))
+    assert output.reply is None
+    # An empty reply is treated exactly like a missing one, never a blank turn.
+    output = IntentModelOutput.from_mapping(_intent_payload(reply="   "))
+    assert output.reply is None
 
 
 def _service(**overrides):

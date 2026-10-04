@@ -26,12 +26,14 @@ Contract conformance (CONTRACTS.md, C-009):
   service's own index, so the model can set ``target`` to a real service id (D-043);
   when absent the local index is used as before. It is not part of the client-facing
   C-009 request, and an over-sized set is 400.
-- The 200 body is camelCase: ``intent`` (``intentType``, ``target``, ``amount``,
-  ``currency``, ``reference``, ``constraints``, ``confidence``, ``language``,
-  ``clarifyingQuestion``), ``candidates`` (``serviceId``, ``name``,
-  ``collectingBody``, ``category``, ``knownAmount``, ``currency``, ``status``,
-  ``confidence``), and ``source`` (``model`` or ``fallback``). The model-internal
-  snake_case schema never crosses this boundary (D-018).
+- The 200 body is camelCase: ``reply`` (the model-authored user-facing message in
+  ``locale``, or null when none was produced so the client renders its prewritten
+  fallback), ``intent`` (``intentType``, ``target``, ``amount``, ``currency``,
+  ``reference``, ``constraints``, ``confidence``, ``detectedLanguage``),
+  ``candidates`` (``serviceId``, ``name``, ``collectingBody``, ``category``,
+  ``knownAmount``, ``currency``, ``status``, ``confidence``), and ``source`` (``model``
+  or ``fallback``). The model-internal snake_case schema never crosses this boundary
+  (D-018).
 - ``source`` is ``fallback`` whenever the pinned provider is unavailable, times out,
   or returns output outside the contract; that path degrades to keyword and search
   resolution and always carries an unresolved intent that requires confirmation, so a

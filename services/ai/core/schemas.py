@@ -98,11 +98,15 @@ def _currency(value: Any) -> str:
 
 @dataclass(frozen=True)
 class Intent:
-    """A resolved payment or discovery intent.
+    """A resolved payment or discovery intent: only the machine-actionable fields.
 
     Amounts are integer minor units (kobo for NGN) in ``currency``, never decimal
-    major units. ``detected_language`` is populated for Nigerian-language
-    understanding (MQ-004) and left null for the launch languages.
+    major units. ``detected_language`` is the language the model detected or served,
+    a machine-actionable signal the client and analytics consume (MQ-001, MQ-004); it
+    is null when none was detected. The user-facing message is not part of this
+    object: the model authors it as ``reply`` (MQ-001), and the greeting, the
+    clarifying question, and the non-resolving replies live there, not in a separate
+    field.
     """
 
     intent_type: str
@@ -112,8 +116,6 @@ class Intent:
     currency: str = DEFAULT_CURRENCY
     reference: str | None = None
     constraints: Mapping[str, Any] = field(default_factory=dict)
-    language: str = "en"
-    clarifying_question: str | None = None
     detected_language: str | None = None
 
     @classmethod
@@ -131,8 +133,6 @@ class Intent:
         if detected is not None and detected not in DETECTED_LANGUAGES:
             raise OutputValidationError(f"unknown detected_language: {detected}")
 
-        language = _optional_str(data.get("language"), "language") or "en"
-
         return cls(
             intent_type=intent_type,
             confidence=_confidence(data.get("confidence"), "confidence"),
@@ -141,10 +141,6 @@ class Intent:
             currency=_currency(data.get("currency")),
             reference=_optional_str(data.get("reference"), "reference"),
             constraints=dict(constraints),
-            language=language,
-            clarifying_question=_optional_str(
-                data.get("clarifying_question"), "clarifying_question"
-            ),
             detected_language=detected,
         )
 
@@ -157,10 +153,33 @@ class Intent:
             "reference": self.reference,
             "constraints": dict(self.constraints),
             "confidence": self.confidence,
-            "language": self.language,
-            "clarifying_question": self.clarifying_question,
             "detected_language": self.detected_language,
         }
+
+
+@dataclass(frozen=True)
+class IntentModelOutput:
+    """The model's full JSON output for MQ-001: the reply plus the intent.
+
+    The model authors the user-facing ``reply`` in natural language (the greeting,
+    the clarifying question, the refusal, or the non-resolving reply) alongside the
+    reduced, machine-actionable intent. ``reply`` is nullable: a missing or empty
+    reply is legitimate and the client renders its prewritten fallback string, so a
+    blank turn never reaches the user (MQ-001). The reply wording is
+    non-deterministic and is never pinned or post-processed; only its safety,
+    grounding, and language boundaries are enforced.
+    """
+
+    reply: str | None
+    intent: Intent
+
+    @classmethod
+    def from_mapping(cls, payload: Any) -> IntentModelOutput:
+        data = _require_mapping(payload, "intent output")
+        return cls(
+            reply=_optional_str(data.get("reply"), "reply"),
+            intent=Intent.from_mapping(data),
+        )
 
 
 # --- Service summary (MQ-002; consumed by C-009 and C-010) -----------------------
@@ -267,6 +286,10 @@ FALLBACK_TASKS: frozenset[str] = frozenset({"confirmation", "amount_entry", "rec
 INTENT_RESPONSE_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "properties": {
+        # The model-authored user-facing message (greeting, clarifying question,
+        # refusal, or non-resolving reply), in the request locale. Nullable: the
+        # client renders its prewritten fallback when it is absent.
+        "reply": {"type": "string", "nullable": True},
         "intent_type": {"type": "string", "enum": sorted(INTENT_TYPES)},
         "target": {"type": "string", "nullable": True},
         "amount": {"type": "integer", "nullable": True},
@@ -274,15 +297,13 @@ INTENT_RESPONSE_SCHEMA: Mapping[str, Any] = {
         "reference": {"type": "string", "nullable": True},
         "constraints": {"type": "object"},
         "confidence": {"type": "number"},
-        "language": {"type": "string"},
-        "clarifying_question": {"type": "string", "nullable": True},
         "detected_language": {
             "type": "string",
             "enum": sorted(DETECTED_LANGUAGES),
             "nullable": True,
         },
     },
-    "required": ["intent_type", "confidence", "currency", "language", "constraints"],
+    "required": ["intent_type", "confidence", "currency", "constraints"],
 }
 
 SERVICE_SUMMARY_SCHEMA: Mapping[str, Any] = {

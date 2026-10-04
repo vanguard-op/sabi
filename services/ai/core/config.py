@@ -32,10 +32,12 @@ FLASH_MODEL_ID = "gemini-3.1-flash-lite"
 # its own version in ``PROMPT_VERSIONS`` rather than editing a shipped artifact in
 # place, so an evaluation run is always reproducible against the exact prompt text.
 PROMPT_VERSION = "v1"
-# Intent resolution moved to ``v3`` for a richer instruction template: a single job
-# statement, explicit failure behavior, the exact output contract, reasoning guidance
-# for narrowing follow-ups, and few-shot examples. The output JSON schema is unchanged.
-INTENT_PROMPT_VERSION = "v3"
+# Intent resolution moved to ``v4`` for the conversational contract: the model authors
+# the user-facing ``reply`` in natural language (greeting, clarifying question,
+# refusal, non-resolving reply) plus the reduced machine-actionable intent, and the
+# request locale is bound as the language to reply in. The v3 template held the
+# structured-only contract (``language``/``clarifying_question`` in the object).
+INTENT_PROMPT_VERSION = "v4"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,
