@@ -123,6 +123,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
 | T-075 | — | infra-engineer | Done | — |
 | T-076 | — | infra-engineer | In Progress | — |
+| T-077 | — | frontend-engineer | Done | — |
+| T-078 | — | frontend-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -164,6 +166,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-034 | Terraform remote state lives in `gs://sabi-hq-tfstate` (us-central1, versioning on, uniform access) | Shared state is required for the CI-driven lifecycle; the bucket survives `destroy` so the environment can be rebuilt | lead |
 | D-035 | Staging Cloud SQL is a single zonal shared-core instance on HDD, so NFR-011's 99.9% availability is not met there; the target applies to production only | Staging is pre-release and must stay cheap to run and tear down (D-032/D-033); HA doubles the instance cost and would defeat the stop/destroy story | lead |
 | D-036 | `gcp-up` runs Terraform twice: a bootstrap apply that creates the platform (Artifact Registry, secrets, Cloud SQL, network, service accounts), then the image build and push, then a deploy apply that rolls Cloud Run onto the built tag | The first attempt pushed images before the registry existed and failed with `Repository "sabi" not found`; the registry is created by the apply, so the apply must come first | lead |
+| D-037 | Android status and navigation bars take the brand token `surface` (#FAF8F4 light / #17181A dark) in both modes, not a transparent bar | branding.md fixes the surface tokens but specifies no system-bar colour; transparent bars revealed Android's own window background (device white/black) below API 35. The brand surface matches the page background and keeps NFR-030 contrast via token luminance | user |
 
 ## Definition of Done
 
