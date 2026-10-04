@@ -9,6 +9,8 @@ Reference: CONTRACTS.md, model-quality.md, features.md.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from core.config import PRIMARY_MODEL_ID
 from core.errors import ProviderUnavailable
 from core.testing import FakeModelProvider as _FakeModelProvider
@@ -43,14 +45,35 @@ def intent_payload(**overrides) -> dict:
 
 
 def valid_stream() -> dict:
+    """A well-formed A2UI v0.9 stream naming the published catalog (C-012 rev 2)."""
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
     return {
         "messages": [
-            {"type": "createSurface", "surfaceId": "confirm-1"},
             {
-                "type": "updateComponents",
-                "components": [{"component": "ConfirmationSummary", "id": "summary"}],
+                "version": "v0.9",
+                "createSurface": {"surfaceId": "confirm-1", "catalogId": catalog_id},
             },
-            {"type": "updateDataModel", "data": {"amount": 500000}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "confirm-1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ConfirmationSummary",
+                            "amount": 500000,
+                            "payee": "Ikeja",
+                        }
+                    ],
+                },
+            },
+            {
+                "version": "v0.9",
+                "updateDataModel": {"surfaceId": "confirm-1", "path": "/"},
+            },
         ]
     }
 
@@ -224,34 +247,54 @@ def test_intent_wire_fields_are_camel_case(ai_client_factory, intent_service) ->
 def test_composed_confirmation_uses_catalogue_components(
     ai_client_factory, composition_serving
 ) -> None:
+    """C-012 rev 2: a catalog-naming A2UI v0.9 stream is composed and returned."""
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
     composition_serving._provider = scripted(
         [json_response(valid_stream(), model_id=PRIMARY_MODEL_ID)]
     )
     with ai_client_factory(composition=composition_serving) as client:
         body = client.post(
             "/v1/agent/surfaces",
-            json={"task": "confirmation", "context": {"amount": 500000, "payee": "Ikeja"}},
+            json={
+                "task": "confirmation",
+                "context": {"amount": 500000, "payee": "Ikeja"},
+                "catalogId": catalog_id,
+            },
         ).json()
-    assert [m["type"] for m in body["messages"]] == [
+    assert [next(k for k in m if k != "version") for m in body["messages"]] == [
         "createSurface",
         "updateComponents",
         "updateDataModel",
     ]
+    assert body["messages"][0]["createSurface"]["catalogId"] == catalog_id
     assert body["fallback"] == "confirmation"
 
 
 def test_unknown_component_is_refused_and_the_task_stays_completable(
     ai_client_factory, composition_serving
 ) -> None:
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
     composition_serving._provider = scripted(
         [
             json_response(
                 {
                     "messages": [
                         {
-                            "type": "updateComponents",
-                            "components": [{"component": "Hologram", "id": "x"}],
-                        }
+                            "version": "v0.9",
+                            "createSurface": {"surfaceId": "s1", "catalogId": catalog_id},
+                        },
+                        {
+                            "version": "v0.9",
+                            "updateComponents": {
+                                "surfaceId": "s1",
+                                "components": [{"id": "root", "component": "Hologram"}],
+                            },
+                        },
                     ]
                 },
                 model_id=PRIMARY_MODEL_ID,
@@ -259,7 +302,10 @@ def test_unknown_component_is_refused_and_the_task_stays_completable(
         ]
     )
     with ai_client_factory(composition=composition_serving) as client:
-        response = client.post("/v1/agent/surfaces", json={"task": "confirmation", "context": {}})
+        response = client.post(
+            "/v1/agent/surfaces",
+            json={"task": "confirmation", "context": {}, "catalogId": catalog_id},
+        )
     assert response.status_code == 200
     assert response.json() == {"messages": [], "fallback": "confirmation"}
 
@@ -267,9 +313,15 @@ def test_unknown_component_is_refused_and_the_task_stays_completable(
 def test_composition_provider_failure_returns_the_fallback_task(
     ai_client_factory, composition_serving
 ) -> None:
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
     composition_serving._provider = scripted([ProviderUnavailable("down")])
     with ai_client_factory(composition=composition_serving) as client:
-        body = client.post("/v1/agent/surfaces", json={"task": "receipt", "context": {}}).json()
+        body = client.post(
+            "/v1/agent/surfaces",
+            json={"task": "receipt", "context": {}, "catalogId": catalog_id},
+        ).json()
     assert body == {"messages": [], "fallback": "receipt"}
 
 
@@ -278,3 +330,150 @@ def test_unknown_task_is_a_400(ai_client_factory) -> None:
         response = client.post("/v1/agent/surfaces", json={"task": "run_payment", "context": {}})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_request"
+
+
+# --------------------------------------------------------------------------- #
+# C-012 revision 2 / MQ-003: one published catalog, both sides.
+# --------------------------------------------------------------------------- #
+
+_ROOT = Path(__file__).resolve().parents[2]
+_DART_CATALOG = _ROOT / "apps" / "mobile" / "lib" / "a2ui" / "sabi_catalog_document.dart"
+_JSON_CATALOG = _ROOT / "services" / "ai" / "core" / "catalogs" / "sabi_a2ui_v1.json"
+
+# The composed surfaces the published catalog exposes. This is read from the
+# client's authored document, never copied by hand: a server-side hand copy of
+# the client's names is the defect this revision removed. The names below are the
+# shell components (prewritten client chrome) that a stale copy wrongly admitted
+# as composable.
+_SHELL_NAMES = (
+    "NavigationShell",
+    "ComposedTaskSurface",
+    "EmptyState",
+    "ErrorState",
+    "OfflineBanner",
+    "SuccessToast",
+)
+
+
+def _dart_component_names() -> set[str]:
+    """The component names from the client's single authored catalog document.
+
+    The client owns the canonical catalog (``sabi_catalog_document.dart``); the
+    AI service ships the JSON generated from it. Reading the Dart source here
+    keeps the assertion honest: the two sides must agree, and a hand copy of the
+    names in the agent (the old twelve-name ``CLIENT_COMPONENT_CATALOGUE``) can
+    no longer satisfy this.
+    """
+
+    import re
+
+    text = _DART_CATALOG.read_text(encoding="utf-8")
+    return set(re.findall(r"^    '([A-Za-z][A-Za-z0-9]*)': \{", text, re.MULTILINE))
+
+
+def test_published_catalog_is_the_same_set_the_client_advertises() -> None:
+    """Criterion: the client's published catalog and the agent's set are the SAME set.
+
+    The regression this wave exists to kill was a server-side hand copy of the
+    client's component names (twelve, including shell names) that had drifted.
+    Here the agent's catalog, the committed JSON artifact, and the client's
+    authored Dart document must all name exactly the same components.
+    """
+
+    from core.a2ui_catalog import published_catalog
+
+    dart_names = _dart_component_names()
+    assert dart_names, f"no components parsed from {_DART_CATALOG.name}"
+    assert set(published_catalog().component_names()) == dart_names
+
+    import json
+
+    artifact = json.loads(_JSON_CATALOG.read_text(encoding="utf-8"))
+    assert set(artifact["components"]) == dart_names
+    assert artifact["catalogId"] == published_catalog().catalog_id
+
+
+def test_surface_naming_a_catalog_component_renders(ai_client_factory, composition_serving) -> None:
+    """A surface naming a catalog component is composed and returned to render."""
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
+    stream = {
+        "messages": [
+            {
+                "version": "v0.9",
+                "createSurface": {"surfaceId": "confirm-1", "catalogId": catalog_id},
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "confirm-1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ConfirmationSummary",
+                            "amount": 500_00,
+                            "payee": "Ikeja Electric",
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    composition_serving._provider = scripted(
+        [json_response(stream, model_id=PRIMARY_MODEL_ID)]
+    )
+    with ai_client_factory(composition=composition_serving) as client:
+        body = client.post(
+            "/v1/agent/surfaces",
+            json={
+                "task": "confirmation",
+                "context": {"amount": 500_00, "payee": "Ikeja Electric"},
+                "catalogId": catalog_id,
+            },
+        ).json()
+    assert body["fallback"] == "confirmation"
+    assert body["messages"], "a catalog-defined component must render, not fall back"
+    assert body["messages"][0]["createSurface"]["catalogId"] == catalog_id
+
+
+def test_surface_naming_a_component_outside_the_catalog_falls_back(
+    ai_client_factory, composition_serving
+) -> None:
+    """A component outside the catalog degrades to the same-task fallback.
+
+    Every shell name here was present in the old hand-copied twelve-name list, so
+    under the removed copy these surfaces would have been admitted and rendered.
+    Against the published catalog they are refused before send and the task falls
+    back to the client form for the same task.
+    """
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog_id = published_catalog().catalog_id
+    for shell in _SHELL_NAMES:
+        stream = {
+            "messages": [
+                {
+                    "version": "v0.9",
+                    "createSurface": {"surfaceId": "s1", "catalogId": catalog_id},
+                },
+                {
+                    "version": "v0.9",
+                    "updateComponents": {
+                        "surfaceId": "s1",
+                        "components": [{"id": "root", "component": shell}],
+                    },
+                },
+            ]
+        }
+        composition_serving._provider = scripted(
+            [json_response(stream, model_id=PRIMARY_MODEL_ID)]
+        )
+        with ai_client_factory(composition=composition_serving) as client:
+            body = client.post(
+                "/v1/agent/surfaces",
+                json={"task": "confirmation", "context": {}, "catalogId": catalog_id},
+            ).json()
+        assert body == {"messages": [], "fallback": "confirmation"}, shell

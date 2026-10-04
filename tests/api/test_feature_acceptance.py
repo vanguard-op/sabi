@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 from types import SimpleNamespace
 
+import pytest
 from app.identity import passkeys
 
 
@@ -380,19 +381,117 @@ def test_intent_resolution_is_reachable_through_the_gateway(
 def test_surface_composition_is_reachable_through_the_gateway(
     signed_in_user, api_client, agent_ai_client
 ):
-    """FEAT-011 / C-012: the client composes a surface through the gateway."""
+    """FEAT-011 / C-012 revision 2: the client composes a surface through the gateway.
+
+    The client names the Sabi catalog it advertises, the gateway forwards
+    ``task``, ``context``, and ``catalogId`` unchanged, and the AI service's A2UI
+    v0.9 stream plus the ``fallback`` task key comes back unreshaped.
+    """
+
+    catalog_id = "https://sabi.app/a2ui/v1/catalog.json"
+    response = api_client.post(
+        "/v1/agent/surfaces",
+        json={
+            "task": "confirmation",
+            "context": {"amount": 500_00},
+            "catalogId": catalog_id,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert set(body) == {"messages", "fallback"}
+    assert body["fallback"] == "confirmation"
+    # The A2UI v0.9 stream names the negotiated catalog the client sent.
+    assert body["messages"][0]["createSurface"]["catalogId"] == catalog_id
+    assert agent_ai_client.surface_calls == [
+        {"task": "confirmation", "context": {"amount": 500_00}, "catalogId": catalog_id}
+    ]
+
+
+def test_gateway_surface_omits_an_absent_catalog_and_falls_back(
+    signed_in_user, api_client, agent_ai_client
+):
+    """C-012 revision 2: an absent catalog is not compatible, never an error.
+
+    The client sends no ``catalogId`` (no compatible catalog negotiated). The
+    gateway must not invent one; the AI service answers 200 with the same-task
+    fallback and no messages, so the task stays completable through the client's
+    form for the task.
+    """
 
     response = api_client.post(
         "/v1/agent/surfaces",
         json={"task": "confirmation", "context": {"amount": 500_00}},
     )
     assert response.status_code == 200, response.text
-    body = response.json()
-    assert set(body) == {"messages", "fallback"}
-    assert body["fallback"] == "confirmation"
+    assert response.json() == {"messages": [], "fallback": "confirmation"}
     assert agent_ai_client.surface_calls == [
-        {"task": "confirmation", "context": {"amount": 500_00}}
+        {"task": "confirmation", "context": {"amount": 500_00}, "catalogId": None}
     ]
+
+
+# --------------------------------------------------------------------------- #
+# FEAT-011 / MQ-003: every composed surface type round-trips through the
+# gateway, and no compatible catalog degrades to the same-task fallback.
+# --------------------------------------------------------------------------- #
+
+_CATALOG_ID = "https://sabi.app/a2ui/v1/catalog.json"
+
+
+@pytest.mark.parametrize(
+    "task",
+    ["confirmation", "amount_entry", "receipt", "discovery", "verification", "recovery"],
+)
+def test_every_composed_surface_type_round_trips_through_the_gateway(
+    signed_in_user, api_client, agent_ai_client, task
+):
+    """C-012 revision 2: every task returns a stream plus a fallback, client-renderable.
+
+    A ``receipt`` request also carries a resolved record reference (a record
+    lookup rather than a post-payment service payment); the gateway forwards the
+    context unchanged.
+    """
+
+    context = {"recordReference": "rcpt_01J1"} if task == "receipt" else {}
+    response = api_client.post(
+        "/v1/agent/surfaces",
+        json={"task": task, "context": context, "catalogId": _CATALOG_ID},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert set(body) == {"messages", "fallback"}, task
+    assert body["fallback"] == task
+    # A non-empty A2UI v0.9 stream: a surface naming the negotiated catalog plus a
+    # root component, which is what the client's gate renders.
+    assert body["messages"] and body["messages"][0]["createSurface"]["catalogId"] == _CATALOG_ID
+    assert agent_ai_client.surface_calls == [
+        {"task": task, "context": context, "catalogId": _CATALOG_ID}
+    ]
+
+
+def test_no_compatible_catalog_is_a_fallback_not_an_error(
+    signed_in_user, api_client, agent_ai_client
+):
+    """C-012 revision 2 / MQ-003 fallback: no compatible catalog -> fallback.
+
+    Every task with a catalog id the agent cannot speak answers 200 with the
+    same-task fallback and no messages; the client renders its prewritten form,
+    so the task remains completable rather than surfacing an error.
+    """
+
+    for task in ("confirmation", "receipt", "discovery"):
+        response = api_client.post(
+            "/v1/agent/surfaces",
+            json={
+                "task": task,
+                "context": {},
+                "catalogId": "https://other.example/a2ui/v9/catalog.json",
+            },
+        )
+        # The gateway forwards to the AI double, which mirrors the AI service's
+        # no-compatible-catalog contract: 200 with the same-task fallback.
+        assert response.status_code == 200, task
+        assert response.json() == {"messages": [], "fallback": task}
 
 
 def test_gateway_rejects_a_request_outside_the_contract_before_forwarding(

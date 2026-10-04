@@ -108,6 +108,10 @@ class FakeAgentAIClient:
         self.intent_calls: list[dict] = []
         self.surface_calls: list[dict] = []
 
+    # The client's published Sabi A2UI catalog id (C-012 revision 2). The double
+    # speaks only this one, mirroring the AI service's negotiation.
+    PUBLISHED_CATALOG_ID = "https://sabi.app/a2ui/v1/catalog.json"
+
     def resolve_intent(
         self,
         *,
@@ -134,15 +138,48 @@ class FakeAgentAIClient:
             "source": "model",
         }
 
-    def compose_surface(self, *, task: str, context: dict) -> dict:
-        self.surface_calls.append({"task": task, "context": context})
-        # Mirror the AI service's C-012 contract: an unknown task is a 400 with
-        # the shared envelope. The gateway must forward that as the same error.
+    def compose_surface(
+        self, *, task: str, context: dict, catalog_id: str | None = None
+    ) -> dict:
+        self.surface_calls.append(
+            {"task": task, "context": context, "catalogId": catalog_id}
+        )
+        # Mirror the AI service's C-012 revision-2 contract: an unknown task is a
+        # 400 with the shared envelope, and a known task returns an A2UI v0.9
+        # message stream naming the negotiated ``catalogId`` (empty when no
+        # compatible catalog was negotiated, so the client renders its same-task
+        # fallback). The gateway must forward all of this unchanged.
         from app.core.errors import APIError, ErrorCode
 
-        if task not in {"confirmation", "amount_entry", "receipt", "discovery"}:
+        if task not in {
+            "confirmation",
+            "amount_entry",
+            "receipt",
+            "discovery",
+            "verification",
+            "recovery",
+        }:
             raise APIError(400, ErrorCode.INVALID_REQUEST, "That task is not supported.")
-        return {"messages": [{"type": "createSurface", "surfaceId": "s1"}], "fallback": task}
+        # Mirror the AI service's catalog negotiation: only the client's
+        # published Sabi catalog is one the agent can speak. An absent or unknown
+        # catalog id is not compatible, so it answers with the same-task fallback
+        # and no messages rather than an error.
+        if catalog_id != FakeAgentAIClient.PUBLISHED_CATALOG_ID:
+            return {"messages": [], "fallback": task}
+        stream = [
+            {
+                "version": "v0.9",
+                "createSurface": {"surfaceId": "s1", "catalogId": catalog_id},
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "s1",
+                    "components": [{"id": "root", "component": "ConfirmationSummary"}],
+                },
+            },
+        ]
+        return {"messages": stream, "fallback": task}
 
 
 @pytest.fixture
