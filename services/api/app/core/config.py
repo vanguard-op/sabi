@@ -8,6 +8,7 @@ production.
 
 from __future__ import annotations
 
+import base64
 import os
 from functools import lru_cache
 from typing import Literal
@@ -22,6 +23,33 @@ Environment = Literal["development", "staging", "production"]
 # validator below rejects it outside development so a forgotten value is caught
 # at boot rather than in production.
 DEV_PLACEHOLDER = "local-dev-only-change-me"
+
+# Android charts the passkey origin as the base64url-encoded SHA-256 of the
+# signing certificate, with no padding (D-038).
+_ANDROID_ORIGIN_PREFIX = "android:apk-key-hash:"
+
+
+def _android_origins(fingerprints: list[str]) -> list[str]:
+    """Derive Android passkey origins from signing-cert fingerprints (FEAT-001).
+
+    A fingerprint is colon-separated, case-insensitive hex of the certificate's
+    SHA-256. It is normalised, decoded, and re-encoded as unpadded base64url to
+    match the value Credential Manager reports as the ceremony origin. Blank
+    entries are skipped; an entry that is not valid hex cannot describe a real
+    certificate, so it is skipped rather than allowed to break every ceremony.
+    """
+    origins: list[str] = []
+    for fingerprint in fingerprints:
+        normalized = fingerprint.replace(":", "").replace(" ", "").strip()
+        if not normalized:
+            continue
+        try:
+            digest = bytes.fromhex(normalized)
+        except ValueError:
+            continue
+        encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        origins.append(f"{_ANDROID_ORIGIN_PREFIX}{encoded}")
+    return origins
 
 
 class Settings(BaseSettings):
@@ -74,18 +102,14 @@ class Settings(BaseSettings):
     webauthn_rp_name: str = "Sabi"
     webauthn_origin: str = "http://localhost:8000"
 
-    # Native clients present a platform origin rather than the web one: iOS runs
-    # the ceremony under "https://<rp_id>" and Android under
-    # "android:apk-key-hash:<sha256>" for its signing certificate. The iOS origin
-    # follows from rp_id; list the Android origins here per deployment. Anything
-    # not in this list is refused, so an unrecognised origin cannot slip through.
-    webauthn_native_origins: list[str] = Field(default_factory=list)
-
     # Android app identity for Digital Asset Links (FEAT-001). The RP origin
     # serves /.well-known/assetlinks.json naming the app package and the SHA-256
     # fingerprints of every certificate it is signed with (debug, upload, and
     # Play App Signing), or Android refuses to associate the app with the domain
-    # and every ceremony fails with `domain-not-associated`.
+    # and every ceremony fails with `domain-not-associated`. The same list backs
+    # the Android passkey origin: each certificate yields
+    # `android:apk-key-hash:<base64url(sha256(cert))>`, so the association file
+    # and the WebAuthn allowlist can never drift apart (D-038).
     android_package_name: str = "ng.sabi.sabi_mobile"
     android_cert_fingerprints: list[str] = Field(default_factory=list)
 
@@ -135,14 +159,18 @@ class Settings(BaseSettings):
     def webauthn_allowed_origins(self) -> list[str]:
         """Origins a passkey ceremony may present (FEAT-001).
 
-        The web client presents ``webauthn_origin``, iOS ``https://<rp_id>``,
-        and Android each configured ``android:apk-key-hash:<sha256>``. The
+        The web client presents ``webauthn_origin`` and iOS presents
+        ``https://<rp_id>``. Android presents
+        ``android:apk-key-hash:<base64url(sha256(cert))>`` for its signing
+        certificate, so one origin is derived per configured cert fingerprint
+        rather than configured separately; the same certificates are named in
+        ``/.well-known/assetlinks.json`` and stay in step with it (D-038). The
         verifier treats the web origin as the primary and admits the native
         origins alongside it, so a valid native ceremony is not rejected merely
         for not being the web origin.
         """
         origins = [self.webauthn_origin, f"https://{self.webauthn_rp_id}"]
-        origins.extend(self.webauthn_native_origins)
+        origins.extend(_android_origins(self.android_cert_fingerprints))
         # py_webauthn matches origins by exact membership; drop duplicates so a
         # deployment where the web and iOS origins coincide stays unambiguous.
         return list(dict.fromkeys(origins))

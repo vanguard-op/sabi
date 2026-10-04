@@ -1,11 +1,14 @@
 """Native passkey origins (FEAT-001).
 
 The native client presents its own platform origin rather than the web origin:
-iOS under ``https://<rp_id>`` and Android under ``android:apk-key-hash:<sha256>``.
-A valid attestation or assertion must not be rejected just because the backend
-only knows the web origin. py_webauthn matches origins by exact membership, so
-these tests run the real library against credentials crafted to carry a native
-origin.
+iOS under ``https://<rp_id>`` and Android under
+``android:apk-key-hash:<base64url(sha256(cert))>``. The Android origin is
+derived from the same signing-certificate fingerprints that back
+``/.well-known/assetlinks.json``, so the association file and the WebAuthn
+allowlist cannot drift apart (D-038). A valid attestation or assertion must not
+be rejected just because the backend only knows the web origin. py_webauthn
+matches origins by exact membership, so these tests run the real library
+against credentials crafted to carry a native origin.
 """
 
 from __future__ import annotations
@@ -23,7 +26,13 @@ from webauthn.helpers.exceptions import (
 from app.core.config import Settings
 from app.identity import passkeys
 
-ANDROID_ORIGIN = "android:apk-key-hash:abc123"
+# A real Android signing certificate's SHA-256, uppercase and colon-separated,
+# as it appears in assetlinks.json and the deployment configuration.
+FINGERPRINT = (
+    "51:60:03:F2:CC:9B:70:47:52:A5:EE:4E:DF:A7:0C:5E:"
+    "29:F9:77:04:41:CE:5F:B9:6A:23:8B:1D:35:12:5E:99"
+)
+ANDROID_ORIGIN = "android:apk-key-hash:UWAD8sybcEdSpe5O36cMXin5dwRBzl-5aiOLHTUSXpk"
 
 
 def b64(value: bytes) -> str:
@@ -65,7 +74,7 @@ def _assertion_credential(challenge: bytes, origin: str) -> dict:
 def _native_settings() -> Settings:
     return make_settings(
         webauthn_rp_id="sabi.example",
-        webauthn_native_origins=[ANDROID_ORIGIN],
+        android_cert_fingerprints=[FINGERPRINT],
     )
 
 
@@ -73,10 +82,48 @@ def test_allowed_origins_cover_the_web_and_both_native_clients() -> None:
     settings = make_settings(
         webauthn_rp_id="sabi.example",
         webauthn_origin="https://app.sabi.example",
-        webauthn_native_origins=[ANDROID_ORIGIN],
+        android_cert_fingerprints=[FINGERPRINT],
     )
     assert settings.webauthn_allowed_origins == [
         "https://app.sabi.example",
+        "https://sabi.example",
+        ANDROID_ORIGIN,
+    ]
+
+
+def test_android_origin_is_derived_from_the_signing_certificate() -> None:
+    assert _native_settings().webauthn_allowed_origins == [
+        "http://localhost:8000",
+        "https://sabi.example",
+        ANDROID_ORIGIN,
+    ]
+
+
+@pytest.mark.parametrize(
+    "fingerprint",
+    [
+        FINGERPRINT,
+        FINGERPRINT.lower(),
+        FINGERPRINT.replace(":", ""),
+        f"  {FINGERPRINT}  ",
+    ],
+)
+def test_fingerprint_format_is_normalised(fingerprint: str) -> None:
+    """Colons, case, and surrounding whitespace must not change the origin."""
+    settings = make_settings(
+        webauthn_rp_id="sabi.example",
+        android_cert_fingerprints=[fingerprint],
+    )
+    assert ANDROID_ORIGIN in settings.webauthn_allowed_origins
+
+
+def test_blank_fingerprints_are_skipped() -> None:
+    settings = make_settings(
+        webauthn_rp_id="sabi.example",
+        android_cert_fingerprints=["", "   ", FINGERPRINT],
+    )
+    assert settings.webauthn_allowed_origins == [
+        "http://localhost:8000",
         "https://sabi.example",
         ANDROID_ORIGIN,
     ]
@@ -92,9 +139,9 @@ def test_allowed_origins_are_deduplicated() -> None:
     settings = make_settings(
         webauthn_rp_id="sabi.example",
         webauthn_origin="https://sabi.example",
-        webauthn_native_origins=["https://sabi.example"],
+        android_cert_fingerprints=[FINGERPRINT, FINGERPRINT],
     )
-    assert settings.webauthn_allowed_origins == ["https://sabi.example"]
+    assert settings.webauthn_allowed_origins == ["https://sabi.example", ANDROID_ORIGIN]
 
 
 @pytest.mark.parametrize("origin", [ANDROID_ORIGIN, "https://sabi.example"])
