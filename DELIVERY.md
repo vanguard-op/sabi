@@ -153,6 +153,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-102 | FEAT-004 | backend-engineer | Done | — |
 | T-103 | FEAT-004 | backend-engineer | Done | — |
 | T-104 | FEAT-004 | infra-engineer | Done | — |
+| T-105 | FEAT-003, FEAT-011 | product-shaper | In Progress | — |
 
 ## Decisions log
 
@@ -207,6 +208,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-047 | The assistant never substitutes a different specific service for the one asked (never offers MTN for Airtel); it may ask a neutral disambiguating question or offer catalogue search, both of which let the user choose | Substituting a specific payee asserts ownership and risks sending money to the wrong place; asking or offering search does not | user |
 | D-048 | A repeatable, idempotent seeder loads real Nigerian services from a version-controlled data file so the owner never hand-enters the catalogue | The ungrounded-reply symptoms were partly an empty catalogue; a data file plus a script makes the catalogue reproducible per environment | user |
 | D-049 | The catalogue seed runs on every `gcp-up` from a Terraform-managed Cloud Run job, not as an ad-hoc manual job | The catalogue must exist for the assistant to ground, so it belongs to the deploy; a managed job is recreated by a fresh `up` and removed by `destroy`, unlike the hand-made job it replaces | user |
+| D-050 | The conversation is the primary control surface: Home composes and completes every task inline (payment, identity verification, receipt, failure recovery) and resolves record lookups, while the existing screens stay a fully functional alternate route; the user chooses and neither path is the fallback for the other. Only task-shaped surfaces are agent-composed; shell and static chrome stay prewritten. Supersedes the "task-first surfaces leave the conversation" framing in screens.md | The product owner's intent is chat-first access to everything, without forcing traditional click-through, while still letting a user take the screens route if they prefer it | user |
 
 ## Definition of Done
 
