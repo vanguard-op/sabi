@@ -46,3 +46,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Environment files. Only the template is committed; every filled file stays on
+# the machine. The values are public endpoints rather than secrets (NFR-024), but
+# the same rule as the repo root keeps a future secret from being committed by
+# habit. This folder-level rule takes precedence over the root .gitignore.
+.env
+.env.*
+!.env.example
