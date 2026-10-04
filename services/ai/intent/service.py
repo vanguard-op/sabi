@@ -2,9 +2,11 @@
 
 A thin adapter over :class:`~core.serving.ModelServing`:
 
-* it retrieves grounding records, renders the earlier turns of the conversation, lets
-  the pinned flash model resolve the structured intent, grounds target, amount, and
-  reference against the retrieved facts, and applies the refusal guardrail;
+* it grounds on the candidate services the gateway forwards for the request, falling
+  back to its own retrieval index when none are forwarded, renders the earlier turns of
+  the conversation, lets the pinned flash model resolve the structured intent, grounds
+  target, amount, and reference against the retrieved facts, and applies the refusal
+  guardrail;
 * below the 0.70 confidence cutoff the intent is unresolved and asks one clarifying
   question that builds on the earlier turns, up to three in one conversation, and
   never presents a payment type; at the bound it declines instead of asking again;
@@ -22,6 +24,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from core.history import ConversationTurn
+from core.retrieval import RetrievedRecord
 from core.serving import IntentResolution, ModelServing
 from intent.schemas import IntentResponse
 
@@ -52,9 +55,14 @@ class IntentService:
         locale: str = "en",
         channel: str = "app",
         history: Sequence[ConversationTurn] = (),
+        candidates: Sequence[RetrievedRecord] | None = None,
     ) -> IntentOutcome:
         result: IntentResolution = self._serving.resolve_intent(
-            text, locale=locale, channel=channel, history=history
+            text,
+            locale=locale,
+            channel=channel,
+            history=history,
+            candidates=candidates,
         )
         # Structure and outcome only; the free text of the request is never logged.
         logger.info(

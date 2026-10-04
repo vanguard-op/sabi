@@ -7,12 +7,19 @@ the client can render the intent without reshaping it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from core.history import MAX_HISTORY_TURNS
+from core.retrieval import RetrievedRecord
 from core.serving import IntentResolution
+
+# At most this many forwarded candidates are accepted into grounding. It matches the
+# retrieval breadth (RETRIEVAL_LIMIT), so a forwarded set cannot grow the prompt wider
+# than the index it replaces.
+MAX_CANDIDATES = 20
 
 
 class HistoryTurn(BaseModel):
@@ -28,13 +35,83 @@ class HistoryTurn(BaseModel):
     text: str
 
 
+class CandidateService(BaseModel):
+    """One candidate service record forwarded by the gateway.
+
+    The API gateway owns the catalogue, so on this private hop it forwards the
+    candidate services it already holds and the AI service grounds on them instead of
+    its own uninstalled index. The wire shape is the C-009 ``ServiceSummary`` the
+    gateway speaks in camelCase (D-018); the snake_case spellings the AI service uses
+    internally are also accepted so the record survives either serialisation. Fields
+    beyond the identifier are optional here because a partial record can still ground a
+    target; a candidate without a ``serviceId`` cannot be cited, so it is rejected as a
+    malformed record (the shared 400) rather than grounded on.
+    """
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    service_id: str = Field(
+        validation_alias=AliasChoices("serviceId", "service_id", "id"),
+        serialization_alias="serviceId",
+    )
+    name: str | None = None
+    collecting_body: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("collectingBody", "collecting_body"),
+    )
+    category: str | None = None
+    known_amount: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("knownAmount", "known_amount"),
+    )
+    currency: str = "NGN"
+    status: str = "active"
+    confidence: float = 0.0
+
+    def to_record(self) -> RetrievedRecord:
+        """Map the candidate to the grounding record shape the serving layer uses.
+
+        Only fields present on the forwarded record are carried; absent fields stay
+        absent so a missing amount can never be read as zero. ``confidence`` grounds
+        no fact and is intentionally dropped.
+        """
+
+        fields: dict[str, Any] = {"service_id": self.service_id, "currency": self.currency}
+        if self.name is not None:
+            fields["name"] = self.name
+        if self.collecting_body is not None:
+            fields["collecting_body"] = self.collecting_body
+        if self.category is not None:
+            fields["category"] = self.category
+        if self.known_amount is not None:
+            fields["known_amount"] = self.known_amount
+        if self.status:
+            fields["status"] = self.status
+        return RetrievedRecord(record_id=self.service_id, kind="service", fields=fields)
+
+
+def candidates_to_records(
+    candidates: Sequence[CandidateService] | None,
+) -> tuple[RetrievedRecord, ...]:
+    """Convert forwarded candidates to grounding records, preserving order."""
+
+    if not candidates:
+        return ()
+    return tuple(candidate.to_record() for candidate in candidates)
+
+
 class IntentRequest(BaseModel):
-    """The C-009 request body.
+    """The C-009 request body plus the gateway's grounding candidates.
 
     ``text`` is bounded at 200 characters here and re-checked in the router so the
     contract's 400 is returned rather than the framework default. ``locale`` and
     ``channel`` default, and an explicit unsupported value is a 400 in the router.
     ``history`` is optional, oldest first, and at most six turns.
+
+    ``candidates`` is the optional grounding set the gateway forwards on this private
+    hop; it is the authoritative retrieval set when present and is not part of the
+    client-facing C-009 request. It is capped at the retrieval breadth so a caller
+    cannot inflate the prompt, and an over-sized array is a 400 in the router.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -46,6 +123,11 @@ class IntentRequest(BaseModel):
         default=None,
         max_length=MAX_HISTORY_TURNS,
         description="earlier turns of the conversation, oldest first, at most six",
+    )
+    candidates: list[CandidateService] | None = Field(
+        default=None,
+        max_length=MAX_CANDIDATES,
+        description="grounding services forwarded by the gateway, when present",
     )
 
 

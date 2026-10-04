@@ -48,7 +48,12 @@ from core.history import (
 )
 from core.prompts import load_prompt, render
 from core.provider import ModelProvider, ModelRequest, parse_json
-from core.retrieval import RetrievalIndex, RetrievedRecord, render_untrusted_block
+from core.retrieval import (
+    KeywordRetrievalIndex,
+    RetrievalIndex,
+    RetrievedRecord,
+    render_untrusted_block,
+)
 from core.schemas import (
     CLIENT_COMPONENT_CATALOGUE,
     COMPOSITION_RESPONSE_SCHEMA,
@@ -160,6 +165,7 @@ class ModelServing:
         locale: str = "en",
         channel: str = "app",
         history: Sequence[ConversationTurn] = (),
+        candidates: Sequence[RetrievedRecord] | None = None,
         cost: TaskCost | None = None,
     ) -> IntentResolution:
         capability = Capability.INTENT_RESOLUTION
@@ -167,7 +173,11 @@ class ModelServing:
         asked = clarifying_questions_asked(history)
         records: list[RetrievedRecord] = []
         try:
-            records = list(self._retrieval.search(text, limit=RETRIEVAL_LIMIT))
+            # The gateway owns the catalogue and forwards the candidate services it
+            # already holds; when it does, those records are the authoritative
+            # grounding set and replace the service's own retrieval index. When it does
+            # not, the local index is used as before.
+            records = self._grounding_records(text, candidates)
             context = build_context(records)
             prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
@@ -230,6 +240,23 @@ class ModelServing:
                 clarifications_asked=asked,
             )
 
+    def _grounding_records(
+        self,
+        text: str,
+        candidates: Sequence[RetrievedRecord] | None,
+    ) -> list[RetrievedRecord]:
+        """The records grounding an intent: forwarded candidates, else the index.
+
+        Forwarded candidates replace the service's own retrieval index (D-043); an
+        empty forwarded list is treated as "not forwarded" rather than "no grounding",
+        so a gateway that sends nothing still degrades through the local index rather
+        than grounding on nothing.
+        """
+
+        if candidates:
+            return list(candidates)
+        return list(self._retrieval.search(text, limit=RETRIEVAL_LIMIT))
+
     def _intent_fallback(
         self,
         text: str,
@@ -240,9 +267,11 @@ class ModelServing:
         reason: str,
         clarifications_asked: int = 0,
     ) -> IntentResolution:
-        resolution: FallbackResolution = keyword_resolution(
-            text, self._retrieval, limit=MAX_RESULTS
-        )
+        # The fallback grounds on the same records the model would have seen: the
+        # forwarded candidates when present, otherwise the local index. Keyword
+        # overlap is computed over those records so a forwarded set is never bypassed.
+        fallback_index = KeywordRetrievalIndex(records) if records else self._retrieval
+        resolution: FallbackResolution = keyword_resolution(text, fallback_index, limit=MAX_RESULTS)
         logger.info("intent_fallback reason=%s", reason)
         candidates = resolution.candidates
         if not candidates and records:

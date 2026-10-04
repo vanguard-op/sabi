@@ -32,7 +32,10 @@ FLASH_MODEL_ID = "gemini-3.1-flash-lite"
 # its own version in ``PROMPT_VERSIONS`` rather than editing a shipped artifact in
 # place, so an evaluation run is always reproducible against the exact prompt text.
 PROMPT_VERSION = "v1"
-INTENT_PROMPT_VERSION = "v2"
+# Intent resolution moved to ``v3`` for a richer instruction template: a single job
+# statement, explicit failure behavior, the exact output contract, reasoning guidance
+# for narrowing follow-ups, and few-shot examples. The output JSON schema is unchanged.
+INTENT_PROMPT_VERSION = "v3"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,

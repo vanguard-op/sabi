@@ -211,6 +211,87 @@ def test_malformed_history_is_rejected_400(catalogue, history):
     assert set(error) <= {"code", "message", "details"}
 
 
+# --- Forwarded candidates (D-043) -------------------------------------------------
+
+
+def test_forwarded_candidates_ground_a_target(catalogue):
+    # The gateway forwards the candidate services it holds in the camelCase
+    # ServiceSummary shape; the model's target is grounded against them.
+    service, provider = _service(catalogue, [json_response(_intent_payload(target="svc-water"))])
+    candidates = [
+        {
+            "serviceId": "svc-water",
+            "name": "Lagos Water Corporation",
+            "collectingBody": "Lagos State Government",
+            "category": "water",
+            "knownAmount": None,
+            "currency": "NGN",
+            "status": "active",
+            "confidence": 0.9,
+        }
+    ]
+    with _client(service) as client:
+        response = client.post(
+            ENDPOINT, json={"text": "pay my water bill", "candidates": candidates}
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent"]["target"] == "svc-water"
+    assert "svc-water" in provider.last_request.contents
+
+
+def test_missing_candidates_ground_via_the_local_index(catalogue):
+    service, provider = _service(catalogue, [json_response(_intent_payload(target="svc-electric"))])
+    with _client(service) as client:
+        response = client.post(ENDPOINT, json={"text": "pay my electricity"})
+    assert response.status_code == 200
+    assert response.json()["intent"]["target"] == "svc-electric"
+    assert "svc-electric" in provider.last_request.contents
+
+
+def test_snake_case_candidates_are_also_accepted(catalogue):
+    # The AI service's internal spelling is snake_case; accept it on the same hop so
+    # the record survives either serialisation (D-018).
+    service, _ = _service(catalogue, [json_response(_intent_payload(target="svc-water"))])
+    candidates = [
+        {
+            "service_id": "svc-water",
+            "name": "Lagos Water Corporation",
+            "collecting_body": "Lagos State Government",
+            "category": "water",
+            "currency": "NGN",
+        }
+    ]
+    with _client(service) as client:
+        body = client.post(
+            ENDPOINT, json={"text": "pay my water bill", "candidates": candidates}
+        ).json()
+    assert body["intent"]["target"] == "svc-water"
+
+
+def test_candidates_without_an_identifier_are_rejected_not_grounded(catalogue):
+    service, _ = _service(catalogue, [json_response(_intent_payload(target="svc-ghost"))])
+    candidates = [{"name": "No identifier", "category": "water"}]
+    with _client(service) as client:
+        response = client.post(
+            ENDPOINT, json={"text": "pay my water bill", "candidates": candidates}
+        )
+    # A candidate missing its serviceId is a malformed record and is rejected as a
+    # contract 400 rather than silently grounding on an unidentifiable service.
+    assert response.status_code == 400
+
+
+def test_oversized_candidate_set_is_rejected_400(catalogue):
+    service, provider = _service(catalogue, [json_response(_intent_payload())])
+    candidates = [
+        {"serviceId": f"svc-{index}", "name": "x", "category": "c"} for index in range(21)
+    ]
+    with _client(service) as client:
+        response = client.post(ENDPOINT, json={"text": "pay", "candidates": candidates})
+    assert response.status_code == 400
+    assert provider.requests == []
+
+
 # --- Non-command (MQ-001) ---------------------------------------------------------
 
 

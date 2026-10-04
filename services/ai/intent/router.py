@@ -20,6 +20,12 @@ Contract conformance (CONTRACTS.md, C-009):
   builds on the answers already given, and the three-question bound is counted from
   them. A greeting or other non-command message resolves to ``non_command``: no
   clarifying question, no payment field, and nothing recorded for coverage.
+- ``candidates`` is the optional grounding set the gateway forwards on this private
+  hop: the candidate services it already holds, in the ``ServiceSummary`` shape. When
+  present it is the authoritative retrieval set for grounding and replaces the
+  service's own index, so the model can set ``target`` to a real service id (D-043);
+  when absent the local index is used as before. It is not part of the client-facing
+  C-009 request, and an over-sized set is 400.
 - The 200 body is camelCase: ``intent`` (``intentType``, ``target``, ``amount``,
   ``currency``, ``reference``, ``constraints``, ``confidence``, ``language``,
   ``clarifyingQuestion``), ``candidates`` (``serviceId``, ``name``,
@@ -40,7 +46,12 @@ from fastapi.responses import JSONResponse
 from core.history import ConversationTurn
 from intent.deps import get_intent_service
 from intent.errors import error_response
-from intent.schemas import IntentRequest, IntentResponse
+from intent.schemas import (
+    MAX_CANDIDATES,
+    IntentRequest,
+    IntentResponse,
+    candidates_to_records,
+)
 from intent.service import IntentService
 
 router = APIRouter(tags=["agent"])
@@ -69,8 +80,18 @@ def resolve_intent(
     if body.channel not in _CHANNELS:
         return error_response(400, "invalid_request", "That channel is not supported.")
 
+    raw_candidates = body.candidates or []
+    if len(raw_candidates) > MAX_CANDIDATES:
+        return error_response(400, "invalid_request", "That candidate set is too large.")
+
     history = tuple(
         ConversationTurn(role=turn.role, text=turn.text) for turn in (body.history or [])
     )
-    outcome = service.resolve(text, locale=body.locale, channel=body.channel, history=history)
+    outcome = service.resolve(
+        text,
+        locale=body.locale,
+        channel=body.channel,
+        history=history,
+        candidates=candidates_to_records(raw_candidates),
+    )
     return outcome.response

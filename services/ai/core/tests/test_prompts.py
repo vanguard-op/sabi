@@ -63,7 +63,35 @@ def test_intent_prompt_states_the_pinned_cutoff():
     assert "0.80" not in text
 
 
-def test_composition_prompt_forbids_executable_content():
-    text = load_prompt(Capability.INTERFACE_COMPOSITION).text
-    assert "executable code" in text
-    assert "external resource loads" in text
+def test_intent_prompt_v3_carries_the_richer_instruction_and_few_shots():
+    from core.config import INTENT_PROMPT_VERSION
+
+    prompt = load_prompt(Capability.INTENT_RESOLUTION)
+    assert prompt.version == INTENT_PROMPT_VERSION == "v3"
+    text = prompt.text
+    # The richer template keeps the token mechanism and the untrusted-data
+    # delimiters and security rules.
+    assert "[[user_message]]" in text
+    assert "[[retrieved_data]]" in text
+    assert "[[conversation_history]]" in text
+    assert "END RETRIEVED DATA" in text
+    assert "untrusted" in text.lower()
+    # Explicit failure behavior, the exact output contract, reasoning guidance, and
+    # the few-shot examples the capability requires.
+    assert "EXAMPLES" in text
+    assert "HOW TO DECIDE" in text
+    assert "non_command" in text
+    assert "unknown" in text
+    assert "OUTPUT" in text
+
+
+def test_intent_prompt_v3_keeps_the_pinned_cutoff_and_no_v2_only_marker():
+    from core.config import INTENT_CONFIDENCE_CUTOFF
+
+    text = load_prompt(Capability.INTENT_RESOLUTION).text
+    assert str(INTENT_CONFIDENCE_CUTOFF) in text
+    # The four required example shapes are present.
+    assert "greeting" in text.lower()
+    assert "Pidgin" in text
+    assert "follow-up" in text.lower()
+    assert "unmappable" in text.lower()

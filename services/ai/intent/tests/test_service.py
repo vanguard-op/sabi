@@ -166,3 +166,76 @@ def test_late_bound_index_uses_the_registry(catalogue, records):
         )
     finally:
         reset_retrieval_index()
+
+
+# --- Forwarded candidates (D-043) -------------------------------------------------
+
+
+def _candidate(service_id: str, name: str, **fields):
+    from core.retrieval import RetrievedRecord
+
+    return RetrievedRecord(
+        record_id=service_id,
+        kind="service",
+        fields={
+            "service_id": service_id,
+            "name": name,
+            "collecting_body": name,
+            "category": "utility",
+            "currency": "NGN",
+            "status": "active",
+            **fields,
+        },
+    )
+
+
+def test_forwarded_candidates_are_the_grounding_set(catalogue):
+    # The model's target is traceable to a forwarded record that the local index
+    # does not contain: grounding must use the forwarded set, not the index.
+    service, provider = _service(catalogue, [json_response(_intent(target="svc-forwarded"))])
+    outcome = service.resolve(
+        "pay my water bill",
+        candidates=[_candidate("svc-forwarded", "Lagos Water Corporation")],
+    )
+    assert outcome.source == "model"
+    assert outcome.response.intent.target == "svc-forwarded"
+    assert "svc-forwarded" in provider.last_request.contents
+
+
+def test_candidates_not_present_use_the_local_index_as_before(catalogue):
+    # No candidates forwarded: the local index still grounds the request.
+    service, provider = _service(catalogue, [json_response(_intent(target="svc-electric"))])
+    outcome = service.resolve("pay my electricity")
+    assert outcome.response.intent.target == "svc-electric"
+    assert "svc-electric" in provider.last_request.contents
+
+
+def test_forwarded_candidate_resolves_a_novel_target_over_the_index(catalogue):
+    # A target that only exists in the forwarded set survives grounding; a target
+    # that exists only in the local index but is not forwarded is dropped.
+    service, _ = _service(catalogue, [json_response(_intent(target="svc-landuse"))])
+    outcome = service.resolve(
+        "pay land use charge",
+        candidates=[_candidate("svc-forwarded", "Lagos Water Corporation")],
+    )
+    assert outcome.response.intent.target is None
+    assert outcome.response.intent.intentType == "unknown"
+    assert outcome.response.intent.clarifyingQuestion is not None
+
+
+def test_empty_candidates_fall_back_to_the_local_index(catalogue):
+    service, _ = _service(catalogue, [json_response(_intent(target="svc-electric"))])
+    outcome = service.resolve("pay my electricity", candidates=[])
+    assert outcome.response.intent.target == "svc-electric"
+
+
+def test_provider_failure_with_candidates_still_grounds_the_fallback(catalogue):
+    # The keyword fallback must search the forwarded set too, or a forwarded-only
+    # service could never be offered for confirmation.
+    service, _ = _service(catalogue, [ProviderUnavailable("down")])
+    outcome = service.resolve(
+        "pay my water",
+        candidates=[_candidate("svc-water", "Lagos Water Corporation")],
+    )
+    assert outcome.source == "fallback"
+    assert [item.serviceId for item in outcome.response.candidates] == ["svc-water"]
