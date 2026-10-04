@@ -25,6 +25,14 @@ dependencies:
   # stays self-hosted (C-001-C-004, D-004); the plugin only frames the request
   # and response and runs the OS prompt.
   passkeys: ^2.23.1
+  # The official Flutter GenUI SDK, the maintained renderer for A2UI v0.9
+  # (FEAT-011, D-051). The package is alpha, so every composed surface has a
+  # prewritten fallback and the task never depends on it. `json_schema_builder`
+  # and `a2ui_core` are exposed by `genui` transitively; they are declared
+  # direct because the catalog and the client-side gate import them.
+  genui: ^0.10.4
+  json_schema_builder: ^0.1.7
+  a2ui_core: ^0.1.1
 
 dev_dependencies:
   flutter_test:

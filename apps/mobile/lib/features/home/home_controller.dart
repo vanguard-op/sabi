@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../a2ui/a2ui_surface.dart';
+import '../../a2ui/providers.dart';
+import '../../a2ui/sabi_catalog.dart';
+import '../../a2ui/surface_task.dart';
 import '../../core/connectivity.dart';
 import '../../data/providers.dart';
 import '../../data/repositories.dart';
 import '../../l10n/sab_strings.dart';
-import '../../models/composed_surface.dart';
 import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
@@ -39,7 +42,7 @@ enum HomePhase {
 }
 
 /// The task a settled intent asks Home to compose inline (FEAT-011, C-012
-/// revision 1): the explicit `task` in the intent's constraints when the agent
+/// revision 2): the explicit `task` in the intent's constraints when the agent
 /// names one, else the task implied by the intent type. Null for a request that
 /// is not task-shaped, so it keeps the discovery and clarification path.
 SurfaceTask? surfaceTaskFor(IntentResult? intent) {
@@ -70,6 +73,9 @@ class ConversationTurn {
     this.afterClarificationBound = false,
     this.record,
     this.records = const [],
+    this.surface,
+    this.surfaceTask,
+    this.surfaceFailed = false,
   });
 
   /// The user's free-form request, verbatim.
@@ -105,6 +111,19 @@ class ConversationTurn {
   /// chooses which to open rather than the assistant guessing.
   final List<ResolvedRecord> records;
 
+  /// The gated A2UI surface the agent composed for this turn (C-012 revision 2).
+  /// Null when no task surface was requested or the response was refused, in
+  /// which case the screen renders the prewritten fallback for [surfaceTask].
+  final A2uiSurfaceStream? surface;
+
+  /// The task the composed surface is for, so the fallback form and the
+  /// `VALIDATION_FAILED` report use the same key.
+  final SurfaceTask? surfaceTask;
+
+  /// True when the agent's response was refused by the client gate or the SDK
+  /// could not render it, so the fallback carries the task.
+  final bool surfaceFailed;
+
   /// True when any discovery result is not currently active, so the surface can
   /// warn before a payment is started (FEAT-004, stale catalogue data).
   bool get hasInactiveCandidate =>
@@ -112,8 +131,8 @@ class ConversationTurn {
 
   /// The composed task the settled payment intent asks Home to render inline:
   /// the explicit task in the intent's constraints, else the intent type's
-  /// surface (FEAT-011, C-012 revision 1).
-  SurfaceTask? get surfaceTask => surfaceTaskFor(intent);
+  /// surface (FEAT-011, C-012 revision 2).
+  SurfaceTask? get task => surfaceTask ?? surfaceTaskFor(intent);
 
   ConversationTurn copyWith({
     HomePhase? phase,
@@ -124,6 +143,9 @@ class ConversationTurn {
     bool? afterClarificationBound,
     ResolvedRecord? record,
     List<ResolvedRecord>? records,
+    A2uiSurfaceStream? surface,
+    SurfaceTask? surfaceTask,
+    bool? surfaceFailed,
   }) => ConversationTurn(
     request: request,
     phase: phase ?? this.phase,
@@ -135,6 +157,9 @@ class ConversationTurn {
         afterClarificationBound ?? this.afterClarificationBound,
     record: record ?? this.record,
     records: records ?? this.records,
+    surface: surface ?? this.surface,
+    surfaceTask: surfaceTask ?? this.surfaceTask,
+    surfaceFailed: surfaceFailed ?? this.surfaceFailed,
   );
 }
 
@@ -223,6 +248,13 @@ class HomeState {
 
   /// The record candidates when a lookup matched more than one.
   List<ResolvedRecord> get records => current?.records ?? const [];
+
+  /// The gated A2UI surface the agent composed for the latest turn (C-012
+  /// revision 2), or null when the prewritten fallback carries the task.
+  A2uiSurfaceStream? get surface => current?.surface;
+
+  /// The task the latest turn's surface (or fallback) is for.
+  SurfaceTask? get surfaceTask => current?.task;
 }
 
 /// Recent activity for Home, loaded once and refreshable.
@@ -346,39 +378,76 @@ class HomeController extends Notifier<HomeState> {
     // lookup, identity verification, failure recovery, or payment confirmation.
     // The confidence gate below still governs an unresolved task-shaped request,
     // so an uncertain result asks a follow-up question rather than composing a
-    // surface from an ungrounded target (FEAT-003/FEAT-011, C-012 revision 1).
+    // surface from an ungrounded target (FEAT-003/FEAT-011, C-012 revision 2).
     if (intent.confidence >= intentServingConfidenceCutoff) {
       final task = surfaceTaskFor(intent);
       switch (task) {
         case SurfaceTask.receipt:
           return _lookupRecord(intent, request: request);
         case SurfaceTask.verification:
+          final surface = await _compose(
+            SurfaceTask.verification,
+            context: {
+              'title': assistantReplyFor(
+                ConversationTurn(request: request, phase: HomePhase.verifying),
+                ref.read(sabStringsProvider),
+              ),
+              'body': intent.reply,
+            },
+          );
           _updateCurrent(
             (turn) => turn.copyWith(
               phase: HomePhase.verifying,
               intent: intent,
               candidates: const [],
+              surface: surface.stream,
+              surfaceTask: SurfaceTask.verification,
+              surfaceFailed: !surface.accepted,
             ),
           );
           return null;
         case SurfaceTask.recovery:
+          final surface = await _compose(
+            SurfaceTask.recovery,
+            context: {
+              'title': ref.read(sabStringsProvider).recoveringTitle,
+              'body': intent.reply,
+              'status': intent.constraints['status']?.toString(),
+            },
+          );
           _updateCurrent(
             (turn) => turn.copyWith(
               phase: HomePhase.recovering,
               intent: intent,
               candidates: const [],
+              surface: surface.stream,
+              surfaceTask: SurfaceTask.recovery,
+              surfaceFailed: !surface.accepted,
             ),
           );
           return null;
         case SurfaceTask.confirmation:
+          final service = intent.candidates.isNotEmpty
+              ? intent.candidates.first
+              : null;
+          final surface = await _compose(
+            SurfaceTask.confirmation,
+            context: {
+              'amount': intent.amount,
+              'currency': intent.currency,
+              'payee': service?.collectingBody ?? intent.target ?? '',
+              'reference': intent.reference,
+            },
+          );
           _updateCurrent(
             (turn) => turn.copyWith(
               phase: HomePhase.confirmation,
               intent: intent,
               candidates: intent.candidates,
-              selectedService: intent.candidates.isNotEmpty
-                  ? intent.candidates.first
-                  : null,
+              selectedService: service,
+              surface: surface.stream,
+              surfaceTask: SurfaceTask.confirmation,
+              surfaceFailed: !surface.accepted,
             ),
           );
           return null;
@@ -431,11 +500,22 @@ class HomeController extends Notifier<HomeState> {
       // (FEAT-004).
       return _searchFallback(request, intent: intent);
     }
+    final surface = await _compose(
+      SurfaceTask.discovery,
+      context: {
+        'services': [
+          for (final service in intent.candidates) service.toJson(),
+        ],
+      },
+    );
     _updateCurrent(
       (turn) => turn.copyWith(
         phase: HomePhase.discovery,
         intent: intent,
         candidates: intent.candidates,
+        surface: surface.stream,
+        surfaceTask: SurfaceTask.discovery,
+        surfaceFailed: !surface.accepted,
       ),
     );
     return intent.candidates;
@@ -451,11 +531,22 @@ class HomeController extends Notifier<HomeState> {
           .read(catalogueRepositoryProvider)
           .search(request);
       if (result.results.isNotEmpty) {
+        final surface = await _compose(
+          SurfaceTask.discovery,
+          context: {
+            'services': [
+              for (final service in result.results) service.toJson(),
+            ],
+          },
+        );
         _updateCurrent(
           (turn) => turn.copyWith(
             phase: HomePhase.discovery,
             candidates: result.results,
             fromSearch: true,
+            surface: surface.stream,
+            surfaceTask: SurfaceTask.discovery,
+            surfaceFailed: !surface.accepted,
           ),
         );
         return result.results;
@@ -507,6 +598,16 @@ class HomeController extends Notifier<HomeState> {
       return null;
     }
 
+    // A single match composes its record surface inline (FEAT-011); several
+    // matches stay as the candidate list the screen renders, each composing its
+    // own surface, so the user chooses rather than the assistant guessing.
+    A2uiSurfaceStream? surface;
+    SurfaceTask? surfaceTask;
+    if (records.length == 1) {
+      surfaceTask = _recordTask(records.first);
+      surface = await _composeRecord(records.first);
+    }
+
     _updateCurrent(
       (turn) => turn.copyWith(
         phase: HomePhase.record,
@@ -514,9 +615,76 @@ class HomeController extends Notifier<HomeState> {
         candidates: const [],
         record: records.length == 1 ? records.first : null,
         records: records,
+        surface: surface,
+        surfaceTask: surfaceTask,
+        surfaceFailed: surface == null,
       ),
     );
     return null;
+  }
+
+  /// The task a resolved record composes: a receipt is the `receipt` surface,
+  /// a payment case is the `recovery` surface with its current state.
+  SurfaceTask _recordTask(ResolvedRecord record) =>
+      record.isReceipt ? SurfaceTask.receipt : SurfaceTask.recovery;
+
+  /// Composes the surface for one resolved record from the record's own fields,
+  /// so the surface shows the record and never a message (FEAT-011, Flow 9).
+  Future<A2uiSurfaceStream?> _composeRecord(ResolvedRecord record) async {
+    final receipt = record.receipt;
+    if (receipt != null) {
+      return (await _compose(
+        SurfaceTask.receipt,
+        context: {
+          'receiptId': receipt.id,
+          'reference': receipt.reference,
+          'payee': receipt.payee,
+          'amount': receipt.amount,
+          'currency': receipt.currency,
+          'issuedAt': receipt.issuedAt.toIso8601String(),
+          'kind': receipt.kind,
+          'status': receipt.status.name,
+        },
+      )).stream;
+    }
+    final paymentCase = record.caseSummary;
+    if (paymentCase != null) {
+      return (await _compose(
+        SurfaceTask.recovery,
+        context: {
+          'title': ref.read(sabStringsProvider).recoveringTitle,
+          'body': '${paymentCase.type.wire} · ${paymentCase.paymentId}',
+          'status': paymentCase.status.wire,
+        },
+      )).stream;
+    }
+    return null;
+  }
+
+  /// Asks the agent to compose [task] against the published catalog and gates
+  /// the response (FEAT-011, C-012 revision 2). A failure of any kind — a
+  /// transport error, a refused gate, or a composition fallback — returns an
+  /// unaccepted result so the caller renders the prewritten fallback for the
+  /// same task and the task stays completable.
+  Future<_Composed> _compose(
+    SurfaceTask task, {
+    required Map<String, dynamic> context,
+  }) async {
+    try {
+      final body = await ref
+          .read(surfaceRepositoryProvider)
+          .compose(SurfaceRequest(task: task, context: context));
+      // The response carries no task field (C-012: messages + fallback), so the
+      // caller's task is the authority for what surface this is.
+      final stream = A2uiGate.gate(
+        body,
+        defines: SabiCatalog.defines,
+        task: task.wire,
+      );
+      return _Composed.accepted(stream);
+    } catch (_) {
+      return const _Composed.rejected();
+    }
   }
 
   /// Re-runs the most recent request in place after a failure, keeping the
@@ -551,3 +719,14 @@ class HomeController extends Notifier<HomeState> {
 final homeControllerProvider = NotifierProvider<HomeController, HomeState>(
   HomeController.new,
 );
+
+/// The outcome of asking the agent to compose a surface: an accepted, gated
+/// stream, or a rejection that makes the caller render the prewritten fallback.
+@immutable
+class _Composed {
+  const _Composed.accepted(this.stream) : accepted = true;
+  const _Composed.rejected() : stream = null, accepted = false;
+
+  final A2uiSurfaceStream? stream;
+  final bool accepted;
+}

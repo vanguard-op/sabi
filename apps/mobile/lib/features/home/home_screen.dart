@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../components/composed_task_surface.dart';
+import '../../a2ui/a2ui_surface.dart';
+import '../../a2ui/sabi_catalog.dart';
+import '../../components/confirmation_summary.dart';
 import '../../components/empty_state.dart';
 import '../../components/error_state.dart';
 import '../../components/offline_banner.dart';
@@ -12,6 +14,7 @@ import '../../components/reauth_dialog.dart';
 import '../../components/sab_button.dart';
 import '../../components/service_result_row.dart';
 import '../../components/skeleton.dart';
+import '../../components/status_pill.dart';
 import '../../core/connectivity.dart';
 import '../../core/reauth.dart';
 import '../../data/providers.dart';
@@ -19,7 +22,6 @@ import '../../data/repositories.dart';
 import '../../design_system/icons.dart';
 import '../../design_system/tokens.dart';
 import '../../l10n/sab_strings.dart';
-import '../../models/composed_surface.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
 import 'home_controller.dart';
@@ -346,7 +348,7 @@ class _Turn extends ConsumerWidget {
             ),
           ),
           HomePhase.discovery => _Discovery(
-            candidates: turn.candidates,
+            turn: turn,
             onOpenService: onOpenService,
           ),
           HomePhase.confirmation => _Confirmation(
@@ -397,43 +399,71 @@ class _Turn extends ConsumerWidget {
   }
 }
 
-/// The composed discovery surface (FEAT-011). The agent names only catalogue
-/// components; an unknown component is refused and the fallback form keeps the
-/// task completable.
+/// The composed discovery surface (FEAT-011). The agent composes the matching
+/// Service Result Rows against the published catalog; the client renders them
+/// through the GenUI SDK. When the surface is refused or the SDK cannot render
+/// it, the same rows are rendered from the candidates the client already holds,
+/// so the task stays completable.
 class _Discovery extends StatelessWidget {
-  const _Discovery({required this.candidates, required this.onOpenService});
+  const _Discovery({
+    required this.turn,
+    required this.onOpenService,
+  });
+
+  final ConversationTurn turn;
+  final ValueChanged<String> onOpenService;
+
+  @override
+  Widget build(BuildContext context) {
+    return A2uiSurfaceView(
+      stream: turn.surface,
+      onAction: (action) {
+        if (action.name == SabiActions.selectService) {
+          final id = action.context['serviceId']?.toString();
+          if (id != null && id.isNotEmpty) onOpenService(id);
+        }
+      },
+      fallback: (context) => _DiscoveryFallback(
+        candidates: turn.candidates,
+        onOpenService: onOpenService,
+      ),
+    );
+  }
+}
+
+/// The prewritten discovery fallback: the selectable result rows the client
+/// already resolved, rendered without the SDK.
+class _DiscoveryFallback extends StatelessWidget {
+  const _DiscoveryFallback({
+    required this.candidates,
+    required this.onOpenService,
+  });
 
   final List<ServiceSummary> candidates;
   final ValueChanged<String> onOpenService;
 
   @override
   Widget build(BuildContext context) {
-    final surface = ComposedSurface(
-      surfaceId: 'discovery',
-      task: SurfaceTask.discovery,
-      fallback: 'discovery',
-      components: [
-        for (final service in candidates)
-          SurfaceComponent(
-            type: 'serviceResultRow',
-            data: {'service': service.toJson()},
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final service in candidates) ...[
+          ServiceResultRow(
+            service: service,
+            onSelect: () => onOpenService(service.serviceId),
           ),
+          const SizedBox(height: SabSpacing.sm),
+        ],
       ],
-    );
-    return ComposedTaskSurface(
-      surface: surface,
-      onServiceSelected: (service) => onOpenService(service.serviceId),
-      onFallbackAction: candidates.isEmpty
-          ? null
-          : () => onOpenService(candidates.first.serviceId),
     );
   }
 }
 
 /// The payment confirmation composed inline (FEAT-011, screens/03-home.md
-/// "Confirmation inline"). The confirmation surface carries the amount, payee,
-/// and reference; the payment screen stays an equal alternate route the user may
-/// choose instead, so the action names it rather than being the only way.
+/// "Confirmation inline"). The agent composes the confirmation surface against
+/// the published catalog; the client renders it and its own payee/amount come
+/// from the machine-actionable intent, never the reply. The payment screen stays
+/// an equal alternate route the user may choose instead.
 class _Confirmation extends ConsumerWidget {
   const _Confirmation({required this.turn, required this.onOpenService});
 
@@ -445,20 +475,6 @@ class _Confirmation extends ConsumerWidget {
     final strings = ref.watch(sabStringsProvider);
     final intent = turn.intent;
     final service = turn.selectedService;
-    final surface = ComposedSurface(
-      surfaceId: 'confirmation',
-      task: SurfaceTask.confirmation,
-      fallback: 'confirmation',
-      data: {
-        'amount': intent?.amount ?? 0,
-        'currency': intent?.currency ?? 'NGN',
-        'payee': service?.collectingBody ?? intent?.target ?? '',
-        'reference': intent?.reference,
-      },
-      components: const [
-        SurfaceComponent(type: 'confirmationSummary'),
-      ],
-    );
     final serviceId = service?.serviceId;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -467,9 +483,14 @@ class _Confirmation extends ConsumerWidget {
           _ConversationReply(text: intent!.reply!),
           const SizedBox(height: SabSpacing.md),
         ],
-        ComposedTaskSurface(
-          surface: surface,
-          fallbackPrompt: strings.confirmTitle,
+        A2uiSurfaceView(
+          stream: turn.surface,
+          fallback: (context) => ConfirmationSummary(
+            amount: intent?.amount ?? 0,
+            currency: intent?.currency ?? 'NGN',
+            payee: service?.collectingBody ?? intent?.target ?? '',
+            reference: intent?.reference,
+          ),
         ),
         // The alternate route to the same task: the payment screen. A variable
         // amount is confirmed there, so the inline surface never invents one.
@@ -485,9 +506,9 @@ class _Confirmation extends ConsumerWidget {
 }
 
 /// The identity-verification task composed inline (FEAT-011, screens/03-home.md
-/// "Verifying inline"). The task is held, not failed; the verification ceremony
-/// is completed on the existing Identity screen, which is the alternate route
-/// for the same task, and the conversation keeps the task's place.
+/// "Verifying inline"). The agent composes the verification surface; the task
+/// is held, not failed, and the ceremony is completed on the existing Identity
+/// screen, which is the alternate route for the same task.
 class _Verifying extends ConsumerWidget {
   const _Verifying({required this.turn, required this.onOpenVerification});
 
@@ -497,19 +518,24 @@ class _Verifying extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
-    return _TaskCard(
-      title: strings.verifyInlineTitle,
-      body: assistantReplyFor(turn, strings),
-      actionLabel: strings.verifyInlineAction,
-      onAction: onOpenVerification,
+    return A2uiSurfaceView(
+      stream: turn.surface,
+      onAction: (action) {
+        if (action.name == SabiActions.openVerification) onOpenVerification();
+      },
+      fallback: (context) => _TaskCard(
+        title: strings.verifyInlineTitle,
+        body: assistantReplyFor(turn, strings),
+        actionLabel: strings.verifyInlineAction,
+        onAction: onOpenVerification,
+      ),
     );
   }
 }
 
 /// The failed-payment or case recovery task composed inline (FEAT-011,
-/// screens/03-home.md "Recovering inline"). It shows the state and the next
-/// step; the case may also be opened on its screen, which is the alternate
-/// route for the same task.
+/// screens/03-home.md "Recovering inline"). The agent composes the recovery
+/// surface; the case may also be opened on its screen, the alternate route.
 class _Recovering extends ConsumerWidget {
   const _Recovering({
     required this.turn,
@@ -524,13 +550,23 @@ class _Recovering extends ConsumerWidget {
     final strings = ref.watch(sabStringsProvider);
     final caseId = turn.record?.caseSummary?.caseId;
     final record = turn.record;
-    return _TaskCard(
-      title: strings.recoveringTitle,
-      body: assistantReplyFor(turn, strings),
-      actionLabel: caseId == null ? null : strings.openCase,
-      onAction: caseId == null || record == null
-          ? null
-          : () => onOpenRecord(record),
+    return A2uiSurfaceView(
+      stream: turn.surface,
+      onAction: (action) {
+        if (action.name == SabiActions.openCase &&
+            record != null &&
+            caseId != null) {
+          onOpenRecord(record);
+        }
+      },
+      fallback: (context) => _TaskCard(
+        title: strings.recoveringTitle,
+        body: assistantReplyFor(turn, strings),
+        actionLabel: caseId == null ? null : strings.openCase,
+        onAction: caseId == null || record == null
+            ? null
+            : () => onOpenRecord(record),
+      ),
     );
   }
 }
@@ -559,7 +595,16 @@ class _RecordLookup extends ConsumerWidget {
             _ConversationReply(text: turn.intent!.reply!),
             const SizedBox(height: SabSpacing.md),
           ],
-          _RecordSurface(record: single, onOpenRecord: onOpenRecord),
+          A2uiSurfaceView(
+            stream: turn.surface,
+            onAction: (action) {
+              if (action.name == SabiActions.openRecord) {
+                onOpenRecord(single);
+              }
+            },
+            fallback: (context) =>
+                _RecordFallback(record: single, onOpenRecord: onOpenRecord),
+          ),
           if (single.isReceipt) ...[
             const SizedBox(height: SabSpacing.sm),
             SabButton(
@@ -573,7 +618,8 @@ class _RecordLookup extends ConsumerWidget {
     }
 
     // Several matches: the user chooses which to open rather than the assistant
-    // guessing. Each is a real record from the owner's own records.
+    // guessing. Each is a real record from the owner's own records, rendered as
+    // the per-record fallback form (a candidate set is not a single surface).
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -590,7 +636,7 @@ class _RecordLookup extends ConsumerWidget {
         ),
         const SizedBox(height: SabSpacing.sm),
         for (final record in turn.records) ...[
-          _RecordSurface(record: record, onOpenRecord: onOpenRecord),
+          _RecordFallback(record: record, onOpenRecord: onOpenRecord),
           const SizedBox(height: SabSpacing.sm),
         ],
       ],
@@ -598,11 +644,11 @@ class _RecordLookup extends ConsumerWidget {
   }
 }
 
-/// One resolved record as a composed surface. A receipt renders the catalogue's
-/// Receipt Card; a case renders its reference and state from the catalogue's
-/// Text and Status Pill, so the record's own fields are shown, never a message.
-class _RecordSurface extends StatelessWidget {
-  const _RecordSurface({required this.record, required this.onOpenRecord});
+/// The prewritten record fallback: a receipt renders the client's Receipt Card;
+/// a case renders its reference and state. It shows the record's own fields,
+/// never a message, and keeps the record openable.
+class _RecordFallback extends StatelessWidget {
+  const _RecordFallback({required this.record, required this.onOpenRecord});
 
   final ResolvedRecord record;
   final ValueChanged<ResolvedRecord> onOpenRecord;
@@ -611,54 +657,26 @@ class _RecordSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final receipt = record.receipt;
     if (receipt != null) {
-      final surface = ComposedSurface(
-        surfaceId: 'record_${record.id}',
-        task: SurfaceTask.receipt,
-        fallback: 'receipt',
-        data: {
-          'receipt': {
-            'id': receipt.id,
-            'reference': receipt.reference,
-            'payee': receipt.payee,
-            'amount': receipt.amount,
-            'currency': receipt.currency,
-            'issuedAt': receipt.issuedAt.toIso8601String(),
-            'kind': receipt.kind,
-            'status': receipt.status.name,
-          },
-        },
-        components: const [SurfaceComponent(type: 'receiptCard')],
-      );
       return Semantics(
         button: true,
         label: receipt.payee,
-        child: ComposedTaskSurface(
-          surface: surface,
-          onFallbackAction: () => onOpenRecord(record),
+        child: ReceiptCard(
+          receipt: receipt,
+          onTap: () => onOpenRecord(record),
         ),
       );
     }
     final paymentCase = record.caseSummary;
     if (paymentCase != null) {
-      final surface = ComposedSurface(
-        surfaceId: 'record_${record.id}',
-        task: SurfaceTask.recovery,
-        fallback: 'recovery',
-        data: {
-          'text': '${paymentCase.type.wire} · ${paymentCase.paymentId}',
-          'status': _pillStatus(paymentCase.status.wire),
-        },
-        components: const [
-          SurfaceComponent(type: 'text'),
-          SurfaceComponent(type: 'statusPill'),
-        ],
-      );
       return Semantics(
         button: true,
         label: paymentCase.caseId,
-        child: ComposedTaskSurface(
-          surface: surface,
-          onFallbackAction: () => onOpenRecord(record),
+        child: _TaskCard(
+          title: paymentCase.type.wire,
+          body: paymentCase.paymentId,
+          status: _pillStatus(paymentCase.status.wire),
+          actionLabel: '',
+          onAction: () => onOpenRecord(record),
         ),
       );
     }
@@ -675,19 +693,32 @@ String _pillStatus(String wire) => switch (wire) {
   _ => 'pending',
 };
 
+/// Maps a status-pill wire value to the [SabStatus] vocabulary.
+SabStatus _statusFrom(String wire) => switch (wire) {
+  'settled' => SabStatus.settled,
+  'failed' => SabStatus.failed,
+  'awaiting_receipt' || 'awaitingReceipt' => SabStatus.awaitingReceipt,
+  'unverified' => SabStatus.unverified,
+  'verified' => SabStatus.verified,
+  'suspended' => SabStatus.suspended,
+  _ => SabStatus.pending,
+};
+
 /// A prewritten inline task card: a titled state with a single next action.
 /// Used by the verification and recovery surfaces whose task state is text and
 /// whose completion action is a route to the equal screen.
 class _TaskCard extends StatelessWidget {
   const _TaskCard({
     required this.title,
-    required this.body,
+    this.body,
+    this.status,
     this.actionLabel,
     this.onAction,
   });
 
   final String title;
-  final String body;
+  final String? body;
+  final String? status;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -711,14 +742,20 @@ class _TaskCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: SabSpacing.xs),
-          Text(
-            body,
-            style: SabTypography.bodySmall.copyWith(
-              color: colors.textSecondary,
+          if (body != null && body!.isNotEmpty) ...[
+            const SizedBox(height: SabSpacing.xs),
+            Text(
+              body!,
+              style: SabTypography.bodySmall.copyWith(
+                color: colors.textSecondary,
+              ),
             ),
-          ),
-          if (actionLabel != null) ...[
+          ],
+          if (status != null) ...[
+            const SizedBox(height: SabSpacing.sm),
+            StatusPill(status: _statusFrom(status!)),
+          ],
+          if (actionLabel != null && actionLabel!.isNotEmpty) ...[
             const SizedBox(height: SabSpacing.sm),
             SabButton(
               label: actionLabel!,

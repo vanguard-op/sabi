@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sabi_mobile/a2ui/mock_surface_repository.dart';
+import 'package:sabi_mobile/a2ui/providers.dart';
+import 'package:sabi_mobile/a2ui/surface_task.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/data/repositories.dart';
 import 'package:sabi_mobile/features/home/home_controller.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
 import 'package:sabi_mobile/l10n/sab_strings.dart';
-import 'package:sabi_mobile/models/composed_surface.dart';
 import 'package:sabi_mobile/models/intent_result.dart';
 import 'package:sabi_mobile/models/receipt_summary.dart';
 import 'package:sabi_mobile/models/service_summary.dart';
@@ -102,6 +104,9 @@ ProviderContainer _container({
   final container = ProviderContainer(
     overrides: [
       catalogueRepositoryProvider.overrideWith((ref) => catalogue),
+      surfaceRepositoryProvider.overrideWith(
+        (ref) => MockSurfaceRepository(latency: Duration.zero),
+      ),
       if (recordLookup != null)
         recordLookupRepositoryProvider.overrideWith((ref) => recordLookup),
     ],
@@ -300,6 +305,9 @@ void main() {
           receiptRepositoryProvider.overrideWith(
             (ref) => MockReceiptRepository(receipts: const []),
           ),
+          surfaceRepositoryProvider.overrideWith(
+            (ref) => MockSurfaceRepository(latency: Duration.zero),
+          ),
         ],
       );
       await tester.pumpAndSettle();
@@ -319,12 +327,17 @@ void main() {
           receiptRepositoryProvider.overrideWith(
             (ref) => MockReceiptRepository(receipts: const []),
           ),
+          surfaceRepositoryProvider.overrideWith(
+            (ref) => MockSurfaceRepository(latency: Duration.zero),
+          ),
         ],
       );
       await tester.pumpAndSettle();
       await _submit(tester, 'pay a regulated bill');
-      expect(find.text(SabStrings.english.verifyInlineTitle), findsOneWidget);
+      // The composed surface is held, not failed, and carries the client-owned
+      // next-step action (FEAT-011).
       expect(find.text(SabStrings.english.verifyInlineAction), findsOneWidget);
+      expect(find.text(SabStrings.english.verifyInlineBody), findsOneWidget);
     });
 
     testWidgets('a record lookup renders the receipt inline', (tester) async {
@@ -340,6 +353,9 @@ void main() {
           catalogueRepositoryProvider.overrideWith((ref) => catalogue),
           receiptRepositoryProvider.overrideWith(
             (ref) => MockReceiptRepository(receipts: const []),
+          ),
+          surfaceRepositoryProvider.overrideWith(
+            (ref) => MockSurfaceRepository(latency: Duration.zero),
           ),
           recordLookupRepositoryProvider.overrideWith(
             (ref) => _ScriptedRecordLookup([
@@ -371,6 +387,9 @@ void main() {
           catalogueRepositoryProvider.overrideWith((ref) => catalogue),
           receiptRepositoryProvider.overrideWith(
             (ref) => MockReceiptRepository(receipts: const []),
+          ),
+          surfaceRepositoryProvider.overrideWith(
+            (ref) => MockSurfaceRepository(latency: Duration.zero),
           ),
           recordLookupRepositoryProvider.overrideWith(
             (ref) => _ScriptedRecordLookup(const []),

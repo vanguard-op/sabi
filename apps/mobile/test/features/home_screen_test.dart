@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sabi_mobile/components/composed_task_surface.dart';
+import 'package:sabi_mobile/a2ui/a2ui_surface.dart';
+import 'package:sabi_mobile/a2ui/mock_surface_repository.dart';
+import 'package:sabi_mobile/a2ui/providers.dart';
 import 'package:sabi_mobile/components/service_result_row.dart';
 import 'package:sabi_mobile/components/skeleton.dart';
 import 'package:sabi_mobile/core/connectivity.dart';
@@ -109,6 +111,9 @@ List<Override> _overrides({
   ),
   catalogueRepositoryProvider.overrideWith(
     (ref) => catalogue ?? MockCatalogueRepository(latency: Duration.zero),
+  ),
+  surfaceRepositoryProvider.overrideWith(
+    (ref) => MockSurfaceRepository(latency: Duration.zero),
   ),
 ];
 
@@ -327,7 +332,7 @@ void main() {
     await tester.pumpAndSettle();
     // Not auto-navigated: the composed discovery surface is shown and the row
     // is selectable (FEAT-004).
-    expect(find.byType(ComposedTaskSurface), findsOneWidget);
+    expect(find.byType(A2uiSurfaceView), findsOneWidget);
     expect(find.byType(ServiceResultRow), findsOneWidget);
     expect(find.text('MTN Nigeria'), findsOneWidget);
   });
