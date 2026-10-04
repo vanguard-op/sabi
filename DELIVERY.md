@@ -148,7 +148,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-097 | C-009 | backend-engineer | Done | — |
 | T-098 | C-009 | ai-engineer | Done | — |
 | T-099 | C-009 | frontend-engineer | Done | — |
-| T-100 | C-009 | qa-engineer | In Progress | — |
+| T-100 | C-009 | qa-engineer | Done | — |
 
 ## Decisions log
 
