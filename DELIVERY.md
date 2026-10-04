@@ -129,7 +129,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-080 | — | infra-engineer | Done | — |
 | T-081 | — | infra-engineer | Done | — |
 | T-082 | C-002, C-004, C-008 | frontend-engineer | Done | — |
-| T-083 | C-009, C-012 | backend-engineer | In Progress | — |
+| T-083 | C-009, C-012 | backend-engineer | Done | — |
 
 ## Decisions log
 
