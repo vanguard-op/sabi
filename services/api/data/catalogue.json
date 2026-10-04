@@ -1,0 +1,275 @@
+{
+  "$comment": "Seed catalogue of real Nigerian payable services. Version-controlled so every environment grounds the assistant on the same records and the owner never hand-enters them. Monetary amounts are integer minor units (kobo for NGN); known_amount is null wherever no source provides a fixed amount. Rows are upserted by name + collecting_body, case-insensitively, so this file can be edited and reloaded safely.",
+  "services": [
+    {
+      "type": "biller",
+      "name": "Ikeja Electric (IE)",
+      "collecting_body": "Ikeja Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["Ikeja Electric", "IE", "Ikeja DisCo", "IKEDC"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Eko Electricity Distribution Company (EKEDC)",
+      "collecting_body": "Eko Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["Eko DisCo", "EKEDC", "Eko Electric", "Eko Electricity"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Abuja Electricity Distribution Company (AEDC)",
+      "collecting_body": "Abuja Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["AEDC", "Abuja DisCo", "Abuja Electric", "Abuja Electricity"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Kano Electricity Distribution Company (KEDCO)",
+      "collecting_body": "Kano Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["KEDCO", "Kano DisCo", "Kano Electric"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Port Harcourt Electricity Distribution Company (PHED)",
+      "collecting_body": "Port Harcourt Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["PHED", "Port Harcourt DisCo", "PH DisCo", "Port Harcourt Electric"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Enugu Electricity Distribution Company (EEDC)",
+      "collecting_body": "Enugu Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["EEDC", "Enugu DisCo", "Enugu Electric"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Kaduna Electric (KAEDC)",
+      "collecting_body": "Kaduna Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["Kaduna Electric", "KAEDC", "Kaduna DisCo", "Kaduna Electricity"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Jos Electricity Distribution Company (JED)",
+      "collecting_body": "Jos Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["JED", "Jos DisCo", "Jos Electric", "JEDPL"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Ibadan Electricity Distribution Company (IBEDC)",
+      "collecting_body": "Ibadan Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["IBEDC", "Ibadan DisCo", "Ibadan Electric"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Benin Electricity Distribution Company (BEDC)",
+      "collecting_body": "Benin Electricity Distribution Company",
+      "category": "electricity",
+      "aliases": ["BEDC", "Benin DisCo", "Benin Electric"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "MTN Airtime",
+      "collecting_body": "MTN Nigeria",
+      "category": "airtime",
+      "aliases": ["MTN", "MTN recharge", "MTN top-up"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Airtel Airtime",
+      "collecting_body": "Airtel Nigeria",
+      "category": "airtime",
+      "aliases": ["Airtel", "Airtel recharge", "Airtel top-up", "Zain", "Celtel"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Glo Airtime",
+      "collecting_body": "Globacom",
+      "category": "airtime",
+      "aliases": ["Glo", "Globacom", "Glo recharge", "Glo top-up"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "9mobile Airtime",
+      "collecting_body": "9mobile",
+      "category": "airtime",
+      "aliases": ["9mobile", "Etisalat", "Etisalat Nigeria", "9mobile recharge"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "MTN Data",
+      "collecting_body": "MTN Nigeria",
+      "category": "data",
+      "aliases": ["MTN data", "MTN internet", "MTN bundle"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Airtel Data",
+      "collecting_body": "Airtel Nigeria",
+      "category": "data",
+      "aliases": ["Airtel data", "Airtel internet", "Airtel bundle"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "Glo Data",
+      "collecting_body": "Globacom",
+      "category": "data",
+      "aliases": ["Glo data", "Glo internet", "Glo bundle", "Globacom data"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "biller",
+      "name": "9mobile Data",
+      "collecting_body": "9mobile",
+      "category": "data",
+      "aliases": ["9mobile data", "9mobile internet", "Etisalat data"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Value Added Tax (VAT)",
+      "collecting_body": "Federal Inland Revenue Service",
+      "category": "tax",
+      "aliases": ["VAT", "Value Added Tax", "FIRS VAT"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Companies Income Tax (CIT)",
+      "collecting_body": "Federal Inland Revenue Service",
+      "category": "tax",
+      "aliases": ["CIT", "Companies Income Tax", "Company Income Tax", "FIRS CIT"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Personal Income Tax (PIT)",
+      "collecting_body": "Federal Inland Revenue Service",
+      "category": "tax",
+      "aliases": ["PIT", "Personal Income Tax", "PAYE", "Pay As You Earn"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Withholding Tax (WHT)",
+      "collecting_body": "Federal Inland Revenue Service",
+      "category": "tax",
+      "aliases": ["WHT", "Withholding Tax", "FIRS WHT"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Tertiary Education Tax (TETFund)",
+      "collecting_body": "Federal Inland Revenue Service",
+      "category": "levy",
+      "aliases": ["Tertiary Education Tax", "Education Tax", "TETFund", "TETFUND", "ET"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "National Information Technology Development Levy (NITDA)",
+      "collecting_body": "National Information Technology Development Agency",
+      "category": "levy",
+      "aliases": ["NITDA Levy", "IT Levy", "NITDA", "Information Technology Levy"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Nigeria Police Force Character Certificate",
+      "collecting_body": "Nigeria Police Force",
+      "category": "fee",
+      "aliases": ["Police Character Certificate", "Police Clearance", "NPF Character Certificate"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "International Passport Application Fee",
+      "collecting_body": "Nigeria Immigration Service",
+      "category": "fee",
+      "aliases": ["Passport Fee", "NIS Passport", "Immigration Passport Fee", "Passport Application"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    },
+    {
+      "type": "government",
+      "name": "Vehicle Licence (Annual)",
+      "collecting_body": "Federal Road Safety Corps",
+      "category": "fee",
+      "aliases": ["Vehicle Licence", "Road Tax", "FRSC Vehicle Licence", "Annual Vehicle Licence"],
+      "known_amount": null,
+      "currency": "NGN",
+      "status": "active"
+    }
+  ]
+}
