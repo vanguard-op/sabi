@@ -179,7 +179,7 @@ jobs:
             echo "## Sabi staging is up"
             echo
             echo "### Service URLs"
-            terraform -chdir="${TF_DIR}" output -raw urls
+            terraform -chdir="${TF_DIR}" output -json urls
             echo
             echo "### DNS records to add at Namecheap"
             terraform -chdir="${TF_DIR}" output -json dns_records
@@ -188,4 +188,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show the service URLs in the log
-        run: terraform -chdir="${TF_DIR}" output -raw urls
+        # `urls` is an object, so it needs -json; -raw only accepts a scalar.
+        run: terraform -chdir="${TF_DIR}" output -json urls
