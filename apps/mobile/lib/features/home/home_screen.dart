@@ -383,18 +383,23 @@ class _Clarification extends ConsumerWidget {
               style: SabTypography.body.copyWith(color: colors.info900),
             ),
           ],
-          const SizedBox(height: SabSpacing.md),
-          Text(
-            strings.candidates.toUpperCase(),
-            style: SabTypography.caption.copyWith(color: colors.info900),
-          ),
-          const SizedBox(height: SabSpacing.sm),
-          for (final service in candidates) ...[
-            ServiceResultRow(
-              service: service,
-              onSelect: () => onOpenService(service.serviceId),
+          // A no-candidate clarification is just the question: the "Closest
+          // matches" caption and its spacing carry no information and would
+          // render as an empty label, so they only appear with candidates.
+          if (candidates.isNotEmpty) ...[
+            const SizedBox(height: SabSpacing.md),
+            Text(
+              strings.candidates.toUpperCase(),
+              style: SabTypography.caption.copyWith(color: colors.info900),
             ),
             const SizedBox(height: SabSpacing.sm),
+            for (final service in candidates) ...[
+              ServiceResultRow(
+                service: service,
+                onSelect: () => onOpenService(service.serviceId),
+              ),
+              const SizedBox(height: SabSpacing.sm),
+            ],
           ],
         ],
       ),

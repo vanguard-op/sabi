@@ -217,4 +217,38 @@ void main() {
     expect(find.text('What would you like to pay for?'), findsOneWidget);
     expect(find.text('Not covered yet'), findsNothing);
   });
+
+  testWidgets(
+    'a no-candidate clarification hides the closest-matches caption',
+    (tester) async {
+      final catalogue = _ScriptedCatalogue(
+        intents: const [
+          IntentResult(
+            intentType: 'unknown',
+            confidence: 0.5,
+            clarifyingQuestion: 'What would you like to pay for?',
+          ),
+        ],
+      );
+      await pumpSab(
+        tester,
+        const HomeScreen(),
+        overrides: [
+          catalogueRepositoryProvider.overrideWith((ref) => catalogue),
+          receiptRepositoryProvider.overrideWith(
+            (ref) => MockReceiptRepository(receipts: const []),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Hello');
+      await tester.pump();
+      await tester.tap(_sendButton);
+      await tester.pumpAndSettle();
+      // The question is rendered, but with no candidates there is nothing to
+      // label, so the caption must not appear as an empty heading.
+      expect(find.text('What would you like to pay for?'), findsOneWidget);
+      expect(find.text('CLOSEST MATCHES'), findsNothing);
+    },
+  );
 }
