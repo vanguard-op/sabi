@@ -133,6 +133,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-084 | C-009 | frontend-engineer | Done | — |
 | T-085 | FEAT-003 | product-shaper | Done | — |
 | T-086 | C-009 | frontend-engineer | Done | — |
+| T-087 | C-009 | backend-engineer | In Progress | — |
+| T-088 | C-009 | ai-engineer | In Progress | — |
+| T-089 | C-009 | frontend-engineer | In Progress | — |
+| T-090 | FEAT-003 | product-shaper | Ready | — |
 
 ## Decisions log
 
@@ -179,6 +183,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-039 | The live client carries the session cookie itself and persists it in platform secure storage, restoring and verifying it on launch | Native Flutter has no browser cookie jar, so the HttpOnly session cookie set by C-002/C-004 was dropped and every authenticated call 401'd. Secure storage is the native equivalent of the browser jar and keeps NFR-026's 30-day session across app restarts | user |
 | D-040 | Hosted private-service identity tokens are minted with `google.oauth2.id_token.fetch_id_token` (metadata-server path), not by signing with a service-account key | On Cloud Run, `google.auth.default()` returns compute-engine credentials with no `.signer`, so the JWT-encode path raised `AttributeError` and every gateway→AI/payments hop returned 500. The metadata id_token path is Google's documented service-to-service method and needs no key file | lead |
 | D-041 | The assistant converses across multiple turns to resolve intent (a representative that asks follow-ups), superseding the single-clarifying-question rule; the BPRD and C-009 are updated before the implementation | The product owner wants the LLM used conversationally rather than as a one-shot command parser, and "Hello" exposed that non-command input dead-ends at "not covered"; the current BPRD mandates exactly one turn, so the behaviour change is a spec update first | user |
+| D-042 | The assistant's memory is conversation-only for now (turns within one exchange, carried by C-009 `history`); account grounding (receipts/obligations as cited context) and long-term memory (corrections/decisions/preferences across sessions) are specified as separate features before any build | The product owner asked whether the assistant would remember past actions, receipts, and decisions. The BPRD grounds every fact in the source and has no memory entity, and durable memory is personal data under NDPA, so it is a spec-first feature rather than an assumption | user |
 
 ## Definition of Done
 
