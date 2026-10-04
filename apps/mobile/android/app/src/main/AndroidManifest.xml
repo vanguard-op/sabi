@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The live client reaches the API gateway over HTTPS (architecture.md
+         "API Gateway / Backend-for-Frontend"; NFR-024 keeps only public
+         endpoints in the client). Without this the release socket cannot open
+         and every screen falls back to its offline state. The staging gateway
+         is HTTPS, so no cleartext-traffic exception is declared. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Passkey relying party (FEAT-001, D-004, D-028).
          The RP origin serves https://<webauthn_rp_id>/.well-known/assetlinks.json
          naming this app as a target:
