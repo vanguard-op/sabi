@@ -145,9 +145,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-094 | FEAT-003, FEAT-004 | product-shaper | In Progress | — |
 | T-095 | — | backend-engineer | Done | — |
 | T-096 | FEAT-003, FEAT-004 | product-shaper | Done | — |
-| T-097 | C-009 | backend-engineer | In Progress | — |
-| T-098 | C-009 | ai-engineer | In Progress | — |
-| T-099 | C-009 | frontend-engineer | In Progress | — |
+| T-097 | C-009 | backend-engineer | Done | — |
+| T-098 | C-009 | ai-engineer | Done | — |
+| T-099 | C-009 | frontend-engineer | Done | — |
+| T-100 | C-009 | qa-engineer | In Progress | — |
 
 ## Decisions log
 
