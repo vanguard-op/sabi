@@ -24,6 +24,7 @@ venv_activate = $(if $(wildcard $(1)/.venv/bin/python),PATH="$(CURDIR)/$(1)/.ven
 .PHONY: help setup up down reset logs ps migrate \
         backend-dev backend-serve ai-dev ai-serve mobile-dev mobile-build \
         test test-backend test-ai test-mobile test-integration test-model-quality \
+        catalog-generate catalog-check \
         lint lint-backend lint-ai lint-mobile format format-backend format-ai check \
         tf-init tf-fmt tf-validate tf-plan tf-apply tf-destroy \
         gcp-init gcp-fmt gcp-validate gcp-plan gcp-apply gcp-up gcp-stop gcp-destroy
@@ -89,6 +90,18 @@ test-mobile: ## Run Flutter tests
 
 test: test-backend test-ai test-mobile ## Run every test suite
 
+# --- Sabi A2UI catalog (one authored copy) ---
+# The catalog is authored once in apps/mobile/lib/a2ui/sabi_catalog_document.dart
+# and generated into services/ai/core/catalogs/sabi_a2ui_v1.json, which the AI
+# service ships (FEAT-011). `catalog-check` fails when the committed JSON and the
+# authored Dart document disagree; run `catalog-generate` to rewrite the JSON.
+# No database, secret, or provider is needed: this is a plain Dart script.
+catalog-generate: ## Regenerate the AI catalog JSON from the authored Dart document
+	@if [ -d apps/mobile ]; then cd apps/mobile && dart run lib/a2ui/generate_catalog.dart --write; else echo "skip: apps/mobile not present"; fi
+
+catalog-check: ## Fail if the AI catalog JSON has drifted from the authored Dart document
+	@if [ -d apps/mobile ]; then cd apps/mobile && dart run lib/a2ui/generate_catalog.dart --check; else echo "skip: apps/mobile not present"; fi
+
 # --- Integration suite (cross-service, tests/**) ---
 # The API and AI services each expose a top-level `app` package, so they cannot
 # share one interpreter: each directory is run from its own service root, as
@@ -130,7 +143,7 @@ format-ai: ## Auto-format the AI service
 
 format: format-backend format-ai ## Auto-format every Python service
 
-check: lint test test-integration ## What CI runs: lint, per-service unit suites, integration gate
+check: lint test test-integration catalog-check ## What CI runs: lint, per-service unit suites, integration gate, catalog drift guard
 
 # --- Deployment (infra/terraform) ---
 # Real variable and backend values live outside the repo; copy the *.example

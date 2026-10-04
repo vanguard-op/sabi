@@ -13,6 +13,7 @@ import '../design_system/tokens.dart';
 import '../l10n/sab_strings.dart';
 import '../models/receipt_summary.dart';
 import '../models/service_summary.dart';
+import 'sabi_catalog_document.dart';
 
 /// The Sabi A2UI catalog (FEAT-011, C-012 revision 2).
 ///
@@ -34,7 +35,10 @@ abstract final class SabiCatalog {
   /// The catalog URI. Per A2UI, `catalogId` and the schema document's `$id`
   /// are the same URI; the major version is carried in the path (v1), and the
   /// catalog evolves additively within it (A2UI "Catalog Naming & Versioning").
-  static const String catalogId = 'https://sabi.app/a2ui/v1/catalog.json';
+  ///
+  /// The single authored definition lives in `sabi_catalog_document.dart`; this
+  /// is a `const` alias so call sites can keep using it in constant contexts.
+  static const String catalogId = sabiCatalogId;
 
   /// The task surfaces the catalog exposes. Each maps to exactly one component
   /// the client renders, so an unknown component is anything outside this set.
@@ -53,17 +57,12 @@ abstract final class SabiCatalog {
   static const SabComponentName verification = SabComponentName('Verification');
   static const SabComponentName recovery = SabComponentName('Recovery');
 
-  /// The canonical component names, in catalog order.
-  static const List<String> componentNames = [
-    'ConfirmationSummary',
-    'AmountEntry',
-    'ProviderPicker',
-    'ServiceResultRow',
-    'ReceiptCard',
-    'StatusPill',
-    'Verification',
-    'Recovery',
-  ];
+  /// The canonical component names, in catalog order, read from the single
+  /// authored document so the set can never drift from it.
+  static final List<String> componentNames = (document()['components'] as Map)
+      .keys
+      .cast<String>()
+      .toList(growable: false);
 
   /// Whether [name] is a component the catalog defines. Used by the client-side
   /// validation to refuse an unknown component and fall back for the task.
@@ -73,138 +72,11 @@ abstract final class SabiCatalog {
   /// [catalogId] and whose `components` mirror the renderer's items. A2UI
   /// catalogs must be freestanding (no external `$ref`s), so this is the exact
   /// document the agent composes against and the client validates with.
-  static Map<String, Object?> document() => {
-    r'$schema': 'https://json-schema.org/draft/2020-12/schema',
-    r'$id': catalogId,
-    'catalogId': catalogId,
-    'title': 'Sabi A2UI Catalog',
-    'description':
-        'The Sabi client composed-surface catalog: the confirmation summary, '
-        'amount entry, provider picker, service result row, receipt card, '
-        'status pill, verification, and recovery surfaces (FEAT-011).',
-    'components': {
-      'ConfirmationSummary': {
-        'type': 'object',
-        'description':
-            'A payment confirmation: amount, payee, charges, and reference.',
-        'properties': {
-          'amount': {'type': 'integer', 'description': 'Minor units (kobo).'},
-          'currency': {'type': 'string', 'default': 'NGN'},
-          'payee': {'type': 'string'},
-          'charges': {'type': ['integer', 'null']},
-          'reference': {'type': ['string', 'null']},
-        },
-        'required': ['amount', 'payee'],
-        'additionalProperties': true,
-      },
-      'AmountEntry': {
-        'type': 'object',
-        'description':
-            'Requests a variable amount for the resolved obligation.',
-        'properties': {
-          'currency': {'type': 'string', 'default': 'NGN'},
-          'minimum': {'type': ['integer', 'null']},
-          'maximum': {'type': ['integer', 'null']},
-          'prompt': {'type': ['string', 'null']},
-        },
-        'required': [],
-        'additionalProperties': true,
-      },
-      'ProviderPicker': {
-        'type': 'object',
-        'description':
-            'A choice among several matching collecting bodies. Each service '
-            'is a ServiceResultRow-shaped object.',
-        'properties': {
-          'services': {
-            'type': 'array',
-            'items': {r'$ref': '#/components/ServiceResultRow'},
-          },
-        },
-        'required': ['services'],
-        'additionalProperties': true,
-      },
-      'ServiceResultRow': {
-        'type': 'object',
-        'description': 'One discovery result: collecting body and obligation.',
-        'properties': {
-          'serviceId': {'type': 'string'},
-          'name': {'type': 'string'},
-          'collectingBody': {'type': 'string'},
-          'category': {'type': 'string'},
-          'knownAmount': {'type': ['integer', 'null']},
-          'currency': {'type': 'string', 'default': 'NGN'},
-          'status': {'type': 'string', 'default': 'active'},
-          'confidence': {'type': 'number'},
-        },
-        'required': ['serviceId', 'collectingBody', 'category'],
-        'additionalProperties': true,
-      },
-      'ReceiptCard': {
-        'type': 'object',
-        'description': 'A resolved record or post-payment receipt.',
-        'properties': {
-          'receiptId': {'type': 'string'},
-          'reference': {'type': 'string'},
-          'payee': {'type': 'string'},
-          'amount': {'type': 'integer', 'description': 'Minor units (kobo).'},
-          'currency': {'type': 'string', 'default': 'NGN'},
-          'issuedAt': {'type': 'string'},
-          'kind': {'type': 'string'},
-          'status': {'type': 'string'},
-        },
-        'required': ['reference', 'payee', 'amount'],
-        'additionalProperties': true,
-      },
-      'StatusPill': {
-        'type': 'object',
-        'description':
-            'A payment state. Colour is never the only signal: the pill pairs '
-            'a semantic colour with a glyph and a label.',
-        'properties': {
-          'status': {
-            'type': 'string',
-            'description':
-                'Open enum: pending, settled, failed, awaitingReceipt, '
-                'unverified, verified, suspended. Unknown variants render as '
-                'pending (A2UI open enums).',
-              },
-          'label': {'type': ['string', 'null']},
-        },
-        'required': ['status'],
-        'additionalProperties': true,
-      },
-      'Verification': {
-        'type': 'object',
-        'description':
-            'An identity-verification task held in the conversation. The task '
-            'is held, not failed, and resumes once verification succeeds.',
-        'properties': {
-          'title': {'type': 'string'},
-          'body': {'type': ['string', 'null']},
-          'actionLabel': {'type': ['string', 'null']},
-        },
-        'required': ['title'],
-        'additionalProperties': true,
-      },
-      'Recovery': {
-        'type': 'object',
-        'description':
-            'A failed-payment or case recovery task: the current state and '
-            'the next step.',
-        'properties': {
-          'title': {'type': 'string'},
-          'body': {'type': ['string', 'null']},
-          'status': {'type': ['string', 'null']},
-          'actionLabel': {'type': ['string', 'null']},
-        },
-        'required': ['title'],
-        'additionalProperties': true,
-      },
-    },
-    'styles': <String, Object?>{},
-    'functions': <String, Object?>{},
-  };
+  ///
+  /// The document is authored once in `sabi_catalog_document.dart` and generated
+  /// into `services/ai/core/catalogs/sabi_a2ui_v1.json` at build time, so there
+  /// is exactly one catalog to edit.
+  static Map<String, Object?> document() => buildSabiCatalogDocument();
 
   /// The catalog document serialised for the wire or for inspection.
   static String documentJson() => jsonEncode(document());

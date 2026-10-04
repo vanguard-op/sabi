@@ -182,6 +182,11 @@ jobs:
       - name: Analyze
         run: make lint-mobile
 
+      - name: Catalog drift guard
+        # The Sabi A2UI catalog is authored once in Dart and generated into the
+        # AI service's JSON; this fails if the two ever disagree (FEAT-011).
+        run: make catalog-check
+
       - name: Test
         run: make test-mobile
 
