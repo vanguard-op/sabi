@@ -38,6 +38,12 @@ PROMPT_VERSION = "v1"
 # request locale is bound as the language to reply in. The v3 template held the
 # structured-only contract (``language``/``clarifying_question`` in the object).
 INTENT_PROMPT_VERSION = "v4"
+# Interface composition moved to ``v2`` when the composed surface became the task
+# mechanism for every task and record type (MQ-003, FEAT-011): the task enum gained
+# ``verification`` and ``recovery``, and ``receipt`` now also composes a resolved
+# record the user asked about, not only a post-payment service payment. The v1
+# template named only confirmation, amount entry, receipt, and discovery.
+INTERFACE_COMPOSITION_PROMPT_VERSION = "v2"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,
@@ -81,6 +87,7 @@ CAPABILITY_MODEL_PATH: Mapping[Capability, ModelPath] = {
 # capabilities remain on the shared default.
 PROMPT_VERSIONS: Mapping[Capability, str] = {
     Capability.INTENT_RESOLUTION: INTENT_PROMPT_VERSION,
+    Capability.INTERFACE_COMPOSITION: INTERFACE_COMPOSITION_PROMPT_VERSION,
 }
 
 

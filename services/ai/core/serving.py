@@ -404,6 +404,11 @@ class ModelServing:
     ) -> CompositionOutcome:
         capability = Capability.INTERFACE_COMPOSITION
         task_cost = cost or self._begin(capability)
+        # A known task falls back to its own client form; an out-of-vocabulary task
+        # (the router answers 400 before reaching here) falls back to confirmation so
+        # the outcome always names a real task. The context is unmodified untrusted
+        # data: a `receipt` task carries a resolved record reference from a record
+        # lookup the same way it carries a post-payment payment's fields.
         fallback_key = task if task in FALLBACK_TASKS else "confirmation"
         try:
             prompt = load_prompt(capability, self._version_for(capability))

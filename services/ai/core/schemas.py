@@ -276,7 +276,15 @@ CLIENT_COMPONENT_CATALOGUE: frozenset[str] = frozenset(
     }
 )
 
-FALLBACK_TASKS: frozenset[str] = frozenset({"confirmation", "amount_entry", "receipt", "discovery"})
+# The task-shaped surfaces the agent composes (C-012, FEAT-011). Every task has a
+# client fallback form, so a known task is exactly one that has a fallback. The
+# `receipt` task covers both a post-payment receipt and a resolved record the user
+# asked about: the task is the same and the resolved record reference rides in the
+# request `context`. The prewritten shell (composer, navigation, static chrome) is
+# never a task and never composed (FEAT-011).
+FALLBACK_TASKS: frozenset[str] = frozenset(
+    {"confirmation", "amount_entry", "receipt", "discovery", "verification", "recovery"}
+)
 
 
 # --- Provider response schemas ---------------------------------------------------

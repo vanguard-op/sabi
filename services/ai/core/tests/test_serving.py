@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from core.config import FLASH_MODEL_ID, INTENT_PROMPT_VERSION
 from core.errors import ProviderUnavailable
 from core.history import ConversationTurn
@@ -255,6 +257,35 @@ def test_compose_surface_returns_a_validated_stream(catalogue):
     assert outcome.messages
     assert outcome.fallback == "confirmation"
     assert provider.last_request.prompt_id == "interface_composition"
+
+
+@pytest.mark.parametrize("task", ["verification", "recovery"])
+def test_compose_surface_accepts_the_new_tasks(catalogue, task):
+    payload = {
+        "messages": [
+            {"type": "createSurface", "surfaceId": "s1", "task": task},
+            {"type": "updateComponents", "components": [{"component": "StatusPill", "id": "c1"}]},
+        ]
+    }
+    serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
+    outcome = serving.compose_surface(task, {"state": "pending"})
+    assert outcome.source == "model"
+    assert outcome.fallback == task
+    assert task in provider.last_request.contents
+
+
+def test_compose_surface_receipt_carries_a_resolved_record(catalogue):
+    payload = {
+        "messages": [
+            {"type": "createSurface", "surfaceId": "s1", "task": "receipt"},
+            {"type": "updateComponents", "components": [{"component": "ReceiptCard", "id": "c1"}]},
+        ]
+    }
+    serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
+    outcome = serving.compose_surface("receipt", {"reference": "FT-1", "receiptId": "rcpt-1"})
+    assert outcome.source == "model"
+    assert outcome.fallback == "receipt"
+    assert "FT-1" in provider.last_request.contents
 
 
 def test_compose_surface_rejects_an_unknown_component(catalogue):

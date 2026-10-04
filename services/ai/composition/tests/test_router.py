@@ -9,9 +9,55 @@ from __future__ import annotations
 from composition.tests.conftest import build_test_client
 from core.config import PRIMARY_MODEL_ID
 from core.errors import ProviderUnavailable
+from core.schemas import FALLBACK_TASKS
 from core.testing import json_response
 
 _HEADERS = {"Content-Type": "application/json"}
+
+
+def _verification_stream() -> dict:
+    return {
+        "messages": [
+            {"type": "createSurface", "surfaceId": "verify-1", "task": "verification"},
+            {
+                "type": "updateComponents",
+                "components": [
+                    {"component": "StatusPill", "id": "status"},
+                    {"component": "ConfirmationSummary", "id": "details"},
+                ],
+            },
+            {"type": "updateDataModel", "data": {"status": "unverified"}},
+        ]
+    }
+
+
+def _recovery_stream() -> dict:
+    return {
+        "messages": [
+            {"type": "createSurface", "surfaceId": "case-1", "task": "recovery"},
+            {
+                "type": "updateComponents",
+                "components": [
+                    {"component": "StatusPill", "id": "status"},
+                    {"component": "ConfirmationSummary", "id": "payment"},
+                ],
+            },
+            {"type": "updateDataModel", "data": {"caseReference": "CASE-7", "state": "refunding"}},
+        ]
+    }
+
+
+def _record_receipt_stream() -> dict:
+    return {
+        "messages": [
+            {"type": "createSurface", "surfaceId": "receipt-1", "task": "receipt"},
+            {
+                "type": "updateComponents",
+                "components": [{"component": "ReceiptCard", "id": "receipt"}],
+            },
+            {"type": "updateDataModel", "data": {"receiptId": "rcpt-9", "kind": "token"}},
+        ]
+    }
 
 
 def _valid_stream() -> dict:
@@ -46,6 +92,87 @@ def test_composes_a_catalogue_valid_surface() -> None:
     assert body["fallback"] == "confirmation"
 
 
+def test_composes_a_verification_surface() -> None:
+    client, provider = build_test_client(
+        [json_response(_verification_stream(), model_id=PRIMARY_MODEL_ID)]
+    )
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={"task": "verification", "context": {"status": "unverified"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fallback"] == "verification"
+    assert body["messages"][0]["task"] == "verification"
+    assert "verification" in provider.last_request.contents
+
+
+def test_composes_a_recovery_surface() -> None:
+    client, _ = build_test_client([json_response(_recovery_stream(), model_id=PRIMARY_MODEL_ID)])
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={"task": "recovery", "context": {"caseReference": "CASE-7"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fallback"] == "recovery"
+    assert [message["type"] for message in body["messages"]] == [
+        "createSurface",
+        "updateComponents",
+        "updateDataModel",
+    ]
+
+
+def test_receipt_accepts_a_resolved_record_context() -> None:
+    """A `receipt` task composes a resolved record, not only a post-payment payment.
+
+    The context carries a record reference from a record lookup; the resolved record's
+    own fields reach the prompt unmodified (FEAT-011, MQ-003 contract impact).
+    """
+
+    client, provider = build_test_client(
+        [json_response(_record_receipt_stream(), model_id=PRIMARY_MODEL_ID)]
+    )
+    context = {"recordKind": "receipt", "reference": "FT-2026-1", "receiptId": "rcpt-9"}
+    response = client.post("/v1/agent/surfaces", json={"task": "receipt", "context": context})
+    assert response.status_code == 200
+    assert response.json()["fallback"] == "receipt"
+    request_contents = provider.last_request.contents
+    assert "FT-2026-1" in request_contents
+    assert "rcpt-9" in request_contents
+
+
+def test_every_contract_task_is_accepted() -> None:
+    """Every C-012 task (including verification and recovery) is a known task."""
+
+    assert FALLBACK_TASKS == {
+        "confirmation",
+        "amount_entry",
+        "receipt",
+        "discovery",
+        "verification",
+        "recovery",
+    }
+    for task in sorted(FALLBACK_TASKS):
+        client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
+        response = client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
+        assert response.status_code == 200, task
+        assert response.json()["fallback"] == task
+
+
+def test_invalid_composition_keeps_the_new_task_fallback() -> None:
+    payload = {
+        "messages": [
+            {"type": "updateComponents", "components": [{"component": "EvilWidget", "id": "x"}]}
+        ]
+    }
+    client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
+    for task in ("verification", "recovery"):
+        response = client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
+        assert response.status_code == 200
+        assert response.json() == {"messages": [], "fallback": task}
+
+
 def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     client, provider = build_test_client(
         [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
@@ -54,7 +181,7 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     request = provider.last_request
     assert request.model_id == PRIMARY_MODEL_ID
     assert request.prompt_id == "interface_composition"
-    assert request.prompt_version == "v1"
+    assert request.prompt_version == "v2"
     assert request.decoding.temperature == 0.0
     assert "receipt" in request.contents
 

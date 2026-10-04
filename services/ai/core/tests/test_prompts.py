@@ -109,3 +109,23 @@ def test_intent_prompt_v4_keeps_the_pinned_cutoff_and_example_shapes():
     assert "Pidgin" in text
     assert "follow-up" in text.lower()
     assert "unmappable" in text.lower()
+
+
+def test_composition_prompt_v2_carries_the_expanded_task_set():
+    from core.config import INTERFACE_COMPOSITION_PROMPT_VERSION
+
+    prompt = load_prompt(Capability.INTERFACE_COMPOSITION)
+    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v2"
+    text = prompt.text
+    # The composed surface is the task mechanism for every task and record type: the
+    # task enum gained verification and recovery, and receipt also composes a resolved
+    # record. The template keeps the token mechanism and the security rules.
+    assert "[[allowed_components]]" in text
+    assert "[[task]]" in text
+    assert "[[context]]" in text
+    assert "verification" in text
+    assert "recovery" in text
+    assert "untrusted" in text.lower()
+    assert "Never request a component outside" in text
+    assert "record lookup" in text
+    assert "prewritten" in text.lower()

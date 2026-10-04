@@ -1,9 +1,12 @@
 """Composed task surface endpoint (C-012, FEAT-011, MQ-003).
 
-The agent composes a task interface (confirmation, amount entry, receipt, or
-discovery) from the client's component catalogue as a declarative UI stream. The
-client renders natively; the agent never requests a component outside the
-catalogue, and never embeds executable content.
+The agent composes a task interface from the client's component catalogue as a
+declarative UI stream: service payment (confirmation, amount entry), discovery,
+identity verification, failed-payment or case recovery, and the composed rendering
+of a resolved record the user asked about (a receipt task whose context carries a
+resolved record reference from a record lookup, not only a post-payment service
+payment). The client renders natively; the agent never requests a component outside
+the catalogue, and never embeds executable content.
 
 This is a private model-serving surface behind the API gateway: the mobile client
 reaches the gateway, which enforces session authentication and rate limiting before
@@ -29,7 +32,8 @@ from core.serving import ModelServing
 router = APIRouter(tags=["composition"])
 
 # Every task has a client fallback (screens.md, "Composed Task Surface"), so a
-# known task is exactly one that has a fallback form.
+# known task is exactly one that has a fallback form: confirmation, amount_entry,
+# receipt, discovery, verification, recovery (C-012, FEAT-011).
 _KNOWN_TASKS = FALLBACK_TASKS
 
 _serving = Depends(get_serving)
