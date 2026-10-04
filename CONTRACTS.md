@@ -82,9 +82,9 @@ Response 200: service: Service
 Errors: 404 (unknown service)
 
 ### C-012: POST /v1/agent/surfaces
-Status: Implemented
+Status: Frozen (revision 1)
 Auth: Session cookie (authenticated account owner)
-Request: task: string (confirmation|amount_entry|receipt|discovery), context: object
+Request: task: string (confirmation|amount_entry|receipt|discovery|verification|recovery), context: object (for `receipt`, may carry a resolved record reference from a record lookup instead of a post-payment service payment)
 Response 200: messages: array of object (declarative UI messages: createSurface | updateComponents | updateDataModel), fallback: string (task key)
 Errors: 200 with fallback on invalid composition, 400 (unknown task), 429 (rate limited)
 
