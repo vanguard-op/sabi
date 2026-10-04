@@ -82,11 +82,11 @@ Response 200: service: Service
 Errors: 404 (unknown service)
 
 ### C-012: POST /v1/agent/surfaces
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: Session cookie (authenticated account owner)
-Request: task: string (confirmation|amount_entry|receipt|discovery|verification|recovery), context: object (for `receipt`, may carry a resolved record reference from a record lookup instead of a post-payment service payment)
-Response 200: messages: array of object (declarative UI messages: createSurface | updateComponents | updateDataModel), fallback: string (task key)
-Errors: 200 with fallback on invalid composition, 400 (unknown task), 429 (rate limited)
+Request: task: string (confirmation|amount_entry|receipt|discovery|verification|recovery), context: object (for `receipt`, may carry a resolved record reference from a record lookup instead of a post-payment service payment), catalogId: string (the client's published Sabi A2UI catalog, negotiated from supportedCatalogIds)
+Response 200: messages: array of object (A2UI message stream conforming to the published catalog: createSurface | updateComponents | updateDataModel), fallback: string (task key)
+Errors: 200 with fallback on invalid composition, unknown component, or no compatible catalog; 400 (unknown task), 429 (rate limited)
 
 ### C-013: POST /v1/providers
 Status: Implemented

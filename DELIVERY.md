@@ -49,7 +49,7 @@ docs/                 source of truth (git submodule)
 
 ## Contracts
 
-`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044). C-009 at revision 4 (conversational `reply`, reduced machine-actionable intent, `non_command`); C-012 at revision 1 (`verification`/`recovery` tasks, a resolved-record `receipt` context).
+`CONTRACTS.md` — C-001–C-044: Phase 1 identity/catalogue (C-001–C-016), Phase 2 payment loop (C-017–C-038, C-035 at revision 1), and the Operations Console (C-039–C-044). C-009 at revision 4 (conversational `reply`, reduced machine-actionable intent, `non_command`); C-012 at revision 2 (A2UI message stream against the published catalog, `verification`/`recovery` tasks, a resolved-record `receipt` context).
 
 ## Token map
 
