@@ -152,7 +152,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-101 | FEAT-003, FEAT-004 | product-shaper | Done | — |
 | T-102 | FEAT-004 | backend-engineer | Done | — |
 | T-103 | FEAT-004 | backend-engineer | Done | — |
-| T-104 | FEAT-004 | infra-engineer | In Progress | — |
+| T-104 | FEAT-004 | infra-engineer | Done | — |
 
 ## Decisions log
 
