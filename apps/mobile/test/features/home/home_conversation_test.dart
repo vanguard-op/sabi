@@ -62,7 +62,7 @@ ServiceSummary _service(String id, String body) => ServiceSummary(
 IntentResult _question(String question) => IntentResult(
   intentType: 'unknown',
   confidence: 0.5,
-  clarifyingQuestion: question,
+  reply: question,
 );
 
 IntentResult _discovery(String body) => IntentResult(
@@ -126,7 +126,7 @@ void main() {
     await tester.tap(_sendButton);
     await tester.pumpAndSettle();
     expect(find.text(SabStrings.english.conversationalReply), findsOneWidget);
-    expect(find.text('Not covered yet'), findsNothing);
+    expect(find.text('No resolution yet'), findsNothing);
     expect(find.text('Just to confirm'), findsNothing);
   });
 
@@ -247,7 +247,7 @@ void main() {
     final state = container.read(homeControllerProvider);
     // Only one question has been asked, so the third turn is still a question.
     expect(state.phase, HomePhase.clarifying);
-    expect(state.intent?.clarifyingQuestion, 'Q2');
+    expect(state.intent?.reply, 'Q2');
   });
 
   test(

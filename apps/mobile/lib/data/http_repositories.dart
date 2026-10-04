@@ -31,18 +31,19 @@ class HttpCatalogueRepository implements CatalogueRepository {
           'text': text,
           'locale': locale.code,
           'channel': 'app',
-          // C-009 revision 3: the prior conversation, oldest first, bounded by
+          // C-009: the prior conversation, oldest first, bounded by
           // the caller. Omitted when there is nothing to carry.
           if (history.isNotEmpty)
             'history': [for (final turn in history) turn.toJson()],
         },
       );
-      // The envelope carries the intent, its candidates, and `source` as
-      // siblings; fold them into the one model the surface renders so a
-      // fallback resolution stays visible and must be confirmed before money
-      // moves (C-009).
+      // The envelope carries the model-authored `reply`, the reduced intent,
+      // `candidates`, and `source` as siblings (C-009); fold the reply and the
+      // candidates onto the intent model the surface renders, so a fallback
+      // resolution stays visible and must be confirmed before money moves.
       return IntentResult.fromJson({
         ...Map<String, dynamic>.from(body['intent'] as Map? ?? {}),
+        'reply': body['reply'],
         'candidates': body['candidates'] ?? const [],
         'source': body['source'],
       });

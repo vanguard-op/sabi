@@ -196,7 +196,8 @@ class MockCatalogueRepository implements CatalogueRepository {
         amount: 2500000,
         reference: 'LUC-2026-0001',
         confidence: 0.94,
-        language: locale.code,
+        detectedLanguage: locale.code,
+        reply: 'I found the Lagos State Land Use Charge. Ready to pay it?',
         candidates: const [_landUse],
       );
     }
@@ -205,7 +206,8 @@ class MockCatalogueRepository implements CatalogueRepository {
         intentType: 'bill_payment',
         target: 'Council levy',
         confidence: 0.8,
-        language: locale.code,
+        detectedLanguage: locale.code,
+        reply: 'Here are the council levies I can see.',
         candidates: const [
           ServiceSummary(
             serviceId: 'svc_onitsha_council',
@@ -236,8 +238,8 @@ class MockCatalogueRepository implements CatalogueRepository {
         intentType: 'bill_payment',
         target: 'Electricity',
         confidence: 0.45,
-        language: locale.code,
-        clarifyingQuestion: 'Which electricity provider do you pay?',
+        detectedLanguage: locale.code,
+        reply: 'Which electricity provider do you pay?',
         candidates: const [
           ServiceSummary(
             serviceId: 'svc_ikeja_electric',
@@ -258,16 +260,16 @@ class MockCatalogueRepository implements CatalogueRepository {
     }
     if (q.contains('school') || q.contains('xyz')) {
       return IntentResult(
-        intentType: 'unresolved',
+        intentType: 'unknown',
         confidence: 0.18,
-        language: locale.code,
+        detectedLanguage: locale.code,
       );
     }
     return IntentResult(
       intentType: 'bill_payment',
       target: 'MTN',
       confidence: 0.88,
-      language: locale.code,
+      detectedLanguage: locale.code,
       candidates: const [
         ServiceSummary(
           serviceId: 'svc_mtn_airtime',

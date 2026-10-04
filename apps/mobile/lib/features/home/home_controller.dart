@@ -36,6 +36,7 @@ class ConversationTurn {
     this.intent,
     this.candidates = const [],
     this.fromSearch = false,
+    this.afterClarificationBound = false,
   });
 
   /// The user's free-form request, verbatim.
@@ -54,6 +55,11 @@ class ConversationTurn {
   /// rather than from intent resolution.
   final bool fromSearch;
 
+  /// True when the clarification bound was reached before this turn, so a
+  /// non-resolving turn is the Unresolved state and uses its own fallback copy
+  /// (screens/03-home.md). False for a plain catalogue miss (No resolution).
+  final bool afterClarificationBound;
+
   /// True when any discovery result is not currently active, so the surface can
   /// warn before a payment is started (FEAT-004, stale catalogue data).
   bool get hasInactiveCandidate =>
@@ -64,14 +70,43 @@ class ConversationTurn {
     IntentResult? intent,
     List<ServiceSummary>? candidates,
     bool? fromSearch,
+    bool? afterClarificationBound,
   }) => ConversationTurn(
     request: request,
     phase: phase ?? this.phase,
     intent: intent ?? this.intent,
     candidates: candidates ?? this.candidates,
     fromSearch: fromSearch ?? this.fromSearch,
+    afterClarificationBound:
+        afterClarificationBound ?? this.afterClarificationBound,
   );
 }
+
+/// The assistant's message for [turn]: the model-authored reply when present,
+/// else the client's prewritten fallback for the turn's state (screens/03-home.md,
+/// "Assistant replies"). Discovery and in-flight turns carry no conversational
+/// message. A clarifying turn always has a reply, because [needsClarification]
+/// requires one; a turn with no reply degrades to the search fallback, so its
+/// state's prewritten copy is used.
+String assistantReplyFor(ConversationTurn turn, SabStrings strings) =>
+    switch (turn.phase) {
+      HomePhase.discovery => turn.candidates
+          .map((service) => service.collectingBody)
+          .join(', '),
+      HomePhase.clarifying => turn.intent?.reply ?? '',
+      HomePhase.conversational =>
+        _replyOrFallback(turn.intent?.reply, strings.conversationalReply),
+      HomePhase.notCovered => _replyOrFallback(
+        turn.intent?.reply,
+        turn.afterClarificationBound
+            ? strings.unresolvedReply
+            : strings.notCoveredBody,
+      ),
+      _ => '',
+    };
+
+String _replyOrFallback(String? reply, String fallback) =>
+    (reply != null && reply.trim().isNotEmpty) ? reply : fallback;
 
 /// The Home conversation. An ordered list of [ConversationTurn]s, oldest first.
 /// A new request appends a turn; an earlier turn is never discarded, so a
@@ -123,7 +158,7 @@ const int homeClarificationLimit = 3;
 /// turn and every turn is preserved, so the conversation builds up in time
 /// order.
 ///
-/// Each resolution carries the prior conversation as C-009 revision 3 `history`
+/// Each resolution carries the prior conversation as C-009 `history`
 /// so a follow-up builds on the answers already given. Discovery is reached two
 /// ways and both render the same selectable results: a resolved intent
 /// (FEAT-003/C-009) and, when intent resolution returns no candidate and asks no
@@ -165,7 +200,7 @@ class HomeController extends Notifier<HomeState> {
 
   /// Resolves [text] with the conversation so far attached. The in-flight turn
   /// is already on the state, so [_history] drops it and sends only what came
-  /// before (C-009 revision 3).
+  /// before (C-009).
   Future<IntentResult> _resolve(String text) {
     final locale = ref.read(localeProvider);
     return ref.read(catalogueRepositoryProvider).resolveIntent(
@@ -197,15 +232,10 @@ class HomeController extends Notifier<HomeState> {
   /// The assistant's own words for a settled turn, so the model sees the
   /// question it asked or the result it gave. Turns with no assistant reply
   /// (queued, in flight, failed) contribute only the user's side.
-  String? _assistantReply(ConversationTurn turn, SabStrings strings) =>
-      switch (turn.phase) {
-        HomePhase.discovery =>
-          turn.candidates.map((service) => service.collectingBody).join(', '),
-        HomePhase.clarifying => turn.intent?.clarifyingQuestion,
-        HomePhase.conversational => strings.conversationalReply,
-        HomePhase.notCovered => strings.notCoveredBody,
-        _ => null,
-      };
+  String? _assistantReply(ConversationTurn turn, SabStrings strings) {
+    final reply = assistantReplyFor(turn, strings);
+    return reply.isEmpty ? null : reply;
+  }
 
   Future<List<ServiceSummary>?> _settle(
     IntentResult intent, {
@@ -225,34 +255,46 @@ class HomeController extends Notifier<HomeState> {
       return null;
     }
 
-    // A question from the model takes precedence over the catalogue search
-    // fallback: when the request is too ambiguous to resolve, the honest next
-    // step is the question even if the model offered no candidates
-    // (FEAT-003/MQ-001, Flow 2 alternate path A). A resolution with no question
-    // still falls through to search below.
-    if (intent.needsClarification) {
+    // Below the serving cutoff the request is unresolved: the model asks a
+    // follow-up question in `reply` (clarifying), and once the bound is reached
+    // the client states the gap (Unresolved) instead of asking again
+    // (FEAT-003/MQ-001). The bound is enforced whether or not a reply arrived,
+    // so a model that returns no reply at the bound still resolves to the
+    // Unresolved state rather than restarting as a plain catalogue miss.
+    if (intent.confidence < intentServingConfidenceCutoff) {
       final asked = state.turns
           .where((turn) => turn.phase == HomePhase.clarifying)
           .length;
       if (asked >= homeClarificationLimit) {
         // Three questions in one conversation and still unresolved: search the
         // catalogue once, then state the gap with human support rather than
-        // asking again or guessing (FEAT-003, MQ-001).
-        return _searchFallback(request, intent: intent);
-      }
-      _updateCurrent(
-        (turn) => turn.copyWith(
-          phase: HomePhase.clarifying,
+        // asking again or guessing (FEAT-003, MQ-001). This non-resolving turn
+        // is the Unresolved state and carries its own fallback copy.
+        return _searchFallback(
+          request,
           intent: intent,
-          candidates: intent.candidates,
-        ),
-      );
-      return null;
+          afterClarificationBound: true,
+        );
+      }
+      if (intent.hasReply) {
+        // The model authored a question: ask it, with the closest candidates.
+        _updateCurrent(
+          (turn) => turn.copyWith(
+            phase: HomePhase.clarifying,
+            intent: intent,
+            candidates: intent.candidates,
+          ),
+        );
+        return null;
+      }
+      // No reply from the model: degrade to keyword and search resolution,
+      // requiring confirmation before any payment (MQ-001 fallback).
+      return _searchFallback(request, intent: intent);
     }
     if (intent.candidates.isEmpty) {
-      // No question and no candidate: resolution found nothing, so search the
-      // catalogue directly in case a plain service query still reaches
-      // discovery (FEAT-004).
+      // No candidate: resolution found nothing, so search the catalogue
+      // directly in case a plain service query still reaches discovery
+      // (FEAT-004).
       return _searchFallback(request, intent: intent);
     }
     _updateCurrent(
@@ -268,6 +310,7 @@ class HomeController extends Notifier<HomeState> {
   Future<List<ServiceSummary>?> _searchFallback(
     String request, {
     required IntentResult intent,
+    bool afterClarificationBound = false,
   }) async {
     try {
       final result = await ref
@@ -287,9 +330,15 @@ class HomeController extends Notifier<HomeState> {
       _updateCurrent((turn) => turn.copyWith(phase: HomePhase.error));
       return null;
     }
-    // No result and no invention: state that the service is not covered.
+    // No result and no invention: state that the service is not covered, using
+    // the Unresolved copy when the clarification bound was reached and the
+    // No resolution copy for a plain catalogue miss (screens/03-home.md).
     _updateCurrent(
-      (turn) => turn.copyWith(phase: HomePhase.notCovered, intent: intent),
+      (turn) => turn.copyWith(
+        phase: HomePhase.notCovered,
+        intent: intent,
+        afterClarificationBound: afterClarificationBound,
+      ),
     );
     return null;
   }

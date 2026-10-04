@@ -35,12 +35,36 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _composer = TextEditingController();
   final _composerFocus = FocusNode();
+  final _conversationScroll = ScrollController();
 
   @override
   void dispose() {
     _composer.dispose();
     _composerFocus.dispose();
+    _conversationScroll.dispose();
     super.dispose();
+  }
+
+  /// Keep the newest turn in view. A conversation that grows past the viewport
+  /// must show the assistant's latest reply without a manual scroll, so the
+  /// list follows the exchange in time order (screens.md, Home layout). The
+  /// scroll is instant under the OS reduce-motion setting.
+  void _scrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_conversationScroll.hasClients) return;
+      final position = _conversationScroll.position;
+      if (position.maxScrollExtent <= position.pixels) return;
+      final target = position.maxScrollExtent;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _conversationScroll.jumpTo(target);
+      } else {
+        _conversationScroll.animateTo(
+          target,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _send() async {
@@ -109,6 +133,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen<bool>(reauthProvider, (previous, next) {
       if (next) _showReauth();
     });
+    // Follow the exchange as it grows: every append or settle scrolls the
+    // newest turn into view.
+    ref.listen(homeControllerProvider, (previous, next) {
+      if (previous?.turns != next.turns) _scrollToLatest();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -142,6 +171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               data: (receipts) => _Conversation(
                 receipts: receipts,
                 state: state,
+                scrollController: _conversationScroll,
                 onOpenService: _openService,
                 onRetry: () =>
                     ref.read(homeControllerProvider.notifier).retry(),
@@ -165,6 +195,7 @@ class _Conversation extends ConsumerWidget {
   const _Conversation({
     required this.receipts,
     required this.state,
+    required this.scrollController,
     required this.onOpenService,
     required this.onRetry,
     required this.onSupport,
@@ -172,6 +203,7 @@ class _Conversation extends ConsumerWidget {
 
   final List<ReceiptSummary> receipts;
   final HomeState state;
+  final ScrollController scrollController;
   final ValueChanged<String> onOpenService;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
@@ -191,6 +223,7 @@ class _Conversation extends ConsumerWidget {
     }
 
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.all(SabSpacing.md),
       children: [
         if (receipts.isNotEmpty) ...[
@@ -288,16 +321,16 @@ class _Turn extends ConsumerWidget {
             onOpenService: onOpenService,
           ),
           HomePhase.clarifying => _Clarification(
-            question: turn.intent?.clarifyingQuestion,
+            question: turn.intent?.reply,
             candidates: turn.candidates,
             onOpenService: onOpenService,
           ),
           HomePhase.conversational => _ConversationReply(
-            text: strings.conversationalReply,
+            text: assistantReplyFor(turn, strings),
           ),
           HomePhase.notCovered => _Notice(
             title: strings.notCoveredTitle,
-            body: strings.notCoveredBody,
+            body: assistantReplyFor(turn, strings),
             actionLabel: strings.contactSupport,
             onAction: onSupport,
           ),

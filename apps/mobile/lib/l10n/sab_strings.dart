@@ -129,6 +129,7 @@ class SabStrings {
   String get candidates => _t('candidates');
   String get conversationalReply => _t('conversationalReply');
   String get notCoveredTitle => _t('notCoveredTitle');
+  String get unresolvedReply => _t('unresolvedReply');
   String get notCoveredBody => _t('notCoveredBody');
   String get contactSupport => _t('contactSupport');
   String get queuedOffline => _t('queuedOffline');
@@ -333,9 +334,12 @@ class SabStrings {
     'recent': 'Recent',
     'clarifyingTitle': 'Just to confirm',
     'candidates': 'Closest matches',
-    'conversationalReply': 'I can pay government obligations and everyday bills for you. Tell me what you need to pay, and I’ll take it from there.',
-    'notCoveredTitle': 'Not covered yet',
-    'notCoveredBody': 'We don’t have that service yet. We’ve recorded your request and can connect you to support.',
+    'conversationalReply': 'I can pay government obligations and everyday bills for you — levies, taxes, airtime, data, a utility, or a biller. Tell me what you need to pay in your own words, English or Pidgin, and I’ll take it from there.',
+    'notCoveredTitle': 'No resolution yet',
+    'unresolvedReply':
+        'Three answers in and I still can’t tell which service you mean, so I haven’t started anything with your money. You can search the catalogue yourself, or ask support to take it from here. If you know the collecting body’s name, or the reference you’re paying, tell me and I’ll pick it up.',
+    'notCoveredBody':
+        'There’s no resolution for that service right now, so I haven’t started anything. Tell me the collecting body’s name, the agency, or the reference you’re paying, and I’ll look again. You can also search the catalogue yourself or reach support.',
     'contactSupport': 'Contact support',
     'queuedOffline':
         'Your request is queued and will send when you’re back online.',

@@ -60,7 +60,7 @@ class _Catalogue implements CatalogueRepository {
 IntentResult _lowConfidence(String question) => IntentResult(
   intentType: 'unknown',
   confidence: 0.3,
-  clarifyingQuestion: question,
+  reply: question,
   candidates: const [
     ServiceSummary(
       serviceId: 'svc_electric',
@@ -226,7 +226,7 @@ void main() {
           .read(homeControllerProvider.notifier)
           .submit('pay my xyz subscription');
       await tester.pumpAndSettle();
-      expect(find.text('Not covered yet'), findsOneWidget);
+      expect(find.text('No resolution yet'), findsOneWidget);
       expect(find.text('Contact support'), findsOneWidget);
     },
   );
@@ -379,7 +379,7 @@ void main() {
     await controller.submit('Ikeja');
     await tester.pumpAndSettle();
     expect(find.text('Which one do you mean?'), findsOneWidget);
-    expect(find.text('Not covered yet'), findsNothing);
+    expect(find.text('No resolution yet'), findsNothing);
     // Both requests remain in the conversation, oldest first.
     expect(find.text('I wan pay my electricity'), findsOneWidget);
     expect(find.text('Ikeja'), findsOneWidget);

@@ -16,7 +16,7 @@ const String intentTypeNonCommand = 'non_command';
 const int intentHistoryMaxEntries = 6;
 
 /// One prior exchange in the Home conversation, carried to intent resolution as
-/// C-009 revision 3 `history`. `role` is `user` or `assistant`.
+/// C-009 `history`. `role` is `user` or `assistant`.
 @immutable
 class IntentHistoryTurn {
   const IntentHistoryTurn({required this.role, required this.text});
@@ -29,8 +29,10 @@ class IntentHistoryTurn {
 
 /// A resolved request from the assistant (CONTRACTS.md C-009).
 ///
-/// The client renders confirmations from this structure, never from raw text
-/// (FEAT-003/011). Amounts are integer minor units (kobo).
+/// The client renders confirmations from the machine-actionable intent, never
+/// from raw text (FEAT-003/011). The user-facing message is the model-authored
+/// [reply]; the intent carries only the fields the client acts on. Amounts are
+/// integer minor units (kobo).
 @immutable
 class IntentResult {
   const IntentResult({
@@ -41,8 +43,8 @@ class IntentResult {
     this.reference,
     this.constraints = const {},
     this.confidence = 0,
-    this.language = 'en',
-    this.clarifyingQuestion,
+    this.detectedLanguage,
+    this.reply,
     this.candidates = const [],
     this.source = 'model',
   });
@@ -54,17 +56,36 @@ class IntentResult {
   final String? reference;
   final Map<String, dynamic> constraints;
   final double confidence;
-  final String language;
-  final String? clarifyingQuestion;
+
+  /// The language the model detected or served (`en`, `pcm`, `ha`, `yo`, `ig`),
+  /// a machine-actionable signal the client consumes (MQ-001/MQ-004). Null when
+  /// none was detected.
+  final String? detectedLanguage;
+
+  /// The model-authored user-facing message in the user's language: the
+  /// greeting, the clarifying question, the refusal, or the non-resolving reply
+  /// (screens/03-home.md). Null when the model produced none, so the client
+  /// renders its prewritten fallback for the state.
+  final String? reply;
+
   final List<ServiceSummary> candidates;
 
   /// `model` or `fallback`; a fallback resolution must be confirmed before any
   /// money moves.
   final String source;
 
+  /// Whether a usable model reply was produced. A blank or whitespace-only
+  /// reply is treated as absent so a turn is never left empty.
+  bool get hasReply => reply != null && reply!.trim().isNotEmpty;
+
+  /// Below the serving cutoff the model asks a follow-up question in [reply]
+  /// and sets no payment type; the client asks it while the reply is present.
+  /// A greeting never consumes a clarification turn, and a turn with no reply
+  /// degrades to the keyword and search fallback (MQ-001).
   bool get needsClarification =>
       confidence < intentServingConfidenceCutoff &&
-      (clarifyingQuestion?.isNotEmpty ?? false);
+      !isNonCommand &&
+      hasReply;
 
   /// A greeting, thanks, or small talk. Answered conversationally, never
   /// recorded as a coverage miss, and never counted as a clarification turn.
@@ -81,10 +102,9 @@ class IntentResult {
       reference: json['reference']?.toString(),
       constraints: (json['constraints'] as Map?)?.cast<String, dynamic>() ?? {},
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
-      language: (json['language'] ?? 'en').toString(),
-      clarifyingQuestion:
-          (json['clarifying_question'] ?? json['clarifyingQuestion'])
-              ?.toString(),
+      detectedLanguage:
+          (json['detected_language'] ?? json['detectedLanguage'])?.toString(),
+      reply: json['reply']?.toString(),
       candidates: candidates
           .whereType<Map>()
           .map((e) => ServiceSummary.fromJson(e.cast<String, dynamic>()))

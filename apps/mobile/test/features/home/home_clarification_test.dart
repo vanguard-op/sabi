@@ -81,7 +81,7 @@ void main() {
           IntentResult(
             intentType: 'unknown',
             confidence: 0.5,
-            clarifyingQuestion: 'What would you like to pay for?',
+            reply: 'What would you like to pay for?',
           ),
         ],
         searchResults: [_service('svc_x', 'Somewhere Council')],
@@ -90,10 +90,7 @@ void main() {
       await container.read(homeControllerProvider.notifier).submit('Hello');
       final state = container.read(homeControllerProvider);
       expect(state.phase, HomePhase.clarifying);
-      expect(
-        state.intent?.clarifyingQuestion,
-        'What would you like to pay for?',
-      );
+      expect(state.intent?.reply, 'What would you like to pay for?');
       expect(catalogue.searchCalls, 0);
     },
   );
@@ -104,7 +101,7 @@ void main() {
         IntentResult(
           intentType: 'unknown',
           confidence: 0.65,
-          clarifyingQuestion: 'Which one do you mean?',
+          reply: 'Which one do you mean?',
         ),
       ],
     );
@@ -119,7 +116,7 @@ void main() {
         IntentResult(
           intentType: 'bill_payment',
           confidence: 0.3,
-          clarifyingQuestion: 'Which electricity provider?',
+          reply: 'Which electricity provider?',
           candidates: [_service('svc_ikeja', 'Ikeja Electric')],
         ),
       ],
@@ -164,12 +161,12 @@ void main() {
           IntentResult(
             intentType: 'unknown',
             confidence: 0.5,
-            clarifyingQuestion: 'Which one?',
+            reply: 'Which one?',
           ),
           IntentResult(
             intentType: 'unknown',
             confidence: 0.5,
-            clarifyingQuestion: 'Still which one?',
+            reply: 'Still which one?',
           ),
         ],
       );
@@ -186,7 +183,7 @@ void main() {
       await controller.submit('not sure');
       final state = container.read(homeControllerProvider);
       expect(state.phase, HomePhase.clarifying);
-      expect(state.intent?.clarifyingQuestion, 'Still which one?');
+      expect(state.intent?.reply, 'Still which one?');
       expect(state.turns, hasLength(2));
     },
   );
@@ -199,7 +196,7 @@ void main() {
         IntentResult(
           intentType: 'unknown',
           confidence: 0.5,
-          clarifyingQuestion: 'What would you like to pay for?',
+          reply: 'What would you like to pay for?',
         ),
       ],
     );
@@ -220,7 +217,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Just to confirm'), findsOneWidget);
     expect(find.text('What would you like to pay for?'), findsOneWidget);
-    expect(find.text('Not covered yet'), findsNothing);
+    expect(find.text('No resolution yet'), findsNothing);
   });
 
   testWidgets(
@@ -231,7 +228,7 @@ void main() {
           IntentResult(
             intentType: 'unknown',
             confidence: 0.5,
-            clarifyingQuestion: 'What would you like to pay for?',
+            reply: 'What would you like to pay for?',
           ),
         ],
       );
