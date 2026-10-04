@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.config import FLASH_MODEL_ID, INTENT_CONFIDENCE_CUTOFF
+from core.config import FLASH_MODEL_ID, INTENT_CONFIDENCE_CUTOFF, INTENT_PROMPT_VERSION
 from core.errors import ProviderUnavailable
 from core.serving import ModelServing
 from core.testing import FakeModelProvider, json_response, text_response
@@ -46,7 +46,7 @@ def test_service_uses_the_pinned_flash_model_and_prompt(catalogue):
     request = provider.last_request
     assert request.model_id == FLASH_MODEL_ID
     assert request.prompt_id == "intent_resolution"
-    assert request.prompt_version == "v1"
+    assert request.prompt_version == INTENT_PROMPT_VERSION
     assert request.decoding.temperature == 0.0
     assert request.decoding.top_p == 1.0
 
@@ -99,6 +99,47 @@ def test_low_confidence_flag_is_surfaced(catalogue):
     assert "low_confidence" in outcome.flags
     assert outcome.response.intent.intentType == "unknown"
     assert outcome.response.intent.clarifyingQuestion is not None
+
+
+def test_history_reaches_the_serving_prompt(catalogue):
+    from core.history import ConversationTurn
+
+    service, provider = _service(catalogue, [json_response(_intent())])
+    service.resolve(
+        "Ikeja",
+        history=(ConversationTurn("assistant", "Which biller do you mean?"),),
+    )
+    assert "[assistant] Which biller do you mean?" in provider.last_request.contents
+
+
+def test_non_command_outcome_has_no_candidates(catalogue):
+    service, _ = _service(
+        catalogue,
+        [json_response(_intent(intent_type="non_command", target=None, confidence=1.0))],
+    )
+    outcome = service.resolve("Hello")
+    assert outcome.response.intent.intentType == "non_command"
+    assert outcome.response.candidates == []
+    assert outcome.response.intent.clarifyingQuestion is None
+
+
+def test_bound_is_honoured_on_the_fallback_path(catalogue):
+    from core.history import ConversationTurn
+
+    service, _ = _service(catalogue, [ProviderUnavailable("down")])
+    history = (
+        ConversationTurn("user", "pay"),
+        ConversationTurn("assistant", "Which biller?"),
+        ConversationTurn("user", "the light one"),
+        ConversationTurn("assistant", "Which one?"),
+        ConversationTurn("user", "that"),
+        ConversationTurn("assistant", "Do you mean Ikeja Electric?"),
+    )
+    outcome = service.resolve("yes", history=history)
+    assert outcome.source == "fallback"
+    assert outcome.response.intent.intentType == "unknown"
+    assert outcome.response.intent.clarifyingQuestion is None
+    assert outcome.response.intent.constraints.get("clarificationLimitReached") is True
 
 
 def test_fail_closed_provider_turns_setup_errors_into_provider_unavailable(catalogue):

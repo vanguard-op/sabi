@@ -24,6 +24,7 @@ INTENT_TYPES: frozenset[str] = frozenset(
         "discovery",
         "status_check",
         "receipt_lookup",
+        "non_command",
         "unknown",
     }
 )
@@ -31,6 +32,10 @@ INTENT_TYPES: frozenset[str] = frozenset(
 # Intents that move money. Refusal behavior forbids these when the request is
 # unresolved or low-confidence.
 PAYMENT_INTENT_TYPES: frozenset[str] = frozenset({"gov_payment", "bill_payment"})
+
+# A greeting or other non-command message. It carries no payment field, asks no
+# clarifying question, and is never a coverage miss (MQ-001).
+NON_COMMAND_INTENT_TYPE = "non_command"
 
 LANGUAGES: frozenset[str] = frozenset({"en", "pcm"})
 DETECTED_LANGUAGES: frozenset[str] = frozenset({"en", "pcm", "ha", "yo", "ig"})

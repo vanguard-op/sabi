@@ -2,8 +2,11 @@
 
 These are product decisions enforced in code, not left to the implementer:
 
-* Refusal: below the confidence threshold the model asks exactly one clarifying
-  question and never presents a payment intent (MQ-001).
+* Refusal: below the confidence threshold the assistant asks one clarifying question,
+  building on the earlier turns, up to three in one conversation, and never presents a
+  payment intent; at the bound it declines instead of asking again (MQ-001).
+* Non-command: a greeting or small talk is classified ``non_command``, which carries
+  no payment field, asks no clarifying question, and is never a coverage miss (MQ-001).
 * No invention: grounding drops an identifier, amount, or reference the model could
   not trace (see :mod:`core.grounding`).
 * Language: a detected language that is not enabled falls back to English with a note
@@ -24,16 +27,19 @@ from typing import Any
 
 from core.config import INTENT_CONFIDENCE_CUTOFF
 from core.grounding import GroundingContext, ground_intent
+from core.history import CLARIFICATION_LIMIT, CLARIFICATION_LIMIT_KEY
 from core.schemas import (
     COMPOSITION_MESSAGE_TYPES,
+    NON_COMMAND_INTENT_TYPE,
     PAYMENT_INTENT_TYPES,
     Intent,
 )
 
 # A resolved request must clear this confidence before a payment intent is presented.
 # The cutoff is a single product decision fixed at 0.70 (D-017) and stated in
-# model-quality.md, "MQ-001" and "Quality bar"; below it the model asks exactly one
-# clarifying question. It is evaluated, never tuned per run.
+# model-quality.md, "MQ-001" and "Quality bar"; below it the assistant asks one
+# clarifying question, up to the three-question conversation bound. It is evaluated,
+# never tuned per run.
 INTENT_CONFIDENCE_THRESHOLD = INTENT_CONFIDENCE_CUTOFF
 
 # A ranking result below this relevance is not shown as a match.
@@ -94,11 +100,34 @@ def enforce_intent(
     user_text: str,
     context: GroundingContext,
     locale: str = "en",
+    clarifications_asked: int = 0,
 ) -> GuardrailOutcome:
-    """Ground an intent and apply the refusal and language guardrails."""
+    """Ground an intent and apply the refusal, bound, and language guardrails.
+
+    ``clarifications_asked`` is the number of clarifying questions already asked
+    earlier in the exchange, counted from the conversation history. At the MQ-001
+    bound the refusal becomes terminal: the request is declined, no further question
+    is asked, and ``constraints`` is marked so the client can offer catalogue search
+    and human support.
+    """
 
     grounded, report = ground_intent(intent, user_text=user_text, context=context)
     flags = set(report.flags)
+    citations = report.citations
+
+    if grounded.intent_type == NON_COMMAND_INTENT_TYPE:
+        # A greeting or other non-command message is answered conversationally: it
+        # sets no payment field, asks no clarifying question, and is never a coverage
+        # miss. The client renders the reply from this intent (MQ-001).
+        grounded = replace(
+            grounded,
+            target=None,
+            amount=None,
+            reference=None,
+            clarifying_question=None,
+        )
+        flags.add("non_command")
+        return GuardrailOutcome(intent=grounded, flags=frozenset(flags), citations=citations)
 
     language_fallback = False
     note: str | None = None
@@ -114,7 +143,19 @@ def enforce_intent(
         or (grounded.intent_type in PAYMENT_INTENT_TYPES and grounded.target is None)
     )
 
-    if unresolved:
+    limit_reached = unresolved and clarifications_asked >= CLARIFICATION_LIMIT
+
+    if limit_reached:
+        # The bound is reached while the request is still unresolved: decline it,
+        # ask no further question, and mark it for catalogue search and human support.
+        flags.add("clarification_limit_reached")
+        grounded = replace(
+            grounded,
+            intent_type="unknown",
+            clarifying_question=None,
+            constraints={**grounded.constraints, CLARIFICATION_LIMIT_KEY: True},
+        )
+    elif unresolved:
         flags.add(
             "low_confidence" if grounded.confidence < INTENT_CONFIDENCE_THRESHOLD else "unresolved"
         )
@@ -130,12 +171,11 @@ def enforce_intent(
             grounded, clarifying_question=normalize_question(grounded.clarifying_question)
         )
 
-    if language_fallback and grounded.clarifying_question is None:
+    if language_fallback and not limit_reached and grounded.clarifying_question is None:
         grounded = replace(
             grounded, clarifying_question=normalize_question(DEFAULT_CLARIFYING_QUESTION)
         )
 
-    citations = report.citations
     if language_fallback and note:
         flags.add("language_note")
 

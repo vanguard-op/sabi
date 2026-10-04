@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from core.config import PROMPT_VERSION, Capability
+from core.config import Capability, prompt_version_for
 from core.errors import ModelError
 
 _PROMPT_DIR = Path(__file__).parent
@@ -35,17 +35,22 @@ class Prompt:
         return self.capability.value
 
 
-def load_prompt(capability: Capability, version: str = PROMPT_VERSION) -> Prompt:
-    """Load a versioned prompt artifact from disk, failing loudly when it is absent."""
+def load_prompt(capability: Capability, version: str | None = None) -> Prompt:
+    """Load a versioned prompt artifact from disk, failing loudly when it is absent.
 
-    if not _VERSION_RE.match(version):
-        raise ModelError(f"invalid prompt version: {version}")
-    path = _PROMPT_DIR / f"{capability.value}.{version}.txt"
+    The version defaults to the one the capability is pinned to (``config``), so a
+    capability can move to a new prompt version without affecting the others.
+    """
+
+    resolved = version or prompt_version_for(capability)
+    if not _VERSION_RE.match(resolved):
+        raise ModelError(f"invalid prompt version: {resolved}")
+    path = _PROMPT_DIR / f"{capability.value}.{resolved}.txt"
     if not path.is_file():
         raise ModelError(f"prompt artifact not found: {path.name}")
     text = path.read_text(encoding="utf-8")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    return Prompt(capability=capability, version=version, text=text, sha256=digest)
+    return Prompt(capability=capability, version=resolved, text=text, sha256=digest)
 
 
 def render(template: str, values: Mapping[str, str]) -> str:

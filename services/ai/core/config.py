@@ -28,7 +28,11 @@ PRIMARY_MODEL_ID = "gemini-3.1-pro-preview"
 FLASH_MODEL_ID = "gemini-3.1-flash-lite"
 
 # Prompt artifacts are versioned alongside the model build they were tuned for.
+# ``PROMPT_VERSION`` is the default; a capability whose prompt behavior changes gets
+# its own version in ``PROMPT_VERSIONS`` rather than editing a shipped artifact in
+# place, so an evaluation run is always reproducible against the exact prompt text.
 PROMPT_VERSION = "v1"
+INTENT_PROMPT_VERSION = "v2"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,
@@ -66,6 +70,19 @@ CAPABILITY_MODEL_PATH: Mapping[Capability, ModelPath] = {
     Capability.DISCOVERY_RANKING: ModelPath.FLASH,
     Capability.INTERFACE_COMPOSITION: ModelPath.PRIMARY,
 }
+
+# Per-capability prompt artifact versions. Intent resolution moved to ``v2`` to carry
+# conversation history, ``non_command``, and the three-clarification bound; the other
+# capabilities remain on the shared default.
+PROMPT_VERSIONS: Mapping[Capability, str] = {
+    Capability.INTENT_RESOLUTION: INTENT_PROMPT_VERSION,
+}
+
+
+def prompt_version_for(capability: Capability) -> str:
+    """The prompt artifact version a capability is pinned to."""
+
+    return PROMPT_VERSIONS.get(capability, PROMPT_VERSION)
 
 
 @dataclass(frozen=True)

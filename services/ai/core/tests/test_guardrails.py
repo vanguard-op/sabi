@@ -8,6 +8,7 @@ from core.guardrails import (
     normalize_question,
     validate_composition,
 )
+from core.history import CLARIFICATION_LIMIT, CLARIFICATION_LIMIT_KEY
 from core.retrieval import RetrievedRecord
 from core.schemas import CLIENT_COMPONENT_CATALOGUE, Intent
 
@@ -85,6 +86,66 @@ def test_supported_language_does_not_fall_back():
     outcome = enforce_intent(intent, user_text="i wan buy light", context=_context())
     assert outcome.language_fallback is False
     assert outcome.note is None
+
+
+# --- Non-command (MQ-001) ---------------------------------------------------------
+
+
+def test_non_command_sets_no_payment_field_and_no_question():
+    intent = Intent(
+        intent_type="non_command",
+        confidence=1.0,
+        target="svc-electric",
+        amount=500000,
+        reference="REF-1",
+        clarifying_question="What would you like to pay?",
+    )
+    outcome = enforce_intent(intent, user_text="hello", context=_context())
+    assert outcome.intent.intent_type == "non_command"
+    assert outcome.intent.target is None
+    assert outcome.intent.amount is None
+    assert outcome.intent.reference is None
+    assert outcome.intent.clarifying_question is None
+    assert "non_command" in outcome.flags
+    assert "low_confidence" not in outcome.flags
+
+
+# --- The three-question bound (MQ-001) --------------------------------------------
+
+
+def test_still_asks_below_the_clarification_bound():
+    intent = Intent(intent_type="bill_payment", confidence=0.3, target=None)
+    outcome = enforce_intent(
+        intent,
+        user_text="pay something",
+        context=_context(),
+        clarifications_asked=CLARIFICATION_LIMIT - 1,
+    )
+    assert outcome.intent.intent_type == "unknown"
+    assert outcome.intent.clarifying_question is not None
+    assert "clarification_limit_reached" not in outcome.flags
+
+
+def test_declines_at_the_clarification_bound():
+    intent = Intent(
+        intent_type="bill_payment",
+        confidence=0.3,
+        target=None,
+        clarifying_question="Which service?",
+    )
+    outcome = enforce_intent(
+        intent,
+        user_text="pay something",
+        context=_context(),
+        clarifications_asked=CLARIFICATION_LIMIT,
+    )
+    assert outcome.intent.intent_type == "unknown"
+    assert outcome.intent.clarifying_question is None
+    assert outcome.intent.constraints.get(CLARIFICATION_LIMIT_KEY) is True
+    assert "clarification_limit_reached" in outcome.flags
+
+
+# --- Composition ------------------------------------------------------------------
 
 
 def _message(component: str):

@@ -7,11 +7,25 @@ the client can render the intent without reshaping it.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from core.history import MAX_HISTORY_TURNS
 from core.serving import IntentResolution
+
+
+class HistoryTurn(BaseModel):
+    """One prior turn of the exchange (C-009 ``history``), oldest first.
+
+    A malformed entry, an unknown role, or more than six turns fails schema
+    validation, which the app maps to the contract's 400 with the shared envelope.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    role: Literal["user", "assistant"]
+    text: str
 
 
 class IntentRequest(BaseModel):
@@ -20,11 +34,19 @@ class IntentRequest(BaseModel):
     ``text`` is bounded at 200 characters here and re-checked in the router so the
     contract's 400 is returned rather than the framework default. ``locale`` and
     ``channel`` default, and an explicit unsupported value is a 400 in the router.
+    ``history`` is optional, oldest first, and at most six turns.
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     text: str = Field(description="free-form user request, at most 200 characters")
     locale: str = "en"
     channel: str = "app"
+    history: list[HistoryTurn] | None = Field(
+        default=None,
+        max_length=MAX_HISTORY_TURNS,
+        description="earlier turns of the conversation, oldest first, at most six",
+    )
 
 
 class IntentOut(BaseModel):

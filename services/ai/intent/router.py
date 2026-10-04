@@ -14,6 +14,12 @@ Contract conformance (CONTRACTS.md, C-009):
   ``pcm``; ``channel`` is ``app``, ``ussd``, ``sms``, or ``whatsapp``. A missing or
   malformed field is 400 (the app maps schema failures to that envelope), rate
   limiting is a gateway concern.
+- ``history`` is optional, oldest first, at most six turns of
+  ``{role: user|assistant, text}``; a malformed entry, an unknown role, or an oversized
+  list is 400. The earlier turns are rendered into the prompt so each clarification
+  builds on the answers already given, and the three-question bound is counted from
+  them. A greeting or other non-command message resolves to ``non_command``: no
+  clarifying question, no payment field, and nothing recorded for coverage.
 - The 200 body is camelCase: ``intent`` (``intentType``, ``target``, ``amount``,
   ``currency``, ``reference``, ``constraints``, ``confidence``, ``language``,
   ``clarifyingQuestion``), ``candidates`` (``serviceId``, ``name``,
@@ -31,6 +37,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
+from core.history import ConversationTurn
 from intent.deps import get_intent_service
 from intent.errors import error_response
 from intent.schemas import IntentRequest, IntentResponse
@@ -62,5 +69,8 @@ def resolve_intent(
     if body.channel not in _CHANNELS:
         return error_response(400, "invalid_request", "That channel is not supported.")
 
-    outcome = service.resolve(text, locale=body.locale, channel=body.channel)
+    history = tuple(
+        ConversationTurn(role=turn.role, text=turn.text) for turn in (body.history or [])
+    )
+    outcome = service.resolve(text, locale=body.locale, channel=body.channel, history=history)
     return outcome.response

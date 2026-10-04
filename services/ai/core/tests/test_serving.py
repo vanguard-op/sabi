@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from core.config import FLASH_MODEL_ID
+from core.config import FLASH_MODEL_ID, INTENT_PROMPT_VERSION
 from core.errors import ProviderUnavailable
+from core.history import ConversationTurn
 from core.serving import ModelServing
 from core.testing import FakeModelProvider, json_response, text_response
 
@@ -54,7 +55,7 @@ def test_resolve_intent_uses_the_pinned_prompt_and_model(catalogue):
     serving.resolve_intent("pay my electricity")
     request = provider.last_request
     assert request.prompt_id == "intent_resolution"
-    assert request.prompt_version == "v1"
+    assert request.prompt_version == INTENT_PROMPT_VERSION
     assert request.model_id == FLASH_MODEL_ID
     assert request.decoding.temperature == 0.0
     assert "RETRIEVED_DATA" in request.contents
@@ -101,6 +102,63 @@ def test_untraceable_amount_is_removed(catalogue):
     result = serving.resolve_intent("pay my electricity")
     assert result.intent.amount is None
     assert "ungrounded_amount" in result.flags
+
+
+# --- MQ-001 multi-turn history and the clarification bound ------------------------
+
+
+def test_history_is_rendered_into_the_prompt(catalogue):
+    serving, provider = _serving(catalogue, [json_response(_intent())])
+    history = (
+        ConversationTurn("user", "I wan pay something"),
+        ConversationTurn("assistant", "Which biller do you mean?"),
+    )
+    serving.resolve_intent("Ikeja", history=history)
+    contents = provider.last_request.contents
+    assert "[user] I wan pay something" in contents
+    assert "[assistant] Which biller do you mean?" in contents
+    assert "1" in contents  # clarifying questions already asked
+
+
+def test_non_command_has_no_candidates_or_payment_fields(catalogue):
+    serving, _ = _serving(
+        catalogue,
+        [json_response(_intent(intent_type="non_command", target=None, confidence=1.0))],
+    )
+    result = serving.resolve_intent("Hello")
+    assert result.intent.intent_type == "non_command"
+    assert result.intent.target is None
+    assert result.intent.clarifying_question is None
+    assert result.candidates == ()
+
+
+def test_third_clarification_turn_declines(catalogue):
+    serving, _ = _serving(catalogue, [json_response(_intent(confidence=0.2))])
+    history = (
+        ConversationTurn("user", "pay something"),
+        ConversationTurn("assistant", "Which biller?"),
+        ConversationTurn("user", "the light one"),
+        ConversationTurn("assistant", "Which of these two?"),
+        ConversationTurn("user", "that one"),
+        ConversationTurn("assistant", "Do you mean Ikeja Electric?"),
+    )
+    result = serving.resolve_intent("yes", history=history)
+    assert result.intent.intent_type == "unknown"
+    assert result.intent.clarifying_question is None
+    assert result.intent.constraints.get("clarificationLimitReached") is True
+    assert "clarification_limit_reached" in result.flags
+
+
+def test_second_clarification_turn_still_asks(catalogue):
+    serving, _ = _serving(catalogue, [json_response(_intent(confidence=0.2))])
+    history = (
+        ConversationTurn("user", "pay something"),
+        ConversationTurn("assistant", "Which biller?"),
+    )
+    result = serving.resolve_intent("the light one", history=history)
+    assert result.intent.intent_type == "unknown"
+    assert result.intent.clarifying_question is not None
+    assert "clarification_limit_reached" not in result.flags
 
 
 # --- MQ-002 discovery ranking ----------------------------------------------------

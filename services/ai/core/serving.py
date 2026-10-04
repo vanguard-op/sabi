@@ -24,6 +24,7 @@ from core.config import (
     RETRIEVAL_LIMIT,
     Capability,
     ModelSettings,
+    prompt_version_for,
 )
 from core.errors import OutputValidationError, ProviderUnavailable
 from core.fallback import (
@@ -38,6 +39,13 @@ from core.guardrails import (
     validate_composition,
 )
 from core.guardrails import enforce_intent as apply_intent_guardrails
+from core.history import (
+    CLARIFICATION_LIMIT,
+    CLARIFICATION_LIMIT_KEY,
+    ConversationTurn,
+    clarifying_questions_asked,
+    render_history,
+)
 from core.prompts import load_prompt, render
 from core.provider import ModelProvider, ModelRequest, parse_json
 from core.retrieval import RetrievalIndex, RetrievedRecord, render_untrusted_block
@@ -46,6 +54,7 @@ from core.schemas import (
     COMPOSITION_RESPONSE_SCHEMA,
     FALLBACK_TASKS,
     INTENT_RESPONSE_SCHEMA,
+    NON_COMMAND_INTENT_TYPE,
     RANKING_RESPONSE_SCHEMA,
     Intent,
     RankingResult,
@@ -126,12 +135,14 @@ class ModelServing:
         retrieval: RetrievalIndex,
         *,
         settings: ModelSettings | None = None,
-        prompt_version: str = PROMPT_VERSION,
+        prompt_version: str | None = None,
         allowed_components: Sequence[str] | None = None,
     ) -> None:
         self._provider = provider
         self._retrieval = retrieval
         self._settings = settings or ModelSettings()
+        # ``None`` means each capability loads the prompt version it is pinned to;
+        # an explicit value is a test or evaluation override for all capabilities.
         self._prompt_version = prompt_version
         self._allowed_components = (
             frozenset(allowed_components)
@@ -148,15 +159,17 @@ class ModelServing:
         *,
         locale: str = "en",
         channel: str = "app",
+        history: Sequence[ConversationTurn] = (),
         cost: TaskCost | None = None,
     ) -> IntentResolution:
         capability = Capability.INTENT_RESOLUTION
         task_cost = cost or self._begin(capability)
+        asked = clarifying_questions_asked(history)
         records: list[RetrievedRecord] = []
         try:
             records = list(self._retrieval.search(text, limit=RETRIEVAL_LIMIT))
             context = build_context(records)
-            prompt = load_prompt(capability, self._prompt_version)
+            prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
                 capability,
                 prompt.prompt_id,
@@ -168,6 +181,9 @@ class ModelServing:
                         "locale": locale,
                         "channel": channel,
                         "retrieved_data": render_untrusted_block(records),
+                        "conversation_history": render_history(history),
+                        "clarifying_questions_asked": str(asked),
+                        "clarification_limit": str(CLARIFICATION_LIMIT),
                     },
                 ),
                 INTENT_RESPONSE_SCHEMA,
@@ -177,13 +193,24 @@ class ModelServing:
             payload = parse_json(response.text) if response.parsed is None else response.parsed
             intent = Intent.from_mapping(payload)
             outcome = apply_intent_guardrails(
-                intent, user_text=text, context=context, locale=locale
+                intent,
+                user_text=text,
+                context=context,
+                locale=locale,
+                clarifications_asked=asked,
+            )
+            # A non-command message carries no candidates: it is answered
+            # conversationally, not resolved as a service.
+            candidates = (
+                ()
+                if outcome.intent.intent_type == NON_COMMAND_INTENT_TYPE
+                else self._candidates(
+                    records, target=outcome.intent.target, confidence=outcome.intent.confidence
+                )
             )
             return IntentResolution(
                 intent=outcome.intent,
-                candidates=self._candidates(
-                    records, target=outcome.intent.target, confidence=outcome.intent.confidence
-                ),
+                candidates=candidates,
                 source=MODEL_SOURCE,
                 citations=outcome.citations,
                 model_id=request.model_id,
@@ -200,6 +227,7 @@ class ModelServing:
                 records=records,
                 task_cost=task_cost,
                 reason=type(exc).__name__,
+                clarifications_asked=asked,
             )
 
     def _intent_fallback(
@@ -210,6 +238,7 @@ class ModelServing:
         records: Sequence[RetrievedRecord],
         task_cost: TaskCost,
         reason: str,
+        clarifications_asked: int = 0,
     ) -> IntentResolution:
         resolution: FallbackResolution = keyword_resolution(
             text, self._retrieval, limit=MAX_RESULTS
@@ -222,14 +251,28 @@ class ModelServing:
                 for record in records
                 if (summary := summary_from_record(record, confidence=0.0)) is not None
             )[:MAX_RESULTS]
+        flags = {"provider_fallback"}
+        if clarifications_asked >= CLARIFICATION_LIMIT:
+            # The degraded path must honour the same bound: decline rather than ask a
+            # fourth question off the back of a keyword match.
+            flags.add("clarification_limit_reached")
+            intent = Intent(
+                intent_type="unknown",
+                confidence=0.0,
+                language=locale,
+                clarifying_question=None,
+                constraints={CLARIFICATION_LIMIT_KEY: True},
+            )
+        else:
+            intent = fallback_intent(text, resolution, locale=locale)
         return IntentResolution(
-            intent=fallback_intent(text, resolution, locale=locale),
+            intent=intent,
             candidates=candidates,
             source=FALLBACK_SOURCE,
             model_id=None,
-            prompt_version=self._prompt_version,
+            prompt_version=self._version_for(Capability.INTENT_RESOLUTION),
             used_fallback=True,
-            flags=frozenset({"provider_fallback"}),
+            flags=frozenset(flags),
             cost=task_cost,
         )
 
@@ -248,7 +291,7 @@ class ModelServing:
         try:
             records = list(self._retrieval.search(query, limit=RETRIEVAL_LIMIT))
             context = build_context(records)
-            prompt = load_prompt(capability, self._prompt_version)
+            prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
                 capability,
                 prompt.prompt_id,
@@ -298,7 +341,7 @@ class ModelServing:
                 source=FALLBACK_SOURCE,
                 citations=tuple(item.service_id for item in results),
                 model_id=None,
-                prompt_version=self._prompt_version,
+                prompt_version=self._version_for(capability),
                 used_fallback=True,
                 cost=task_cost,
             )
@@ -316,7 +359,7 @@ class ModelServing:
         task_cost = cost or self._begin(capability)
         fallback_key = task if task in FALLBACK_TASKS else "confirmation"
         try:
-            prompt = load_prompt(capability, self._prompt_version)
+            prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
                 capability,
                 prompt.prompt_id,
@@ -370,12 +413,17 @@ class ModelServing:
                 fallback=fallback_key,
                 source=FALLBACK_SOURCE,
                 model_id=None,
-                prompt_version=self._prompt_version,
+                prompt_version=self._version_for(capability),
                 used_fallback=True,
                 cost=task_cost,
             )
 
     # -- Internals ----------------------------------------------------------------
+
+    def _version_for(self, capability: Capability) -> str:
+        """The prompt version this serving instance uses for a capability."""
+
+        return self._prompt_version or prompt_version_for(capability)
 
     def _begin(self, capability: Capability) -> TaskCost:
         model_id = self._settings.model_id_for_capability(capability)

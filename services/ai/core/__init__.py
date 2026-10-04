@@ -14,12 +14,14 @@ from core.config import (
     COST_CEILINGS,
     FLASH_MODEL_ID,
     INTENT_CONFIDENCE_CUTOFF,
+    INTENT_PROMPT_VERSION,
     PRIMARY_MODEL_ID,
     PROMPT_VERSION,
     Capability,
     DecodingSettings,
     ModelPath,
     ModelSettings,
+    prompt_version_for,
 )
 from core.errors import (
     ModelError,
@@ -54,6 +56,14 @@ from core.guardrails import (
     normalize_question,
     validate_composition,
 )
+from core.history import (
+    CLARIFICATION_LIMIT,
+    CLARIFICATION_LIMIT_KEY,
+    MAX_HISTORY_TURNS,
+    ConversationTurn,
+    clarifying_questions_asked,
+    render_history,
+)
 from core.prompts import Prompt, load_prompt, render
 from core.provider import (
     GeminiProvider,
@@ -76,6 +86,7 @@ from core.schemas import (
     FALLBACK_TASKS,
     INTENT_TYPES,
     LANGUAGES,
+    NON_COMMAND_INTENT_TYPE,
     PAYMENT_INTENT_TYPES,
     Intent,
     RankingResult,
@@ -92,6 +103,8 @@ from core.telemetry import CostTracker, TaskCost, estimate_cost, price_for
 __all__ = [
     "CAPABILITY_DECODING",
     "CAPABILITY_MODEL_PATH",
+    "CLARIFICATION_LIMIT",
+    "CLARIFICATION_LIMIT_KEY",
     "CLIENT_COMPONENT_CATALOGUE",
     "COMPOSITION_MESSAGE_TYPES",
     "COST_CEILINGS",
@@ -102,9 +115,12 @@ __all__ = [
     "FLASH_MODEL_ID",
     "INTENT_CONFIDENCE_CUTOFF",
     "INTENT_CONFIDENCE_THRESHOLD",
+    "INTENT_PROMPT_VERSION",
     "INTENT_TYPES",
     "LANGUAGE_FALLBACK_NOTE",
     "LANGUAGES",
+    "MAX_HISTORY_TURNS",
+    "NON_COMMAND_INTENT_TYPE",
     "PAYMENT_INTENT_TYPES",
     "PRIMARY_MODEL_ID",
     "PROMPT_VERSION",
@@ -113,6 +129,7 @@ __all__ = [
     "Capability",
     "CompositionOutcome",
     "CompositionValidation",
+    "ConversationTurn",
     "CostTracker",
     "DecodingSettings",
     "FallbackResolution",
@@ -144,6 +161,7 @@ __all__ = [
     "amount_is_traceable",
     "amounts_in_text",
     "build_context",
+    "clarifying_questions_asked",
     "enforce_intent",
     "estimate_cost",
     "fallback_intent",
@@ -154,7 +172,9 @@ __all__ = [
     "normalize_question",
     "parse_json",
     "price_for",
+    "prompt_version_for",
     "render",
+    "render_history",
     "render_untrusted_block",
     "validate_composition",
 ]
