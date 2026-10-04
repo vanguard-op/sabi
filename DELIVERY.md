@@ -124,7 +124,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-075 | — | infra-engineer | Done | — |
 | T-076 | — | infra-engineer | In Progress | — |
 | T-077 | — | frontend-engineer | Done | — |
-| T-078 | — | frontend-engineer | In Progress | — |
+| T-078 | — | frontend-engineer | Done | — |
+| T-079 | — | backend-engineer | Done | — |
+| T-080 | — | infra-engineer | Done | — |
+| T-081 | — | infra-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -167,6 +170,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-035 | Staging Cloud SQL is a single zonal shared-core instance on HDD, so NFR-011's 99.9% availability is not met there; the target applies to production only | Staging is pre-release and must stay cheap to run and tear down (D-032/D-033); HA doubles the instance cost and would defeat the stop/destroy story | lead |
 | D-036 | `gcp-up` runs Terraform twice: a bootstrap apply that creates the platform (Artifact Registry, secrets, Cloud SQL, network, service accounts), then the image build and push, then a deploy apply that rolls Cloud Run onto the built tag | The first attempt pushed images before the registry existed and failed with `Repository "sabi" not found`; the registry is created by the apply, so the apply must come first | lead |
 | D-037 | Android status and navigation bars take the brand token `surface` (#FAF8F4 light / #17181A dark) in both modes, not a transparent bar | branding.md fixes the surface tokens but specifies no system-bar colour; transparent bars revealed Android's own window background (device white/black) below API 35. The brand surface matches the page background and keeps NFR-030 contrast via token luminance | user |
+| D-038 | Android passkey origins are derived from `android_cert_fingerprints` — the same certificates `assetlinks.json` names — and the separate `WEBAUTHN_NATIVE_ORIGINS` secret is retired | Staging never allowlisted the Android origin, and the secret was not injected into the API container, so every Android ceremony passed the OS prompt then failed verification. Deriving keeps the WebAuthn allowlist in step with the association file and survives destroy/up | user |
 
 ## Definition of Done
 
