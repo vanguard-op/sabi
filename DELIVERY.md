@@ -130,6 +130,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-081 | — | infra-engineer | Done | — |
 | T-082 | C-002, C-004, C-008 | frontend-engineer | Done | — |
 | T-083 | C-009, C-012 | backend-engineer | Done | — |
+| T-084 | C-009 | frontend-engineer | In Progress | — |
+| T-085 | FEAT-003 | product-shaper | In Progress | — |
 
 ## Decisions log
 
@@ -175,6 +177,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-038 | Android passkey origins are derived from `android_cert_fingerprints` — the same certificates `assetlinks.json` names — and the separate `WEBAUTHN_NATIVE_ORIGINS` secret is retired | Staging never allowlisted the Android origin, and the secret was not injected into the API container, so every Android ceremony passed the OS prompt then failed verification. Deriving keeps the WebAuthn allowlist in step with the association file and survives destroy/up | user |
 | D-039 | The live client carries the session cookie itself and persists it in platform secure storage, restoring and verifying it on launch | Native Flutter has no browser cookie jar, so the HttpOnly session cookie set by C-002/C-004 was dropped and every authenticated call 401'd. Secure storage is the native equivalent of the browser jar and keeps NFR-026's 30-day session across app restarts | user |
 | D-040 | Hosted private-service identity tokens are minted with `google.oauth2.id_token.fetch_id_token` (metadata-server path), not by signing with a service-account key | On Cloud Run, `google.auth.default()` returns compute-engine credentials with no `.signer`, so the JWT-encode path raised `AttributeError` and every gateway→AI/payments hop returned 500. The metadata id_token path is Google's documented service-to-service method and needs no key file | lead |
+| D-041 | The assistant converses across multiple turns to resolve intent (a representative that asks follow-ups), superseding the single-clarifying-question rule; the BPRD and C-009 are updated before the implementation | The product owner wants the LLM used conversationally rather than as a one-shot command parser, and "Hello" exposed that non-command input dead-ends at "not covered"; the current BPRD mandates exactly one turn, so the behaviour change is a spec update first | user |
 
 ## Definition of Done
 
