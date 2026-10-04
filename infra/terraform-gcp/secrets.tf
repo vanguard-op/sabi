@@ -8,9 +8,8 @@
 locals {
   # Application secrets, keyed by the .env variable they populate. Those a fresh
   # environment can generate are filled by Terraform below; the rest (the model
-  # API key, the rail credential, the native WebAuthn origins) have no committed
-  # default and are written out-of-band or by the `up` workflow from GitHub
-  # secrets.
+  # API key, the rail credential) have no committed default and are written
+  # out-of-band or by the `up` workflow from GitHub secrets.
   #
   # The two connection strings live here rather than as plain launch variables
   # because each embeds the database password, and Secret Manager is the only
@@ -20,7 +19,6 @@ locals {
     "RECOVERY_CODE_PEPPER",
     "MANDATE_SIGNING_KEY",
     "GEMINI_API_KEY",
-    "WEBAUTHN_NATIVE_ORIGINS",
     "PAYMENT_RAIL_CREDENTIAL",
     "DATABASE_URL",
     "PAYMENTS_DATABASE_URL",
@@ -87,12 +85,10 @@ resource "google_secret_manager_secret_version" "generated" {
 # an unset secret carries a single space rather than "". The application trims
 # its configuration (`ModelSettings.from_env` and the API settings both strip
 # whitespace), so a space reads as unset: the AI service uses its keyword
-# fallback, and the rail credential is treated as absent. The native-origin list
-# is a JSON array and is valid as `[]`.
+# fallback, and the rail credential is treated as absent.
 resource "google_secret_manager_secret_version" "placeholder" {
   for_each = {
     GEMINI_API_KEY          = " "
-    WEBAUTHN_NATIVE_ORIGINS = "[]"
     PAYMENT_RAIL_CREDENTIAL = " "
   }
 

@@ -38,7 +38,6 @@ locals {
     api = [
       "SESSION_SECRET",
       "RECOVERY_CODE_PEPPER",
-      "WEBAUTHN_NATIVE_ORIGINS",
       "DATABASE_URL",
       "PAYMENTS_DATABASE_URL",
     ]

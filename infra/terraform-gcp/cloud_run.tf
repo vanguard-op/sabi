@@ -63,7 +63,6 @@ locals {
     RECOVERY_CODE_PEPPER    = google_secret_manager_secret.app["RECOVERY_CODE_PEPPER"].secret_id
     MANDATE_SIGNING_KEY     = google_secret_manager_secret.app["MANDATE_SIGNING_KEY"].secret_id
     GEMINI_API_KEY          = google_secret_manager_secret.app["GEMINI_API_KEY"].secret_id
-    WEBAUTHN_NATIVE_ORIGINS = google_secret_manager_secret.app["WEBAUTHN_NATIVE_ORIGINS"].secret_id
     PAYMENT_RAIL_CREDENTIAL = google_secret_manager_secret.app["PAYMENT_RAIL_CREDENTIAL"].secret_id
     DATABASE_URL            = google_secret_manager_secret.app["DATABASE_URL"].secret_id
     PAYMENTS_DATABASE_URL   = google_secret_manager_secret.app["PAYMENTS_DATABASE_URL"].secret_id
