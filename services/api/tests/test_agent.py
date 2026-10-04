@@ -8,6 +8,7 @@ behaviour itself is covered by the AI service's own tests, not here.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -57,6 +58,11 @@ SURFACE_RESPONSE = {
     "fallback": "confirmation",
 }
 
+HISTORY = [
+    {"role": "user", "text": "I wan pay my light bill"},
+    {"role": "assistant", "text": "Which electricity biller?"},
+]
+
 
 class FakeAgentClient:
     """A deterministic stand-in for the AI service client."""
@@ -69,8 +75,18 @@ class FakeAgentClient:
         self.intent_response: dict[str, Any] = INTENT_RESPONSE
         self.surface_response: dict[str, Any] = SURFACE_RESPONSE
 
-    def resolve_intent(self, *, text: str, locale: str, channel: str) -> dict[str, Any]:
-        self.intent_calls.append({"text": text, "locale": locale, "channel": channel})
+    def resolve_intent(
+        self,
+        *,
+        text: str,
+        locale: str,
+        channel: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        call: dict[str, Any] = {"text": text, "locale": locale, "channel": channel}
+        if history is not None:
+            call["history"] = history
+        self.intent_calls.append(call)
         if self.intent_error is not None:
             raise self.intent_error
         return self.intent_response
@@ -163,6 +179,84 @@ def test_intents_rejects_out_of_contract_input_with_400(
 ) -> None:
     _sign_in(api_client, session_manager)
     response = api_client.post("/v1/agent/intents", json=body)
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert agent_client.intent_calls == []
+
+
+def test_intents_is_valid_without_history(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    _sign_in(api_client, session_manager)
+    response = api_client.post("/v1/agent/intents", json={"text": "pay electricity"})
+    assert response.status_code == 200
+    # An absent history stays absent on the forwarded call.
+    assert agent_client.intent_calls == [
+        {"text": "pay electricity", "locale": "en", "channel": "app"}
+    ]
+
+
+def test_intents_forwards_history_intact(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    _sign_in(api_client, session_manager)
+    response = api_client.post(
+        "/v1/agent/intents",
+        json={"text": "the one I mentioned", "history": HISTORY},
+    )
+    assert response.status_code == 200
+    assert agent_client.intent_calls == [
+        {
+            "text": "the one I mentioned",
+            "locale": "en",
+            "channel": "app",
+            "history": HISTORY,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        "not a list",
+        {"role": "user", "text": "hi"},
+        [{"role": "user"}],
+        [{"role": "user", "text": 5}],
+        [{"role": "user", "text": "hi"}, "hello"],
+    ],
+)
+def test_intents_rejects_a_malformed_history_with_400(
+    api_client: TestClient,
+    session_manager: SessionManager,
+    agent_client: FakeAgentClient,
+    history: object,
+) -> None:
+    _sign_in(api_client, session_manager)
+    response = api_client.post("/v1/agent/intents", json={"text": "pay", "history": history})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert agent_client.intent_calls == []
+
+
+def test_intents_rejects_an_unknown_history_role_with_400(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    _sign_in(api_client, session_manager)
+    response = api_client.post(
+        "/v1/agent/intents",
+        json={"text": "pay", "history": [{"role": "system", "text": "hi"}]},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert agent_client.intent_calls == []
+
+
+def test_intents_rejects_more_than_six_history_entries_with_400(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    _sign_in(api_client, session_manager)
+    history = [{"role": "user", "text": f"turn {index}"} for index in range(7)]
+    response = api_client.post("/v1/agent/intents", json={"text": "pay", "history": history})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_request"
     assert agent_client.intent_calls == []
@@ -293,6 +387,41 @@ def test_http_client_reports_a_transport_failure_as_unavailable() -> None:
         client.resolve_intent(text="pay", locale="en", channel="app")
     assert error.value.status_code == 503
     assert error.value.code == AI_UNAVAILABLE
+
+
+class _CapturingTransport(httpx.BaseTransport):
+    def __init__(self, response: httpx.Response) -> None:
+        self._response = response
+        self.requests: list[httpx.Request] = []
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        return self._response
+
+
+def _capturing_client() -> tuple[HttpAgentAIClient, _CapturingTransport]:
+    client = HttpAgentAIClient(AIEndpoint("http://ai", 1.0))
+    transport = _CapturingTransport(_response(200, INTENT_RESPONSE))
+    client._client = httpx.Client(base_url="http://ai", transport=transport)
+    return client, transport
+
+
+def test_http_client_forwards_history_in_the_c009_body() -> None:
+    client, transport = _capturing_client()
+
+    client.resolve_intent(text="pay", locale="en", channel="app", history=HISTORY)
+
+    body = json.loads(transport.requests[0].content)
+    assert body == {"text": "pay", "locale": "en", "channel": "app", "history": HISTORY}
+
+
+def test_http_client_omits_an_absent_history_from_the_c009_body() -> None:
+    client, transport = _capturing_client()
+
+    client.resolve_intent(text="pay", locale="en", channel="app")
+
+    body = json.loads(transport.requests[0].content)
+    assert body == {"text": "pay", "locale": "en", "channel": "app"}
 
 
 def test_endpoint_prefers_an_explicit_base_url() -> None:

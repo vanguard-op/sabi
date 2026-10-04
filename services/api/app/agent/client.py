@@ -68,7 +68,14 @@ def _timeout(source: dict[str, str]) -> float:
 class AgentAIClient(Protocol):
     """The two model-backed capabilities the gateway forwards."""
 
-    def resolve_intent(self, *, text: str, locale: str, channel: str) -> dict[str, Any]: ...
+    def resolve_intent(
+        self,
+        *,
+        text: str,
+        locale: str,
+        channel: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]: ...
 
     def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]: ...
 
@@ -92,11 +99,20 @@ class HttpAgentAIClient:
     def close(self) -> None:
         self._client.close()
 
-    def resolve_intent(self, *, text: str, locale: str, channel: str) -> dict[str, Any]:
-        return self._post(
-            "/v1/agent/intents",
-            json={"text": text, "locale": locale, "channel": channel},
-        )
+    def resolve_intent(
+        self,
+        *,
+        text: str,
+        locale: str,
+        channel: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"text": text, "locale": locale, "channel": channel}
+        # An omitted history stays omitted on the wire; the AI service applies its
+        # own default. A present history is forwarded exactly as validated.
+        if history is not None:
+            body["history"] = history
+        return self._post("/v1/agent/intents", json=body)
 
     def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
         return self._post("/v1/agent/surfaces", json={"task": task, "context": context})

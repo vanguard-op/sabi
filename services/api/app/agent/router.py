@@ -16,7 +16,7 @@ of its own to give.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
@@ -37,12 +37,42 @@ router = APIRouter(tags=["agent"])
 
 # C-009 bounds and vocabularies.
 _MAX_TEXT_LENGTH = 200
+_MAX_HISTORY_ENTRIES = 6
 _LOCALES = frozenset({"en", "pcm"})
 _CHANNELS = frozenset({"app", "ussd", "sms", "whatsapp"})
+_HISTORY_ROLES = frozenset({"user", "assistant"})
+_HISTORY_INVALID = "That conversation history is not valid."
 
 AccountOwner = Annotated[SessionData, Depends(current_user)]
 AgentClient = Annotated[AgentAIClient, Depends(get_agent_client)]
 Limiter = Annotated[RateLimiter, Depends(get_rate_limiter)]
+
+
+def _validated_history(raw: Any) -> list[dict[str, str]] | None:
+    """Return the C-009 conversation history, or raise the contract's 400.
+
+    The request declares ``history`` loosely so a malformed value reaches here
+    and gets the shared envelope instead of the framework's 422. Each entry must
+    be an object whose ``role`` is ``user`` or ``assistant`` and whose ``text``
+    is a string; order is preserved and the entries are forwarded as received.
+    """
+
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise APIError(400, ErrorCode.INVALID_REQUEST, _HISTORY_INVALID)
+    if len(raw) > _MAX_HISTORY_ENTRIES:
+        raise APIError(400, ErrorCode.INVALID_REQUEST, "That conversation is too long.")
+    history: list[dict[str, str]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise APIError(400, ErrorCode.INVALID_REQUEST, _HISTORY_INVALID)
+        role = entry.get("role")
+        text = entry.get("text")
+        if not isinstance(role, str) or role not in _HISTORY_ROLES or not isinstance(text, str):
+            raise APIError(400, ErrorCode.INVALID_REQUEST, _HISTORY_INVALID)
+        history.append(entry)
+    return history
 
 
 @router.post("/agent/intents", response_model=IntentResponse)
@@ -64,8 +94,11 @@ def resolve_intent(
         raise APIError(400, ErrorCode.INVALID_REQUEST, "That locale is not supported.")
     if payload.channel not in _CHANNELS:
         raise APIError(400, ErrorCode.INVALID_REQUEST, "That channel is not supported.")
+    history = _validated_history(payload.history)
 
-    return client.resolve_intent(text=text, locale=payload.locale, channel=payload.channel)
+    return client.resolve_intent(
+        text=text, locale=payload.locale, channel=payload.channel, history=history
+    )
 
 
 @router.post("/agent/surfaces", response_model=SurfaceResponse)

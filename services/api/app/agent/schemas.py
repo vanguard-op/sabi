@@ -19,6 +19,11 @@ class IntentRequest(BaseModel):
     ``text`` is optional at the schema layer so the router can return the
     contract's 400 for a missing or empty value rather than the framework's 422;
     defaults match the AI service.
+
+    ``history`` is the earlier turns of the exchange, oldest first. It is typed
+    loosely for the same reason as ``text``: the router validates the entries and
+    returns the contract's 400 for a malformed or oversized history rather than
+    the framework's 422. A present history is forwarded unchanged.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -26,6 +31,7 @@ class IntentRequest(BaseModel):
     text: str | None = None
     locale: str = "en"
     channel: str = "app"
+    history: Any = None
 
 
 class IntentOut(BaseModel):
