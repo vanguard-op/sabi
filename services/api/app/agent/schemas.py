@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IntentRequest(BaseModel):
@@ -92,12 +92,20 @@ class SurfaceRequest(BaseModel):
     task context and is forwarded unchanged; for a ``receipt`` task it may carry a
     resolved record reference from a record lookup instead of a post-payment
     service payment.
+
+    ``catalogId`` is the client's published Sabi A2UI catalog, negotiated from the
+    ``supportedCatalogIds`` the client advertises (C-012 revision 2). It is
+    optional at the schema layer: the gateway validates and forwards whatever the
+    client sends, and the AI service decides whether the named catalog is one it
+    can speak, answering with the same-task fallback when it is absent or unknown.
+    The gateway never composes or validates components itself.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     task: str | None = None
     context: dict[str, Any] = {}
+    catalog_id: str | None = Field(default=None, alias="catalogId")
 
 
 class SurfaceResponse(BaseModel):

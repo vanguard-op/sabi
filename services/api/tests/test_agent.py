@@ -55,8 +55,27 @@ INTENT_RESPONSE = {
     "source": "model",
 }
 
+# The C-012 revision-2 body: an A2UI v0.9 message stream conforming to the
+# published Sabi catalog (createSurface naming the catalog, updateComponents with
+# a root) and the fallback task key.
+CATALOG_ID = "https://sabi.app/a2ui/v1/catalog.json"
+
 SURFACE_RESPONSE = {
-    "messages": [{"type": "createSurface", "surfaceId": "s1"}],
+    "messages": [
+        {
+            "version": "v0.9",
+            "createSurface": {"surfaceId": "s1", "catalogId": CATALOG_ID},
+        },
+        {
+            "version": "v0.9",
+            "updateComponents": {
+                "surfaceId": "s1",
+                "components": [
+                    {"id": "root", "component": "ConfirmationSummary"},
+                ],
+            },
+        },
+    ],
     "fallback": "confirmation",
 }
 
@@ -96,8 +115,17 @@ class FakeAgentClient:
             raise self.intent_error
         return self.intent_response
 
-    def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
-        self.surface_calls.append({"task": task, "context": context})
+    def compose_surface(
+        self,
+        *,
+        task: str,
+        context: dict[str, Any],
+        catalog_id: str | None = None,
+    ) -> dict[str, Any]:
+        call: dict[str, Any] = {"task": task, "context": context}
+        if catalog_id is not None:
+            call["catalogId"] = catalog_id
+        self.surface_calls.append(call)
         if self.surface_error is not None:
             raise self.surface_error
         return self.surface_response
@@ -467,17 +495,53 @@ def test_surfaces_requires_a_session(api_client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_surfaces_forwards_task_and_context(
+def test_surfaces_forwards_task_context_and_catalog_id(
     api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
 ) -> None:
     _sign_in(api_client, session_manager)
     response = api_client.post(
         "/v1/agent/surfaces",
-        json={"task": " confirmation ", "context": {"amount": 50000}},
+        json={
+            "task": " confirmation ",
+            "context": {"amount": 50000},
+            "catalogId": CATALOG_ID,
+        },
     )
     assert response.status_code == 200
     assert response.json() == SURFACE_RESPONSE
-    assert agent_client.surface_calls == [{"task": "confirmation", "context": {"amount": 50000}}]
+    # The catalog is forwarded byte-for-byte, never validated or rewritten here.
+    assert agent_client.surface_calls == [
+        {"task": "confirmation", "context": {"amount": 50000}, "catalogId": CATALOG_ID}
+    ]
+
+
+def test_surfaces_forwards_an_absent_catalog_id_as_absent(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    # An absent catalog is the client's choice; the gateway forwards the absence
+    # so the AI service can answer with the same-task fallback rather than the
+    # gateway inventing a catalog.
+    _sign_in(api_client, session_manager)
+    response = api_client.post("/v1/agent/surfaces", json={"task": "confirmation", "context": {}})
+    assert response.status_code == 200
+    assert agent_client.surface_calls == [{"task": "confirmation", "context": {}}]
+
+
+def test_surfaces_does_not_validate_the_catalog_id(
+    api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient
+) -> None:
+    # The gateway validates and forwards; whether a catalog is one the agent can
+    # speak is decided by the AI service, so an unknown catalog id is still a 200
+    # pass-through, not a gateway 400.
+    _sign_in(api_client, session_manager)
+    response = api_client.post(
+        "/v1/agent/surfaces",
+        json={"task": "receipt", "context": {}, "catalogId": "https://example.test/other.json"},
+    )
+    assert response.status_code == 200
+    assert agent_client.surface_calls == [
+        {"task": "receipt", "context": {}, "catalogId": "https://example.test/other.json"}
+    ]
 
 
 @pytest.mark.parametrize(
@@ -501,7 +565,7 @@ def test_surfaces_rejects_an_unknown_task_with_400(
 def test_surfaces_accepts_every_contract_task(
     api_client: TestClient, session_manager: SessionManager, agent_client: FakeAgentClient, task
 ) -> None:
-    """C-012 revision 1: every task type, including verification and recovery."""
+    """C-012: every task type, including verification and recovery."""
 
     _sign_in(api_client, session_manager)
     response = api_client.post("/v1/agent/surfaces", json={"task": task, "context": {}})
@@ -658,6 +722,24 @@ def test_http_client_forwards_the_c012_task_and_context_unchanged() -> None:
     assert transport.requests[0].url.path == "/v1/agent/surfaces"
     body = json.loads(transport.requests[0].content)
     assert body == {"task": "recovery", "context": context}
+
+
+def test_http_client_forwards_the_c012_catalog_id_unchanged() -> None:
+    client, transport = _capturing_client()
+
+    client.compose_surface(task="confirmation", context={}, catalog_id=CATALOG_ID)
+
+    body = json.loads(transport.requests[0].content)
+    assert body == {"task": "confirmation", "context": {}, "catalogId": CATALOG_ID}
+
+
+def test_http_client_omits_an_absent_c012_catalog_id() -> None:
+    client, transport = _capturing_client()
+
+    client.compose_surface(task="confirmation", context={})
+
+    body = json.loads(transport.requests[0].content)
+    assert "catalogId" not in body
 
 
 def test_endpoint_prefers_an_explicit_base_url() -> None:

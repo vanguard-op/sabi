@@ -78,7 +78,13 @@ class AgentAIClient(Protocol):
         candidates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]: ...
 
-    def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]: ...
+    def compose_surface(
+        self,
+        *,
+        task: str,
+        context: dict[str, Any],
+        catalog_id: str | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class HttpAgentAIClient:
@@ -121,8 +127,21 @@ class HttpAgentAIClient:
             body["candidates"] = candidates
         return self._post("/v1/agent/intents", json=body)
 
-    def compose_surface(self, *, task: str, context: dict[str, Any]) -> dict[str, Any]:
-        return self._post("/v1/agent/surfaces", json={"task": task, "context": context})
+    def compose_surface(
+        self,
+        *,
+        task: str,
+        context: dict[str, Any],
+        catalog_id: str | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"task": task, "context": context}
+        # The client's published catalog is forwarded unchanged when the client
+        # named one. An absent catalog stays absent: the AI service treats it as
+        # no compatible catalog and answers with the same-task fallback, rather
+        # than the gateway inventing a catalog on the client's behalf.
+        if catalog_id is not None:
+            body["catalogId"] = catalog_id
+        return self._post("/v1/agent/surfaces", json=body)
 
     def _auth_headers(self) -> dict[str, str]:
         """Attach an identity token for the private origin, when configured.

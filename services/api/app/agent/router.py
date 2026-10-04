@@ -178,4 +178,13 @@ def compose_surface(
     # The context is untrusted, free-form task data; a resolved record reference for
     # a ``receipt`` task is carried here and forwarded exactly as received. The
     # gateway neither composes nor reshapes: the AI service owns composition.
-    return client.compose_surface(task=task, context=payload.context)
+    #
+    # ``catalogId`` is the client's published Sabi A2UI catalog, negotiated from
+    # its supportedCatalogIds (C-012 revision 2). The gateway validates and
+    # forwards it unchanged; whether the named catalog is one the agent can speak,
+    # and the A2UI validation of the composed stream, are the AI service's job.
+    return client.compose_surface(
+        task=task,
+        context=payload.context,
+        catalog_id=payload.catalog_id,
+    )
