@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:sabi_mobile/a2ui/mock_surface_repository.dart';
 import 'package:sabi_mobile/a2ui/providers.dart';
 import 'package:sabi_mobile/a2ui/surface_repository.dart';
@@ -12,11 +10,10 @@ import 'package:sabi_mobile/components/service_result_row.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/data/repositories.dart';
-import 'package:sabi_mobile/design_system/sab_art.dart';
-import 'package:sabi_mobile/design_system/theme.dart';
 import 'package:sabi_mobile/features/home/home_controller.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
-import 'package:sabi_mobile/l10n/sab_strings.dart';
+import 'package:sabi_mobile/features/payment/payment_strings.dart';
+import 'package:sabi_mobile/l10n/sab_strings.dart' show AppLocale;
 import 'package:sabi_mobile/models/intent_result.dart';
 import 'package:sabi_mobile/models/service_summary.dart';
 
@@ -222,14 +219,17 @@ void main() {
       await tester.tap(find.text('Onitsha North LGA'));
       await tester.pumpAndSettle();
 
-      // No navigation: the confirmation is composed inline and the screen is
-      // offered as the explicit alternate. The selected service's own payee and
-      // known amount are shown, never a message or an invented value.
+      // No navigation: the confirmation is composed inline. The selected
+      // service's own payee and known amount are shown, never a message or an
+      // invented value, and the authorise action is the explicit confirmation.
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(find.byType(ServiceResultRow), findsNothing);
       expect(find.text('Onitsha North LGA'), findsOneWidget);
       expect(find.textContaining('2,500'), findsOneWidget);
-      expect(find.text(SabStrings.english.openPaymentScreen), findsOneWidget);
+      expect(
+        find.text(PaymentStrings.english.authorisePayment),
+        findsOneWidget,
+      );
       final state = containerOf(tester).read(homeControllerProvider);
       expect(state.phase, HomePhase.confirmation);
       expect(state.selectedService?.serviceId, 'svc_north');
@@ -259,11 +259,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // The prewritten confirmation fallback carries the selected service's own
-      // known amount, not a zero, and keeps the screen as the alternate.
+      // known amount, not a zero, and still offers the authorise action.
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(find.text('Onitsha North LGA'), findsOneWidget);
       expect(find.textContaining('2,500'), findsOneWidget);
-      expect(find.text(SabStrings.english.openPaymentScreen), findsOneWidget);
+      expect(
+        find.text(PaymentStrings.english.authorisePayment),
+        findsOneWidget,
+      );
       expect(
         containerOf(tester).read(homeControllerProvider).phase,
         HomePhase.confirmation,
@@ -295,66 +298,11 @@ void main() {
           containerOf(tester).read(homeControllerProvider).phase,
           HomePhase.confirmation,
         );
-        expect(find.text(SabStrings.english.openPaymentScreen), findsOneWidget);
+        expect(
+          find.text(PaymentStrings.english.authorisePayment),
+          findsOneWidget,
+        );
       },
     );
   });
-
-  group('the payment screen is the explicit alternate', () {
-    testWidgets('the confirmation action pushes the payment route', (
-      tester,
-    ) async {
-      final catalogue = _Catalogue([
-        _discovery([
-          _service('svc_north', 'Onitsha North LGA', amount: 250000),
-        ]),
-      ]);
-      await _pumpRoutedHome(tester, overrides: _widgetOverrides(catalogue));
-      await tester.pumpAndSettle();
-      await _submit(tester, 'council levy');
-
-      await tester.tap(find.text('Onitsha North LGA'));
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeScreen), findsOneWidget);
-
-      await tester.tap(find.text(SabStrings.english.openPaymentScreen));
-      await tester.pumpAndSettle();
-
-      // The alternate action pushes the Payment Confirmation route, and the
-      // conversation was never the fallback that pushed it.
-      expect(find.text('PAY svc_north'), findsOneWidget);
-    });
-  });
-}
-
-/// Pumps Home inside a router with a stub payment route, so the alternate
-/// action's push can be asserted without the full app.
-Future<void> _pumpRoutedHome(
-  WidgetTester tester, {
-  required List<Override> overrides,
-}) async {
-  await initializeDateFormatting('en_NG');
-  final router = GoRouter(
-    initialLocation: '/home',
-    routes: [
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
-      GoRoute(
-        path: '/pay/:serviceId',
-        builder: (context, state) =>
-            Scaffold(body: Text('PAY ${state.pathParameters['serviceId']}')),
-      ),
-    ],
-  );
-  await tester.pumpWidget(
-    SabArtMode(
-      staticOnly: true,
-      child: ProviderScope(
-        overrides: overrides,
-        child: MaterialApp.router(
-          theme: buildSabTheme(Brightness.light),
-          routerConfig: router,
-        ),
-      ),
-    ),
-  );
 }

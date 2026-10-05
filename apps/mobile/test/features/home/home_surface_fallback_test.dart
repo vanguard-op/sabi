@@ -9,6 +9,7 @@ import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/data/repositories.dart';
 import 'package:sabi_mobile/features/home/home_controller.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
+import 'package:sabi_mobile/features/payment/payment_strings.dart';
 import 'package:sabi_mobile/l10n/sab_strings.dart';
 import 'package:sabi_mobile/models/intent_result.dart';
 import 'package:sabi_mobile/models/service_summary.dart';
@@ -191,7 +192,12 @@ void main() {
         HomePhase.confirmation,
       );
       expect(find.text('Lagos State Government'), findsOneWidget);
-      expect(find.text('Open payment screen'), findsOneWidget);
+      // The fallback form still carries the task: the authorise action is
+      // client chrome and stays reachable when composition fails.
+      expect(
+        find.text(PaymentStrings.english.authorisePayment),
+        findsOneWidget,
+      );
     });
   });
 
@@ -214,6 +220,9 @@ void main() {
     );
     expect(container.read(homeControllerProvider).surface, isNotNull);
     expect(find.text('Lagos State Government'), findsOneWidget);
-    expect(find.text(SabStrings.english.openPaymentScreen), findsOneWidget);
+    expect(
+      find.text(PaymentStrings.english.authorisePayment),
+      findsOneWidget,
+    );
   });
 }

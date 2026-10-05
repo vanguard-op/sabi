@@ -98,6 +98,44 @@ void main() {
     },
   );
 
+  test('begin binds the conversation service and amount to the mandate', () async {
+    final container = _container();
+    const id = 'svc_conversation';
+    final notifier = container.read(paymentControllerProvider(id).notifier);
+    await notifier.begin(
+      const ServiceSummary(
+        serviceId: id,
+        name: 'Land Use Charge',
+        collectingBody: 'Lagos State Government',
+        category: 'Government',
+        knownAmount: 2500000,
+      ),
+      amount: 2500000,
+    );
+    final state = container.read(paymentControllerProvider(id));
+    expect(state.phase, PaymentPhase.ready);
+    expect(state.obligation.service.collectingBody, 'Lagos State Government');
+    expect(state.effectiveAmount, 2500000);
+  });
+
+  test('begin with no known amount opens the inline amount entry', () async {
+    final container = _container();
+    const id = 'svc_variable_conversation';
+    final notifier = container.read(paymentControllerProvider(id).notifier);
+    await notifier.begin(
+      const ServiceSummary(
+        serviceId: id,
+        name: 'Electricity token',
+        collectingBody: 'Ikeja Electric',
+        category: 'Biller',
+      ),
+    );
+    expect(
+      container.read(paymentControllerProvider(id)).phase,
+      PaymentPhase.amountEntry,
+    );
+  });
+
   test('a variable obligation opens the amount entry state', () async {
     final id = 'svc_test';
     final obligation = _obligation(amount: null);

@@ -11,7 +11,6 @@ import '../features/account/account_screen.dart';
 import '../features/account/verification/verification_screen.dart';
 import '../features/case/case_screen.dart';
 import '../features/home/home_screen.dart';
-import '../features/payment/payment_confirmation_screen.dart';
 import '../features/placeholder/gated_screen.dart';
 import '../features/receipts/receipt_detail_screen.dart';
 import '../features/receipts/receipts_screen.dart';
@@ -19,8 +18,9 @@ import '../features/sign_in/sign_in_screen.dart';
 import '../features/welcome/welcome_screen.dart';
 
 /// The navigation map from screens.md. Tabbed screens sit inside the shell;
-/// task-first surfaces (Payment Confirmation, Identity Verification, Case) push
-/// above it without the shell.
+/// the remaining task-first surfaces (Identity Verification, Case) push above
+/// it without the shell. Every payment task completes inline in the
+/// conversation, so no payment route exists (D-057).
 class SabRoutes {
   const SabRoutes._();
 
@@ -30,10 +30,8 @@ class SabRoutes {
   static const home = '/home';
   static const receipts = '/receipts';
   static const account = '/account';
-  static const paymentConfirmation = '/pay';
   static const identityVerification = '/account/verify';
 
-  static String payment(String serviceId) => '$paymentConfirmation/$serviceId';
   static String receipt(String receiptId) => '$receipts/$receiptId';
 }
 
@@ -84,16 +82,6 @@ GoRouter buildRouter(Ref ref) {
             SignInScreen(from: state.uri.queryParameters['from']),
       ),
       // Task-first surfaces: no navigation shell.
-      GoRoute(
-        path: '${SabRoutes.paymentConfirmation}/:serviceId',
-        builder: (context, state) => SabGatedScreen(
-          feature: SabFeature.paymentAuthorization,
-          title: state.pathParameters['serviceId'] ?? 'Payment',
-          builder: (context) => PaymentConfirmationScreen(
-            serviceId: state.pathParameters['serviceId'] ?? '',
-          ),
-        ),
-      ),
       GoRoute(
         path: SabRoutes.identityVerification,
         builder: (context, state) => SabGatedScreen(

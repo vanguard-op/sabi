@@ -143,11 +143,9 @@ class SabStrings {
   String get sendFailed => _t('sendFailed');
   String get questionLabel => _t('questionLabel');
 
-  // Home inline tasks (FEAT-011, C-012 revision 1). A task the conversation
-  // resolves renders inline; the existing screen stays an alternate route the
-  // user may choose, so the action names the screen rather than being the only
-  // way to finish.
-  String get openPaymentScreen => _t('openPaymentScreen');
+  // Home inline tasks (FEAT-011, C-012 revision 2). A task the conversation
+  // resolves renders inline and completes there; the remaining screens are
+  // reached where a non-conversation surface still leads to them.
   String get verifyInlineTitle => _t('verifyInlineTitle');
   String get verifyInlineBody => _t('verifyInlineBody');
   String get verifyInlineAction => _t('verifyInlineAction');
@@ -372,7 +370,6 @@ class SabStrings {
     'sendFailed':
         'We couldn’t work that out. Check your connection and try again.',
     'questionLabel': 'Question',
-    'openPaymentScreen': 'Open payment screen',
     'verifyInlineTitle': 'Verify your identity',
     'verifyInlineBody': 'This payment needs your identity verified. It is held, not failed. Verify to continue, or open the identity screen.',
     'verifyInlineAction': 'Verify now',

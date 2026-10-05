@@ -267,6 +267,55 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
       _set(state.copyWith(phase: PaymentPhase.offline));
       return;
     }
+    await _resolveFlow();
+  }
+
+  /// Begins the flow for a service the conversation already resolved.
+  ///
+  /// The conversation holds the discovery result the user selected, so the
+  /// obligation is bound to that exact service and amount: the confirmation the
+  /// user sees and the mandate that is signed agree (FEAT-005). The flow kind
+  /// still comes from the catalogue (C-011), so a federal collection keeps its
+  /// prepare step and a bill its validation; only the shared
+  /// authorise-and-execute path treats the obligation as ready.
+  Future<void> begin(
+    ServiceSummary service, {
+    int? amount,
+    String? reference,
+  }) async {
+    var kind = PaymentKind.standard;
+    try {
+      final resolved = await ref.read(
+        paymentObligationProvider(service.serviceId).future,
+      );
+      kind = resolved.kind;
+    } catch (_) {
+      // An unknown service keeps the shared path; authorisation surfaces the
+      // catalogue error rather than the client inventing a flow.
+    }
+    if (!ref.mounted) return;
+    _set(
+      PaymentConfirmationState(
+        obligation: PaymentObligation(
+          service: service,
+          amount: amount ?? service.knownAmount,
+          reference: reference,
+          currency: service.currency,
+          kind: kind,
+        ),
+      ),
+    );
+    if (!ref.read(connectivityProvider)) {
+      _set(state.copyWith(phase: PaymentPhase.offline));
+      return;
+    }
+    await _resolveFlow();
+  }
+
+  /// Runs the flow-specific resolution once the obligation is known: federal
+  /// prepares its collection facts, a bill needs a recipient before validation,
+  /// and a standard obligation is ready as soon as it has an amount.
+  Future<void> _resolveFlow() async {
     try {
       if (state.isFederal) {
         final prepare = await _federal.prepare(
@@ -324,10 +373,12 @@ class PaymentController extends Notifier<PaymentConfirmationState> {
     }
   }
 
-  /// Sets the payer reference for a federal collection and re-resolves.
+  /// Sets the payer reference for a federal collection and re-resolves the
+  /// flow. It keeps the conversation-bound obligation rather than re-fetching
+  /// it, so the amount the user was shown is preserved.
   Future<void> setReference(String reference) async {
     _set(state.copyWith(reference: reference.trim(), failure: null));
-    if (state.isFederal) await resolve();
+    if (state.isFederal) await _resolveFlow();
   }
 
   /// Sets the bill recipient identifier and validates it.

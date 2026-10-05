@@ -12,6 +12,8 @@ import '../../l10n/sab_strings.dart';
 import '../../models/intent_result.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
+import '../payment/models/payment.dart';
+import '../payment/payment_controller.dart';
 
 /// The Home conversation states from screens.md (screen 3). `idle` is the
 /// neutral state before any request, `queued` is a request captured offline,
@@ -431,28 +433,46 @@ class HomeController extends Notifier<HomeState> {
           final service = intent.candidates.isNotEmpty
               ? intent.candidates.first
               : null;
-          final surface = await _compose(
-            SurfaceTask.confirmation,
-            context: {
-              'amount': intent.amount,
-              'currency': intent.currency,
-              'payee': service?.collectingBody ?? intent.target ?? '',
-              'reference': intent.reference,
-            },
-          );
-          _updateCurrent(
-            (turn) => turn.copyWith(
-              phase: HomePhase.confirmation,
-              intent: intent,
-              candidates: intent.candidates,
-              selectedService: service,
-              surface: surface.stream,
-              surfaceTask: SurfaceTask.confirmation,
-              surfaceFailed: !surface.accepted,
-            ),
-          );
+          if (service == null) {
+            // No resolved service to bind the mandate to: compose the summary
+            // from the intent alone so the task still shows, with no authorise
+            // action (the gate needs a payee the client resolved).
+            final surface = await _compose(
+              SurfaceTask.confirmation,
+              context: {
+                'amount': intent.amount,
+                'currency': intent.currency,
+                'payee': intent.target ?? '',
+                'reference': intent.reference,
+              },
+            );
+            _updateCurrent(
+              (turn) => turn.copyWith(
+                phase: HomePhase.confirmation,
+                intent: intent,
+                candidates: intent.candidates,
+                surface: surface.stream,
+                surfaceTask: SurfaceTask.confirmation,
+                surfaceFailed: !surface.accepted,
+              ),
+            );
+            return null;
+          }
+          await _startPayment(service: service, intent: intent);
           return null;
         case SurfaceTask.amountEntry:
+          final service = intent.candidates.isNotEmpty
+              ? intent.candidates.first
+              : null;
+          if (service == null) break;
+          // A variable-amount request composes its amount entry inline; the
+          // amount the user enters binds the mandate (FEAT-005, FEAT-011).
+          await _startPayment(
+            service: service,
+            intent: intent,
+            forceAmountEntry: true,
+          );
+          return null;
         case SurfaceTask.discovery:
         case null:
           break;
@@ -524,9 +544,8 @@ class HomeController extends Notifier<HomeState> {
 
   /// Selects a discovery result and composes its confirmation inline, so the
   /// conversation is the primary control surface: the turn moves to
-  /// [HomePhase.confirmation] with the chosen service and the Payment
-  /// Confirmation screen stays an explicit alternate the user may choose
-  /// instead (D-050, screens.md "dual path"). Selecting never navigates.
+  /// [HomePhase.confirmation] with the chosen service. Selecting never
+  /// navigates (FEAT-011, screens.md "Confirmation inline").
   ///
   /// The service is resolved from the turn's own candidates, never taken from
   /// the action's context, so the agent cannot name a service the client did
@@ -546,11 +565,84 @@ class HomeController extends Notifier<HomeState> {
     // The composer disables on `composing`, so a second request cannot append
     // while the confirmation is being composed for this turn.
     _updateCurrent((turn) => turn.copyWith(phase: HomePhase.composing));
-    final intent = turn.intent;
+    await _startPayment(service: service, intent: turn.intent);
+  }
+
+  /// Starts the inline payment task for a service the client resolved: binds
+  /// the payment controller to the exact service and displayed amount, then
+  /// composes the amount-entry surface when the amount is still unknown, else
+  /// the confirmation surface. The controller holds the state machine, so the
+  /// authorise action and every payment state render from it (FEAT-005/011).
+  Future<void> _startPayment({
+    required ServiceSummary service,
+    required IntentResult? intent,
+    bool forceAmountEntry = false,
+  }) async {
+    final controller = ref.read(
+      paymentControllerProvider(service.serviceId).notifier,
+    );
+    final groundedAmount = forceAmountEntry
+        ? null
+        : (service.knownAmount ?? intent?.amount);
+    await controller.begin(
+      service,
+      amount: groundedAmount,
+      reference: intent?.reference,
+    );
+    if (!ref.mounted) return;
+    final payment = ref.read(paymentControllerProvider(service.serviceId));
+    if (forceAmountEntry || payment.phase == PaymentPhase.amountEntry) {
+      await _composeAmountEntry(
+        service,
+        intent,
+        payment.billValidation?.range,
+      );
+    } else {
+      await _composeConfirmation(service, intent);
+    }
+  }
+
+  /// Composes the amount-entry surface inline for a variable amount, carrying
+  /// the biller's C-033 range when one is known, so the user enters the amount
+  /// in the conversation.
+  Future<void> _composeAmountEntry(
+    ServiceSummary service,
+    IntentResult? intent,
+    BillRange? range,
+  ) async {
+    final billRange = range ?? _billRange(intent);
+    final surface = await _compose(
+      SurfaceTask.amountEntry,
+      context: {
+        'currency': service.currency,
+        'payee': service.collectingBody,
+        if (billRange != null) 'minimum': billRange.minimum,
+        if (billRange != null) 'maximum': billRange.maximum,
+      },
+    );
+    _updateCurrent(
+      (turn) => turn.copyWith(
+        phase: HomePhase.confirmation,
+        selectedService: service,
+        surface: surface.stream,
+        surfaceTask: SurfaceTask.amountEntry,
+        surfaceFailed: !surface.accepted,
+      ),
+    );
+  }
+
+  /// Composes the confirmation surface inline for [service]. The amount is the
+  /// grounded one the user was shown: the selected service's own known amount,
+  /// the intent amount, or the amount entered inline.
+  Future<void> _composeConfirmation(
+    ServiceSummary service,
+    IntentResult? intent, {
+    int? amount,
+  }) async {
     final surface = await _compose(
       SurfaceTask.confirmation,
       context: {
-        'amount': service.knownAmount ?? intent?.amount,
+        'amount': amount ?? service.knownAmount ?? intent?.amount,
         'currency': service.currency,
         'payee': service.collectingBody,
         'reference': intent?.reference,
@@ -565,6 +657,43 @@ class HomeController extends Notifier<HomeState> {
         surfaceFailed: !surface.accepted,
       ),
     );
+  }
+
+  /// Applies the amount entered inline for a variable obligation and composes
+  /// the confirmation for it, so the mandate is bound to the amount the user
+  /// typed rather than an invented one.
+  Future<void> setAmount(int amountMinor) async {
+    final turn = state.current;
+    final service = turn?.selectedService;
+    if (service == null) return;
+    _updateCurrent((turn) => turn.copyWith(phase: HomePhase.composing));
+    await ref
+        .read(paymentControllerProvider(service.serviceId).notifier)
+        .setAmount(amountMinor);
+    if (!ref.mounted) return;
+    await _composeConfirmation(service, turn?.intent, amount: amountMinor);
+  }
+
+  /// The accepted amount band the agent grounded for a variable bill (C-033
+  /// `range`), carried in the intent's constraints as `{minimum, maximum}` in
+  /// minor units. Null when the biller gave none.
+  BillRange? _billRange(IntentResult? intent) {
+    final constraints = intent?.constraints;
+    if (constraints == null) return null;
+    final raw = constraints['range'];
+    if (raw is Map) {
+      final minimum = raw['minimum'];
+      final maximum = raw['maximum'];
+      if (minimum is num && maximum is num) {
+        return BillRange(minimum: minimum.toInt(), maximum: maximum.toInt());
+      }
+    }
+    final minimum = constraints['minimum'];
+    final maximum = constraints['maximum'];
+    if (minimum is num && maximum is num) {
+      return BillRange(minimum: minimum.toInt(), maximum: maximum.toInt());
+    }
+    return null;
   }
 
   Future<List<ServiceSummary>?> _searchFallback(

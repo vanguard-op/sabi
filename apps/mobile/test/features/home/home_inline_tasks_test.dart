@@ -9,6 +9,7 @@ import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/data/repositories.dart';
 import 'package:sabi_mobile/features/home/home_controller.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
+import 'package:sabi_mobile/features/payment/payment_strings.dart';
 import 'package:sabi_mobile/l10n/sab_strings.dart';
 import 'package:sabi_mobile/models/intent_result.dart';
 import 'package:sabi_mobile/models/receipt_summary.dart';
@@ -314,7 +315,12 @@ void main() {
       await _submit(tester, 'pay land use');
       expect(find.text('Lagos State Government'), findsOneWidget);
       expect(find.textContaining('25,000'), findsOneWidget);
-      expect(find.text('Open payment screen'), findsOneWidget);
+      // The confirmation completes inline: the authorise action is the explicit
+      // confirmation, and there is no route to a separate payment screen.
+      expect(
+        find.text(PaymentStrings.english.authorisePayment),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a verification task renders the held surface', (tester) async {

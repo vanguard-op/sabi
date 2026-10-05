@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../a2ui/a2ui_surface.dart';
 import '../../a2ui/sabi_catalog.dart';
+import '../../a2ui/surface_task.dart';
 import '../../components/confirmation_summary.dart';
 import '../../components/empty_state.dart';
 import '../../components/error_state.dart';
@@ -23,6 +24,8 @@ import '../../design_system/tokens.dart';
 import '../../l10n/sab_strings.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
+import '../payment/payment_controller.dart';
+import '../payment/payment_task_view.dart';
 import 'home_controller.dart';
 
 /// Screen 3: Home (`/home`). State a payment need, resolve it, and reach
@@ -80,16 +83,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await ref.read(homeControllerProvider.notifier).submit(text);
   }
 
-  /// The explicit alternate route: the Payment Confirmation screen. Only the
-  /// confirmation surface's own action reaches it, never a discovery selection
-  /// (D-050, screens.md "dual path").
-  void _openPaymentScreen(String serviceId) => context.push('/pay/$serviceId');
-
   /// Selects a discovery result in the conversation: the turn composes its
   /// confirmation inline rather than navigating away.
   void _selectService(String serviceId) {
     ref.read(homeControllerProvider.notifier).selectService(serviceId);
   }
+
+  /// Opens the existing receipt screen for a settled bill, the non-conversation
+  /// route to the same record (FEAT-008).
+  void _openReceipt(String receiptId) => context.push('/receipts/$receiptId');
 
   /// Opens the existing screen for a record the conversation rendered inline,
   /// so the user may take either route to the same record (user-flow Flow 9).
@@ -191,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 state: state,
                 scrollController: _conversationScroll,
                 onSelectService: _selectService,
-                onOpenPaymentScreen: _openPaymentScreen,
+                onOpenReceipt: _openReceipt,
                 onOpenRecord: _openRecord,
                 onOpenVerification: _openVerification,
                 onRetry: () =>
@@ -218,7 +220,7 @@ class _Conversation extends ConsumerWidget {
     required this.state,
     required this.scrollController,
     required this.onSelectService,
-    required this.onOpenPaymentScreen,
+    required this.onOpenReceipt,
     required this.onOpenRecord,
     required this.onOpenVerification,
     required this.onRetry,
@@ -232,8 +234,8 @@ class _Conversation extends ConsumerWidget {
   /// Selects a discovery result in the conversation (never navigates).
   final ValueChanged<String> onSelectService;
 
-  /// Opens the Payment Confirmation screen, the explicit alternate route.
-  final ValueChanged<String> onOpenPaymentScreen;
+  /// Opens the existing Receipt Detail screen for a settled bill.
+  final ValueChanged<String> onOpenReceipt;
   final ValueChanged<ResolvedRecord> onOpenRecord;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
@@ -280,7 +282,7 @@ class _Conversation extends ConsumerWidget {
             turn: state.turns[i],
             isLatest: i == state.turns.length - 1,
             onSelectService: onSelectService,
-            onOpenPaymentScreen: onOpenPaymentScreen,
+            onOpenReceipt: onOpenReceipt,
             onOpenRecord: onOpenRecord,
             onOpenVerification: onOpenVerification,
             onRetry: onRetry,
@@ -300,7 +302,7 @@ class _Turn extends ConsumerWidget {
     required this.turn,
     required this.isLatest,
     required this.onSelectService,
-    required this.onOpenPaymentScreen,
+    required this.onOpenReceipt,
     required this.onOpenRecord,
     required this.onOpenVerification,
     required this.onRetry,
@@ -313,7 +315,7 @@ class _Turn extends ConsumerWidget {
   /// failed turn is history, so it renders its notice without the action.
   final bool isLatest;
   final ValueChanged<String> onSelectService;
-  final ValueChanged<String> onOpenPaymentScreen;
+  final ValueChanged<String> onOpenReceipt;
   final ValueChanged<ResolvedRecord> onOpenRecord;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
@@ -362,7 +364,8 @@ class _Turn extends ConsumerWidget {
           ),
           HomePhase.confirmation => _Confirmation(
             turn: turn,
-            onOpenPaymentScreen: onOpenPaymentScreen,
+            onOpenVerification: onOpenVerification,
+            onOpenReceipt: onOpenReceipt,
           ),
           HomePhase.verifying => _Verifying(
             turn: turn,
@@ -471,29 +474,43 @@ class _DiscoveryFallback extends StatelessWidget {
   }
 }
 
-/// The payment confirmation composed inline (FEAT-011, screens/03-home.md
-/// "Confirmation inline"). The agent composes the confirmation surface against
-/// the published catalog; the client renders it and its own payee/amount come
-/// from the machine-actionable intent, never the reply. The payment screen stays
-/// an equal alternate route the user may choose instead.
+/// The payment task composed inline (FEAT-005/011, screens/03-home.md
+/// "Confirmation inline"). A variable amount first composes its `AmountEntry`
+/// surface inline; the confirmation then renders the agent-composed summary (or
+/// its prewritten fallback) with the client-owned authorise action and every
+/// payment state, driven by the payment controller. The confirmation gate is
+/// unchanged: the authorise action is the explicit confirmation, and no payment
+/// is submitted without it.
 class _Confirmation extends ConsumerWidget {
   const _Confirmation({
     required this.turn,
-    required this.onOpenPaymentScreen,
+    required this.onOpenVerification,
+    required this.onOpenReceipt,
   });
 
   final ConversationTurn turn;
 
-  /// Opens the Payment Confirmation screen, the explicit alternate route to
-  /// the same task. The user chooses it; it is never a fallback.
-  final ValueChanged<String> onOpenPaymentScreen;
+  /// Opens the Identity screen for a payment held pending verification.
+  final VoidCallback onOpenVerification;
+
+  /// Opens the existing Receipt Detail screen for a settled bill.
+  final ValueChanged<String> onOpenReceipt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ref.watch(sabStringsProvider);
     final intent = turn.intent;
     final service = turn.selectedService;
     final serviceId = service?.serviceId;
+
+    Widget summaryFallback(BuildContext context) => ConfirmationSummary(
+      // The selected service's own known amount is the grounded source; the
+      // intent amount covers a task-named confirmation.
+      amount: service?.knownAmount ?? intent?.amount ?? 0,
+      currency: service?.currency ?? intent?.currency ?? 'NGN',
+      payee: service?.collectingBody ?? intent?.target ?? '',
+      reference: intent?.reference,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -501,26 +518,62 @@ class _Confirmation extends ConsumerWidget {
           _ConversationReply(text: intent!.reply!),
           const SizedBox(height: SabSpacing.md),
         ],
-        A2uiSurfaceView(
-          stream: turn.surface,
-          fallback: (context) => ConfirmationSummary(
-            // The selected service's own known amount is the grounded source;
-            // the intent amount covers a task-named confirmation.
-            amount: service?.knownAmount ?? intent?.amount ?? 0,
-            currency: service?.currency ?? intent?.currency ?? 'NGN',
-            payee: service?.collectingBody ?? intent?.target ?? '',
-            reference: intent?.reference,
-          ),
-        ),
-        // The alternate route to the same task: the payment screen. A variable
-        // amount is confirmed there, so the inline surface never invents one.
-        if (serviceId != null)
-          SabButton(
-            label: strings.openPaymentScreen,
-            variant: SabButtonVariant.ghost,
-            onPressed: () => onOpenPaymentScreen(serviceId),
+        if (serviceId == null)
+          // No resolved service to bind the mandate to: show the composed
+          // summary only, with no authorise action.
+          A2uiSurfaceView(
+            stream: turn.surface,
+            fallback: summaryFallback,
+          )
+        else if (turn.surfaceTask == SurfaceTask.amountEntry)
+          _InlineAmountEntry(turn: turn, serviceId: serviceId)
+        else
+          PaymentTaskView(
+            serviceId: serviceId,
+            surface: turn.surface,
+            summaryFallback: summaryFallback,
+            onOpenVerification: onOpenVerification,
+            onOpenReceipt: onOpenReceipt,
           ),
       ],
+    );
+  }
+}
+
+/// The variable-amount task composed inline (FEAT-005/011). The agent composes
+/// the `AmountEntry` surface with the biller's C-033 range when one is known;
+/// the prewritten fallback is the client's inline amount field. Submitting binds
+/// the amount to the payment controller and moves the turn to its confirmation.
+class _InlineAmountEntry extends ConsumerWidget {
+  const _InlineAmountEntry({required this.turn, required this.serviceId});
+
+  final ConversationTurn turn;
+  final String serviceId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
+    final range = ref
+        .watch(paymentControllerProvider(serviceId))
+        .billValidation
+        ?.range;
+    return A2uiSurfaceView(
+      stream: turn.surface,
+      onAction: (action) {
+        if (action.name == SabiActions.submitAmount) {
+          final amount = action.context['amount'];
+          if (amount is num) {
+            ref.read(homeControllerProvider.notifier).setAmount(amount.toInt());
+          }
+        }
+      },
+      fallback: (context) => SabAmountEntryField(
+        strings: strings,
+        minimum: range?.minimum,
+        maximum: range?.maximum,
+        onSubmit: (minor) =>
+            ref.read(homeControllerProvider.notifier).setAmount(minor),
+      ),
     );
   }
 }

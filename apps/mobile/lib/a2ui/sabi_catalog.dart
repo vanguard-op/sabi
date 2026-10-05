@@ -7,6 +7,7 @@ import 'package:json_schema_builder/json_schema_builder.dart';
 
 import '../components/confirmation_summary.dart';
 import '../components/receipt_card.dart';
+import '../components/sab_button.dart';
 import '../components/service_result_row.dart';
 import '../components/status_pill.dart';
 import '../design_system/tokens.dart';
@@ -148,6 +149,11 @@ abstract final class SabiActions {
 
   /// The recovery (case) next step was chosen: context carries `recordRef`.
   static const String openCase = 'sabi.openCase';
+
+  /// A variable amount was entered inline: context carries `amount` in minor
+  /// units (kobo). The host binds it to the payment task so the mandate is
+  /// signed for the amount the user typed (FEAT-005, FEAT-011).
+  static const String submitAmount = 'sabi.submitAmount';
 }
 
 // --- Catalog items --------------------------------------------------------
@@ -286,7 +292,17 @@ Widget _confirmationSummary(CatalogItemContext ctx) {
 
 Widget _amountEntry(CatalogItemContext ctx) {
   final data = _props(ctx);
-  return BoundAmountEntry(data: data, dataContext: ctx.dataContext);
+  return BoundAmountEntry(
+    data: data,
+    dataContext: ctx.dataContext,
+    onSubmit: (minor) => ctx.dispatchEvent(
+      UserActionEvent(
+        name: SabiActions.submitAmount,
+        sourceComponentId: ctx.id,
+        context: {'amount': minor},
+      ),
+    ),
+  );
 }
 
 Widget _providerPicker(CatalogItemContext ctx) {
@@ -453,50 +469,69 @@ class BoundConfirmationSummary extends StatelessWidget {
 /// in the conversation. The agent supplies the range; the client owns the
 /// field, its validation, and the amount in minor units, exactly as the
 /// amount-entry sheet does.
-class BoundAmountEntry extends StatelessWidget {
+class BoundAmountEntry extends ConsumerWidget {
   const BoundAmountEntry({
     super.key,
     required this.data,
     required this.dataContext,
+    this.onSubmit,
   });
 
   final Map<String, Object?> data;
   final DataContext dataContext;
 
+  /// Called with the validated amount in minor units (kobo) when the user
+  /// submits the field, so the host can bind it to the payment task.
+  final ValueChanged<int>? onSubmit;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(sabStringsProvider);
     return _BoundNumbers(
       dataContext: dataContext,
       amount: data['minimum'],
       charges: data['maximum'],
-      builder: (minimum, maximum) => _AmountEntryField(
+      builder: (minimum, maximum) => SabAmountEntryField(
         minimum: minimum,
         maximum: maximum,
         prompt: data['prompt']?.toString(),
+        strings: strings,
+        onSubmit: onSubmit,
       ),
     );
   }
 }
 
-/// An inline amount field for the composed surface. Validates against the
-/// provider's range and reports the amount in minor units (kobo), mirroring
-/// the amount-entry bottom sheet.
-class _AmountEntryField extends StatefulWidget {
-  const _AmountEntryField({
-    required this.minimum,
-    required this.maximum,
+/// An inline amount field for a variable amount. Validates against the
+/// provider's range (C-033) and reports the amount in minor units (kobo). It is
+/// the composed `AmountEntry` surface and the prewritten fallback form for the
+/// same task, so both validate and submit identically.
+class SabAmountEntryField extends StatefulWidget {
+  const SabAmountEntryField({
+    super.key,
+    required this.strings,
+    this.minimum,
+    this.maximum,
     this.prompt,
+    this.onSubmit,
   });
 
   final int? minimum;
   final int? maximum;
   final String? prompt;
 
+  /// The active copy, so the field follows the app locale rather than a fixed
+  /// English string.
+  final SabStrings strings;
+
+  /// Called with the validated amount in minor units (kobo).
+  final ValueChanged<int>? onSubmit;
+
   @override
-  State<_AmountEntryField> createState() => _AmountEntryFieldState();
+  State<SabAmountEntryField> createState() => _SabAmountEntryFieldState();
 }
 
-class _AmountEntryFieldState extends State<_AmountEntryField> {
+class _SabAmountEntryFieldState extends State<SabAmountEntryField> {
   final _controller = TextEditingController();
   String? _error;
 
@@ -507,7 +542,7 @@ class _AmountEntryFieldState extends State<_AmountEntryField> {
   }
 
   void _submit() {
-    final strings = SabStrings.english;
+    final strings = widget.strings;
     final parsed = double.tryParse(_controller.text.trim());
     if (parsed == null || parsed <= 0) {
       setState(() => _error = strings.requiredField);
@@ -516,13 +551,18 @@ class _AmountEntryFieldState extends State<_AmountEntryField> {
     final minor = (parsed * 100).round();
     final below = widget.minimum != null && minor < widget.minimum!;
     final above = widget.maximum != null && minor > widget.maximum!;
-    setState(() => _error = (below || above) ? strings.amountOutOfRange : null);
+    if (below || above) {
+      setState(() => _error = strings.amountOutOfRange);
+      return;
+    }
+    setState(() => _error = null);
+    widget.onSubmit?.call(minor);
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = SabColorTokens.of(context);
-    final strings = SabStrings.english;
+    final strings = widget.strings;
     return Container(
       padding: const EdgeInsets.all(SabSpacing.md),
       decoration: BoxDecoration(
@@ -550,6 +590,15 @@ class _AmountEntryFieldState extends State<_AmountEntryField> {
               hintText: strings.amountEntryHint,
               errorText: _error,
             ),
+          ),
+          const SizedBox(height: SabSpacing.md),
+          // A visible, touchable submit: the field is not the only way to
+          // continue, so the amount entry is usable without the keyboard
+          // action (branding.md, "Accessibility").
+          SabButton(
+            label: strings.continueLabel,
+            expand: true,
+            onPressed: _submit,
           ),
         ],
       ),

@@ -7,8 +7,8 @@ import 'package:sabi_mobile/core/session.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
 import 'package:sabi_mobile/features/account/account_screen.dart';
+import 'package:sabi_mobile/features/account/verification/verification_screen.dart';
 import 'package:sabi_mobile/features/home/home_screen.dart';
-import 'package:sabi_mobile/features/payment/payment_confirmation_screen.dart';
 import 'package:sabi_mobile/features/receipts/receipts_screen.dart';
 import 'package:sabi_mobile/features/welcome/welcome_screen.dart';
 import 'package:sabi_mobile/router/app_router.dart';
@@ -158,11 +158,32 @@ void main() {
       ],
     );
     await tester.pumpAndSettle();
-    containerOf(tester).read(routerProvider).go('/pay/svc_lagos_land_use');
+    containerOf(tester).read(routerProvider).go('/account/verify');
     await tester.pumpAndSettle();
-    // The payment surface now renders above the shell rather than the gated
+    // The identity surface renders above the shell rather than the gated
     // placeholder, so the task-first push stays shell-free.
     expect(find.byType(BottomNavigationBar), findsNothing);
-    expect(find.byType(PaymentConfirmationScreen), findsOneWidget);
+    expect(find.byType(VerificationScreen), findsOneWidget);
+  });
+
+  testWidgets('no payment route remains, so nothing reaches a deleted screen', (
+    tester,
+  ) async {
+    await pumpSabApp(
+      tester,
+      overrides: [
+        ..._baseOverrides(),
+        _session(authenticated: true),
+        _noopBootstrap,
+      ],
+    );
+    await tester.pumpAndSettle();
+    containerOf(tester).read(routerProvider).go('/pay/svc_lagos_land_use');
+    await tester.pumpAndSettle();
+    // Payment completes inline in the conversation; the old confirmation route
+    // is gone and resolves to the router's not-found surface instead.
+    expect(find.byType(HomeScreen), findsNothing);
+    expect(find.byType(VerificationScreen), findsNothing);
+    expect(find.text('Sabi'), findsOneWidget);
   });
 }
