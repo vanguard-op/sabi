@@ -166,6 +166,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-115 | C-012 | ai-engineer | Done | — |
 | T-116 | C-012 | ai-engineer | Done | — |
 | T-117 | C-012 | ai-engineer | Done | — |
+| T-118 | MQ-001–004 | product-shaper | In Progress | — |
+| T-119 | MQ-001–004 | ai-engineer | In Progress | — |
 
 ## Decisions log
 
