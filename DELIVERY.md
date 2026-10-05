@@ -108,74 +108,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | Phase | Closed | Notes |
 |---|---|---|
 | Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console |
-| Phase 2: The payment loop | 2026-10-03 | C-017–C-038 implemented and conformant (C-035 at revision 1); FEAT-002/005/006/007/008/009/010 accepted; QA gate passed on API 53 + AI 16 + mobile 255 integration tests with both services booting; MQ-001–MQ-003 live bars deferred under D-022 |
-
-### Post-phase fixes
-
-Carried from the Phase 2 report; comments and configuration only, no behaviour change.
-
-| Task | Feature | Owner | Status | Contract |
-|---|---|---|---|---|
-| T-068 | FEAT-001 | infra-engineer | Done | — |
-| T-069 | FEAT-009, FEAT-010 | backend-engineer | Done | — |
-| T-070 | FEAT-002 | frontend-engineer | Done | C-022 |
-| T-071 | FEAT-007 | frontend-engineer | Done | C-033 |
-| T-072 | FEAT-001 | frontend-engineer | Done | C-002, C-004 |
-| T-073 | — | infra-engineer | Done | — |
-| T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
-| T-075 | — | infra-engineer | Done | — |
-| T-076 | — | infra-engineer | Done | — |
-| T-077 | — | frontend-engineer | Done | — |
-| T-078 | — | frontend-engineer | Done | — |
-| T-079 | — | backend-engineer | Done | — |
-| T-080 | — | infra-engineer | Done | — |
-| T-081 | — | infra-engineer | Done | — |
-| T-082 | C-002, C-004, C-008 | frontend-engineer | Done | — |
-| T-083 | C-009, C-012 | backend-engineer | Done | — |
-| T-084 | C-009 | frontend-engineer | Done | — |
-| T-085 | FEAT-003 | product-shaper | Done | — |
-| T-086 | C-009 | frontend-engineer | Done | — |
-| T-087 | C-009 | backend-engineer | Done | — |
-| T-088 | C-009 | ai-engineer | Done | — |
-| T-089 | C-009 | frontend-engineer | Done | — |
-| T-090 | FEAT-003 | product-shaper | Done | — |
-| T-091 | C-009 | frontend-engineer | Done | — |
-| T-092 | C-009 | backend-engineer | Done | — |
-| T-093 | C-009 | ai-engineer | Done | — |
-| T-094 | FEAT-003, FEAT-004 | product-shaper | Done | — |
-| T-095 | — | backend-engineer | Done | — |
-| T-096 | FEAT-003, FEAT-004 | product-shaper | Done | — |
-| T-097 | C-009 | backend-engineer | Done | — |
-| T-098 | C-009 | ai-engineer | Done | — |
-| T-099 | C-009 | frontend-engineer | Done | — |
-| T-100 | C-009 | qa-engineer | Done | — |
-| T-101 | FEAT-003, FEAT-004 | product-shaper | Done | — |
-| T-102 | FEAT-004 | backend-engineer | Done | — |
-| T-103 | FEAT-004 | backend-engineer | Done | — |
-| T-104 | FEAT-004 | infra-engineer | Done | — |
-| T-105 | FEAT-003, FEAT-011 | product-shaper | Done | — |
-| T-106 | C-012 | ai-engineer | Done | — |
-| T-107 | C-012 | frontend-engineer | Done | — |
-| T-108 | C-012 | backend-engineer | Done | — |
-| T-109 | FEAT-011 | product-shaper | Done | — |
-| T-110 | C-012 | frontend-engineer | Done | — |
-| T-111 | C-012 | ai-engineer | Done | — |
-| T-112 | C-012 | backend-engineer | Done | — |
-| T-113 | C-012 | qa-engineer | Done | — |
-| T-114 | FEAT-011 | infra-engineer | Done | — |
-| T-115 | C-012 | ai-engineer | Done | — |
-| T-116 | C-012 | ai-engineer | Done | — |
-| T-117 | C-012 | ai-engineer | Done | — |
-| T-118 | MQ-001–004 | product-shaper | Done | — |
-| T-119 | MQ-001–004 | ai-engineer | Done | — |
-| T-120 | MQ-001–004 | qa-engineer | Done | — |
-| T-121 | C-012 | ai-engineer | Done | — |
-| T-122 | C-012 | ai-engineer | Done | — |
-| T-123 | C-012 | frontend-engineer | Done | — |
-| T-124 | C-012 | ai-engineer | Done | — |
-| T-125 | C-012 | frontend-engineer | Done | — |
-| T-126 | — | infra-engineer | Done | — |
-| T-127 | — | infra-engineer | Done | — |
+| Phase 2: The payment loop | 2026-10-03 | C-017–C-038 implemented and conformant (C-035 at revision 1); FEAT-002/005/006/007/008/009/010 accepted; QA gate passed on API 53 + AI 16 + mobile 255 integration tests with both services booting; MQ-001–MQ-003 live bars deferred under D-022; the post-Phase-2 wave T-068–T-127 (C-009 rev 4, C-012 rev 2; D-037–D-056) verified and merged |
 
 ## Decisions log
 
