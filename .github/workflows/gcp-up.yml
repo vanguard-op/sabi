@@ -3,29 +3,25 @@
 # Manual by design (D-033). Bringing the staging environment up costs money, so
 # this workflow never runs on push: an operator dispatches it explicitly.
 #
-# It authenticates to GCP, ensures the Artifact Registry repository exists
-# (via gcloud, only when it is absent), builds and pushes the four images into
-# it, applies the Terraform stack once, writes the one secret Terraform cannot
-# generate, runs the Alembic migrations and the catalogue seed as Cloud Run jobs
-# inside the VPC, and prints the mapped URLs and the DNS records to add at
-# Namecheap.
+# It authenticates to GCP, creates the Artifact Registry repository with a
+# targeted Terraform apply (a bootstrap), builds and pushes the four images into
+# it, applies the rest of the Terraform stack, writes the one secret Terraform
+# cannot generate, runs the Alembic migrations and the catalogue seed as Cloud
+# Run jobs inside the VPC, and prints the mapped URLs and the DNS records to add
+# at Namecheap.
 #
 # The ordering is deliberate. Cloud Run refuses to create a service or job whose
 # image is not yet in Artifact Registry, and the provider then leaves the
 # half-created service un-State'd (hashicorp/terraform-provider-google#14493).
-# So the images must exist before the apply, and the repository must exist
-# before the images can be pushed. Ensuring the repository first lets the
-# platform and the workloads land in a single apply, with no placeholder
-# revision (D-055, superseding the two-phase apply of D-036).
-#
-# The repository is also declared in Terraform
-# (infra/terraform-gcp/artifact_registry.tf). On an environment Terraform
-# already tracks it — every `up` after a previous `up` — the ensure step finds
-# it and does nothing, and the apply leaves it unchanged. On a fresh environment
-# (a first `up`, or the `destroy` -> `up` rebuild of D-033) it is not in state
-# yet, so the ensure step creates it out of band and the apply's create then
-# collides with it (409 already exists). That rebuild path is not covered by
-# this workflow as it stands.
+# So the repository must exist before the images can be pushed, and the images
+# must exist before the apply that creates the services. The repository is
+# Terraform-managed (infra/terraform-gcp/artifact_registry.tf), so the bootstrap
+# apply targets it alone (with the APIs it depends on); because Terraform
+# creates it, the repository is always in state, and a fresh environment (a
+# first `up`, or the `destroy` -> `up` rebuild of D-033) never collides with an
+# out-of-band create (409 already exists). The full apply then creates the
+# platform and the workloads in one pass, with no placeholder revision (D-055,
+# superseding the two-phase apply of D-036).
 #
 # Auth is Workload Identity Federation (NFR-024): no long-lived service-account
 # key is committed. Set these repository variables:
@@ -56,7 +52,10 @@ permissions:
   id-token: write # required for Workload Identity Federation
 
 concurrency:
-  group: gcp-up
+  # Shared with gcp-stop and gcp-destroy so the three lifecycle workflows are
+  # mutually exclusive: an `up` can never overlap a `destroy` (or a `stop`) and
+  # race over the repository and the shared state.
+  group: gcp-lifecycle
   cancel-in-progress: false
 
 env:
@@ -99,27 +98,23 @@ jobs:
         run: |
           set -euo pipefail
           cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
+          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
           terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
 
-      - name: Ensure the image repository exists
+      - name: Bootstrap the image repository
         # Cloud Run refuses a service or job whose image is not yet in Artifact
         # Registry, and the provider leaves such a half-created service un-State'd
-        # (hashicorp/terraform-provider-google#14493). So the repository is
-        # ensured here — only when it is absent — and the images are pushed
-        # before the single apply, so the workloads can be created in the same
-        # pass as the rest of the platform. The repository is Terraform-managed
-        # (see the header for the fresh-environment caveat).
+        # (hashicorp/terraform-provider-google#14493). The repository is created
+        # here, through Terraform, so it is in state before the full apply and a
+        # fresh environment cannot collide with an out-of-band create. `-target`
+        # pulls in the required APIs (google_project_service.required) as a
+        # dependency; on an environment that already tracks the repository this
+        # is a no-op.
         run: |
           set -euo pipefail
-          if ! gcloud artifacts repositories describe sabi \
-              --project="${{ vars.GCP_PROJECT_ID }}" \
-              --location="${{ vars.GCP_REGION }}" >/dev/null 2>&1; then
-            gcloud artifacts repositories create sabi \
-              --project="${{ vars.GCP_PROJECT_ID }}" \
-              --location="${{ vars.GCP_REGION }}" \
-              --repository-format=docker \
-              --description="Sabi staging service images (api, ai, payments, console)."
-          fi
+          terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
+            -target=google_artifact_registry_repository.images \
+            -var-file=envs/staging/terraform.tfvars
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
@@ -147,15 +142,14 @@ jobs:
           done
 
       - name: Terraform apply
-        # One apply. The images now exist, so the Cloud Run services, jobs, their
-        # IAM, and the domain mappings are created in the same pass as the
-        # platform (D-055).
+        # The full apply. The repository is already in state (bootstrap) and the
+        # images now exist, so the Cloud Run services, jobs, their IAM, and the
+        # domain mappings are created in the same pass as the platform (D-055).
         env:
           TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
         run: |
           set -euo pipefail
-          cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
           terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \
             -var-file=envs/staging/terraform.tfvars
 
