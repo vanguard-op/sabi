@@ -134,7 +134,6 @@ class SabStrings {
   String get contactSupport => _t('contactSupport');
   String get queuedOffline => _t('queuedOffline');
   String get offlineNoPayment => _t('offlineNoPayment');
-  String get providerPickerTitle => _t('providerPickerTitle');
   String get reauthTitle => _t('reauthTitle');
   String get reauthBody => _t('reauthBody');
   String get reauthAction => _t('reauthAction');
@@ -148,7 +147,6 @@ class SabStrings {
   // reached where a non-conversation surface still leads to them.
   String get verifyInlineTitle => _t('verifyInlineTitle');
   String get verifyInlineBody => _t('verifyInlineBody');
-  String get verifyInlineAction => _t('verifyInlineAction');
   String get openVerificationScreen => _t('openVerificationScreen');
   String get recoveringTitle => _t('recoveringTitle');
   String get recoveringBody => _t('recoveringBody');
@@ -362,7 +360,6 @@ class SabStrings {
     'queuedOffline':
         'Your request is queued and will send when you’re back online.',
     'offlineNoPayment': 'Payments can’t be authorised while you’re offline.',
-    'providerPickerTitle': 'Which one do you mean?',
     'reauthTitle': 'Session expired',
     'reauthBody':
         'Sign in again to keep going. Your screen is right where you left it.',
@@ -374,7 +371,6 @@ class SabStrings {
     'questionLabel': 'Question',
     'verifyInlineTitle': 'Verify your identity',
     'verifyInlineBody': 'This payment needs your identity verified. It is held, not failed. Verify to continue, or open the identity screen.',
-    'verifyInlineAction': 'Verify now',
     'openVerificationScreen': 'Open identity screen',
     'recoveringTitle': 'This payment needs attention',
     'recoveringBody': 'The payment didn’t complete as expected. We can show you the state and the next step here, or open the case for the full timeline.',
@@ -568,7 +564,6 @@ class SabStrings {
     'caseOffline': 'You no get network. This na the last state we sabi.',
     'verifyInlineTitle': 'Verify your identity',
     'verifyInlineBody': 'This payment need your identity verify first. E dey hold, e no fail. Verify to continue, or open the identity screen.',
-    'verifyInlineAction': 'Verify now',
     'openCase': 'Open case',
     'recordTitle': 'Your record',
     'openReceipt': 'Open for Receipts',

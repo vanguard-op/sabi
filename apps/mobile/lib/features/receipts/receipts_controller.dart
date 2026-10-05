@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
-import '../../models/payment_case.dart';
 import '../../models/receipt.dart';
 import '../../models/receipt_summary.dart';
 
@@ -180,9 +179,4 @@ final receiptsControllerProvider =
 /// One receipt with its payment (C-024), for the detail screen.
 final receiptDetailProvider = FutureProvider.family<ReceiptDetail, String>(
   (ref, receiptId) => ref.watch(receiptsRepositoryProvider).detail(receiptId),
-);
-
-/// One case with its payment and timeline (C-027), for the case screen.
-final caseDetailProvider = FutureProvider.family<CaseDetail, String>(
-  (ref, caseId) => ref.watch(casesRepositoryProvider).detail(caseId),
 );
