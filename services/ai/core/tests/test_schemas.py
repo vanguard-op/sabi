@@ -142,3 +142,61 @@ def test_ranking_rejects_more_than_five_results():
 def test_ranking_rejects_empty_results_without_no_match():
     with pytest.raises(OutputValidationError):
         RankingResult.from_mapping({"results": [], "no_match": False})
+
+
+def test_composition_response_schema_forces_a_non_empty_populated_envelope():
+    """The provider schema must not be satisfiable by an empty message body.
+
+    The old schema allowed ``{"messages": [{}]}`` and ``{"version": ...}`` bodies with
+    nothing in them, which is exactly what the model emitted (MQ-003). The
+    catalog-derived schema requires a v0.9 version, exactly one body, and each
+    component's names and required properties.
+    """
+
+    from core.schemas import composition_response_json_schema
+
+    schema = composition_response_json_schema()
+    messages = schema["properties"]["messages"]
+    assert messages["minItems"] >= 1
+    item = messages["items"]
+    assert item["required"] == ["version"]
+    assert item["properties"]["version"]["enum"] == ["v0.9"]
+    # Exactly one message body, via anyOf on the body keys.
+    body_requirements = {tuple(sorted(branch["required"])) for branch in item["anyOf"]}
+    assert body_requirements == {
+        ("createSurface",),
+        ("updateComponents",),
+        ("updateDataModel",),
+    }
+
+
+def test_composition_schema_requires_each_components_catalog_properties():
+    from core.a2ui_catalog import published_catalog
+    from core.schemas import composition_response_json_schema
+
+    catalog = published_catalog()
+    schema = composition_response_json_schema()
+    variants = schema["properties"]["messages"]["items"]["properties"]["updateComponents"][
+        "properties"
+    ]["components"]["items"]["anyOf"]
+    by_name = {branch["properties"]["component"]["enum"][0]: branch for branch in variants}
+
+    # One variant per catalog component, each requiring its catalog-required props.
+    assert set(by_name) == set(catalog.component_names())
+    for name in catalog.component_names():
+        branch = by_name[name]
+        for required in catalog.required_properties(name):
+            assert required in branch["required"], name
+            assert required in branch["properties"], name
+        # Flat properties stay open: additionalProperties is never closed.
+        assert branch["additionalProperties"] is True
+
+
+def test_composition_schema_bounds_the_envelope_fields():
+    from core.schemas import composition_response_json_schema
+
+    item = composition_response_json_schema()["properties"]["messages"]["items"]
+    assert item["properties"]["createSurface"]["required"] == ["surfaceId", "catalogId"]
+    components = item["properties"]["updateComponents"]["properties"]["components"]
+    assert components["minItems"] >= 1
+    assert item["properties"]["updateDataModel"]["required"] == ["surfaceId", "path"]

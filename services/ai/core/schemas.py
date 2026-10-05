@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 from core.errors import OutputValidationError
@@ -390,32 +391,162 @@ COMPOSITION_RESPONSE_SCHEMA: Mapping[str, Any] = {
 }
 
 # The composition stream is dynamic and polymorphic: each message body and each
-# flat component is a different shape per task and component, so a schema that
-# declares concrete fields cannot cover it without either dropping valid fields or
-# constraining the model to the empty object. Google's ``response_schema`` also
-# rejects ``additionalProperties`` on the Developer API, so it cannot express an
-# open component. This draft-2020-12 schema describes the A2UI envelope (version,
-# message bodies, the ``surfaceId``/``catalogId`` fields) while leaving message
-# bodies open, and is pinned via the provider's ``response_json_schema`` field. The
-# agent-side pre-send validation (``core.a2ui``) remains the authority on the
-# component names, required properties, and executable-content rules (MQ-003).
-COMPOSITION_RESPONSE_JSON_SCHEMA: Mapping[str, Any] = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "messages": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "version": {"type": "string"},
-                    "createSurface": {"type": "object", "additionalProperties": True},
-                    "updateComponents": {"type": "object", "additionalProperties": True},
-                    "updateDataModel": {"type": "object", "additionalProperties": True},
+# flat component is a different shape per task and component. Google's
+# ``response_schema`` rejects ``additionalProperties`` on the Developer API, so it
+# cannot express an open component; the envelope is therefore pinned via the
+# provider's ``response_json_schema`` field (draft 2020-12).
+#
+# A schema that declares only ``items: {"type": "object"}`` and requires only
+# ``version`` is satisfiable by ``{"messages": [{}]}`` and by ``{"version": ...}``
+# bodies with nothing in them, so the model emits empty envelopes that the
+# agent-side pre-send validation then rejects as ``version None`` / ``no surface``
+# / ``no root``. The schema below closes that gap while leaving each component's
+# flat properties open (``additionalProperties: true``):
+#
+#   * the array requires at least one message (``minItems``);
+#   * each message requires a v0.9 ``version`` and exactly one body, via ``anyOf``;
+#   * ``createSurface`` requires ``surfaceId``/``catalogId``, ``updateComponents``
+#     requires a non-empty ``components`` array, ``updateDataModel`` requires a
+#     ``path``;
+#   * each component must carry ``id``, a ``component`` name drawn from the
+#     published catalog, and the properties that catalog marks ``required``, with
+#     their declared primitive types; every other property the catalog declares is
+#     described too, so the model is not left to invent an unconstrained one.
+#
+# The component variants are derived from the same published catalog the
+# agent-side pre-send validation uses, so the two cannot disagree on a component's
+# required properties (FEAT-011, MQ-003). Optional and task-specific flat
+# properties stay open: the model may add any property the catalog's
+# ``additionalProperties: true`` permits, and the validator remains the authority
+# on names, required properties, and executable-content rules.
+_PRIMITIVE_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
+
+
+def _catalog_property_schema(declared: Any) -> Mapping[str, Any]:
+    """A provider-facing schema for one catalog property declaration.
+
+    The catalog declares a property as ``{"type": "integer"}``, a nullable
+    ``{"type": ["integer", "null"]}``, an array ``{"type": "array", "items": ...}``,
+    or a component ``$ref``. Gemini's ``response_json_schema`` speaks JSON Schema
+    2020-12, so a nullable union is expressed as a two-branch ``anyOf`` and an
+    array keeps an object ``items`` for a referenced row type. Anything the catalog
+    does not type is left open rather than guessed.
+    """
+
+    if not isinstance(declared, Mapping):
+        return {}
+    declared_type = declared.get("type")
+    if isinstance(declared_type, list):
+        branches = [{"type": item} for item in declared_type if item in _PRIMITIVE_TYPES]
+        if "null" in declared_type:
+            branches.append({"type": "null"})
+        if not branches:
+            return {}
+        return branches[0] if len(branches) == 1 else {"anyOf": branches}
+    if declared_type == "array":
+        items = declared.get("items")
+        if isinstance(items, Mapping) and "$ref" in items:
+            return {"type": "array", "items": {"type": "object"}}
+        if isinstance(items, Mapping):
+            return {"type": "array", "items": _catalog_property_schema(items)}
+        return {"type": "array", "items": {}}
+    if isinstance(declared_type, str) and declared_type in _PRIMITIVE_TYPES:
+        return {"type": declared_type}
+    return {}
+
+
+def _catalog_component_variant(catalog: Any, name: str) -> Mapping[str, Any]:
+    """One ``anyOf`` branch for a catalog component: its flat properties, typed.
+
+    Every property the catalog declares is described (with its declared type), not
+    only the required ones. Leaving an optional property unnamed makes it an
+    unconstrained ``additionalProperties`` entry, and the model then degenerates when
+    it tries to emit one: a ``receipt`` context carrying ``kind`` produced a
+    malformed, truncated response until ``kind`` was typed. Naming the property keeps
+    the model on the rails without closing the object; ``additionalProperties: true``
+    still permits any property the catalog allows.
+    """
+
+    properties: dict[str, Any] = {
+        "id": {"type": "string"},
+        "component": {"type": "string", "enum": [name]},
+    }
+    for prop, declared in catalog.property_types(name).items():
+        properties[prop] = _catalog_property_schema(declared)
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": ["id", "component", *catalog.required_properties(name)],
+        "additionalProperties": True,
+    }
+
+
+@lru_cache(maxsize=1)
+def composition_response_json_schema() -> Mapping[str, Any]:
+    """The provider JSON Schema that forces a real, populated A2UI stream.
+
+    Built once from the published Sabi catalog so the provider's constraint and the
+    agent-side validator agree on every component's required properties.
+    """
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog = published_catalog()
+    variants = [_catalog_component_variant(catalog, name) for name in catalog.component_names()]
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "messages": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "version": {"type": "string", "enum": ["v0.9"]},
+                        "createSurface": {
+                            "type": "object",
+                            "properties": {
+                                "surfaceId": {"type": "string"},
+                                "catalogId": {"type": "string", "enum": [catalog.catalog_id]},
+                            },
+                            "required": ["surfaceId", "catalogId"],
+                            "additionalProperties": True,
+                        },
+                        "updateComponents": {
+                            "type": "object",
+                            "properties": {
+                                "surfaceId": {"type": "string"},
+                                "components": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {"anyOf": variants},
+                                },
+                            },
+                            "required": ["surfaceId", "components"],
+                            "additionalProperties": True,
+                        },
+                        "updateDataModel": {
+                            "type": "object",
+                            "properties": {
+                                "surfaceId": {"type": "string"},
+                                "path": {"type": "string"},
+                                "value": {},
+                            },
+                            "required": ["surfaceId", "path"],
+                            "additionalProperties": True,
+                        },
+                    },
+                    "required": ["version"],
+                    "anyOf": [
+                        {"required": ["createSurface"]},
+                        {"required": ["updateComponents"]},
+                        {"required": ["updateDataModel"]},
+                    ],
+                    "additionalProperties": True,
                 },
-                "required": ["version"],
             },
         },
-    },
-    "required": ["messages"],
-}
+        "required": ["messages"],
+        "additionalProperties": True,
+    }

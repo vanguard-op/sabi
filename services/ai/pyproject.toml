@@ -49,6 +49,9 @@ include = ["app*", "core*", "intent*", "ranking*", "composition*", "payment_inte
 testpaths = ["core/tests", "app/tests", "intent/tests", "ranking/tests", "composition/tests", "payment_intent/tests"]
 pythonpath = ["."]
 addopts = "-q"
+markers = [
+  "real_model: exercises the live provider; requires GEMINI_API_KEY and is skipped without it",
+]
 
 [tool.ruff]
 target-version = "py313"

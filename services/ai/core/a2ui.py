@@ -304,23 +304,16 @@ def _validate_component(
         if required not in component:
             errors.append(f"message {index} component {name!r} is missing required {required!r}")
             continue
+        # Pass the full property schema, not just its ``type``: an array property's
+        # object ``items`` (for example ``ProviderPicker.services``) is where a
+        # non-object element is caught, and that detail is lost if only the type is
+        # forwarded.
         declared_schema = catalog.property_types(name).get(required)
-        declared_type = _declared_type(declared_schema)
-        if declared_type is not None:
+        if declared_schema is not None:
             _check_property_type(
-                component[required], declared_type, f"component {name!r} {required!r}", errors
+                component[required],
+                declared_schema,
+                f"component {name!r} {required!r}",
+                errors,
             )
     return name, component_id == "root"
-
-
-def _declared_type(property_schema: Any) -> Any:
-    """The JSON-Schema ``type`` of a property, or ``None`` when it is not declared.
-
-    A property definition is itself an object schema (``{"type": "integer"}``), an
-    array schema (``{"type": "array", "items": ...}``), or a ``$ref``; only the
-    primitive ``type`` declaration is returned for the pre-send type check.
-    """
-
-    if isinstance(property_schema, Mapping):
-        return property_schema.get("type")
-    return property_schema

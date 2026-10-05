@@ -113,11 +113,11 @@ def test_intent_prompt_v4_keeps_the_pinned_cutoff_and_example_shapes():
     assert "unmappable" in text.lower()
 
 
-def test_composition_prompt_v4_carries_the_a2ui_catalog_contract():
+def test_composition_prompt_v5_carries_the_a2ui_catalog_contract():
     from core.config import INTERFACE_COMPOSITION_PROMPT_VERSION
 
     prompt = load_prompt(Capability.INTERFACE_COMPOSITION)
-    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v4"
+    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v5"
     text = prompt.text
     # The composed surface is an A2UI v0.9 message stream against the published
     # catalog: the negotiated catalogId and its components are rendered in, and the
@@ -143,9 +143,13 @@ def test_composition_prompt_v4_carries_the_a2ui_catalog_contract():
     # required context and scopes the empty-stream escape hatch to a task the catalog
     # genuinely cannot represent, so it never demands a property the context lacks.
     assert "REQUIRED CONTEXT PER TASK" in text
-    assert "the caller supplies and what the context carries" in text
+    assert "do not\ninvent it" in text
     assert "Do not return an" in text and "empty list when CONTEXT carries" in text
     assert "every message must pass" not in text.lower()
+    # The flat-property rule matches what the pre-send validator checks: a component's
+    # required properties are flat on the component, not routed through updateDataModel.
+    assert "flat properties" in text
+    assert "Do not use it to carry a" in text
 
 
 def test_composition_prompt_states_the_shared_per_task_fields():
@@ -206,12 +210,13 @@ def _render_values(capability, catalog):
         }
     if capability is Capability.INTERFACE_COMPOSITION:
         from core.schemas import render_task_context_fields
+        from core.serving import render_component_names
 
         return {
             "catalog_id": catalog.catalog_id,
             "task": "confirmation",
             "context": "{}",
-            "allowed_components": ", ".join(catalog.component_names()),
+            "allowed_components": render_component_names(catalog),
             "task_context_fields": render_task_context_fields(),
         }
     raise AssertionError(f"no render map for {capability}")

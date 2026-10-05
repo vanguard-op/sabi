@@ -195,6 +195,87 @@ def test_provider_picker_accepts_nested_service_rows():
     assert result.ok is True
 
 
+def test_provider_picker_rejects_a_services_list_of_bare_identifiers():
+    """A picker whose ``services`` are not objects renders empty on the client.
+
+    The catalog requires ``services`` to be a list of ServiceResultRow-shaped objects.
+    A list of identifiers (or JSON-encoded strings) satisfies the container check but
+    the client drops every non-object entry, so the surface renders nothing. The
+    pre-send validator refuses it and the task degrades to its fallback (MQ-003).
+    """
+
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d1", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ProviderPicker",
+                            "services": ["svc-1", "svc-2"],
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    result = _validate(payload)
+    assert result.ok is False
+    assert any("must be an object" in error for error in result.errors)
+    assert result.messages == ()
+
+
+def test_provider_picker_rejects_json_encoded_string_rows():
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d1", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ProviderPicker",
+                            "services": ['{"serviceId": "svc-1"}'],
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    result = _validate(payload)
+    assert result.ok is False
+    assert any("must be an object" in error for error in result.errors)
+
+
+def test_discovery_single_result_uses_a_flat_service_row():
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d2", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d2",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ServiceResultRow",
+                            "serviceId": "svc-1",
+                            "collectingBody": "Lagos State Government",
+                            "category": "government",
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    assert _validate(payload).ok is True
+
+
 def test_a_null_on_a_nullable_property_is_accepted():
     payload = {
         "messages": [

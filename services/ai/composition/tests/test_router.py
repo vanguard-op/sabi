@@ -216,10 +216,17 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     request = provider.last_request
     assert request.model_id == PRIMARY_MODEL_ID
     assert request.prompt_id == "interface_composition"
-    assert request.prompt_version == "v4"
+    assert request.prompt_version == "v5"
     assert request.decoding.temperature == 0.0
     assert _CATALOG_ID in request.contents
     assert "Verification" in request.contents and "Recovery" in request.contents
+    # The provider is constrained by the catalog-derived JSON schema, not the open
+    # object schema that permitted an empty message body (MQ-003).
+    schema = request.response_json_schema
+    assert schema is not None
+    messages = schema["properties"]["messages"]
+    assert messages["minItems"] >= 1
+    assert messages["items"]["required"] == ["version"]
 
 
 # --- Catalog negotiation (C-012: fallback, not a failure) ------------------------

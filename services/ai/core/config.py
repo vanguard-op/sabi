@@ -49,8 +49,12 @@ INTENT_PROMPT_VERSION = "v4"
 # prompt now states each task's required context (rendered from the same contract the
 # serving layer guards on) and scopes the empty-stream escape hatch to a task the
 # catalog genuinely cannot represent, so a composable context is never answered with
-# an empty surface.
-INTERFACE_COMPOSITION_PROMPT_VERSION = "v4"
+# an empty surface. It moved to ``v5`` when the provider response schema was
+# catalog-derived: the prompt now renders the component names one per line (a
+# comma-joined list was echoed into a component name) and states that a component's
+# required properties are flat properties on the component rather than routed through
+# ``updateDataModel``, matching what the pre-send validator checks.
+INTERFACE_COMPOSITION_PROMPT_VERSION = "v5"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,

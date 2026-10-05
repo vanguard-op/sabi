@@ -56,7 +56,6 @@ from core.retrieval import (
     render_untrusted_block,
 )
 from core.schemas import (
-    COMPOSITION_RESPONSE_JSON_SCHEMA,
     COMPOSITION_RESPONSE_SCHEMA,
     FALLBACK_TASKS,
     INTENT_RESPONSE_SCHEMA,
@@ -66,6 +65,7 @@ from core.schemas import (
     IntentModelOutput,
     RankingResult,
     ServiceSummary,
+    composition_response_json_schema,
     missing_task_context,
     render_task_context_fields,
 )
@@ -75,6 +75,18 @@ logger = logging.getLogger("core.serving")
 
 MODEL_SOURCE = "model"
 FALLBACK_SOURCE = "fallback"
+
+
+def render_component_names(catalog: A2uiCatalog) -> str:
+    """The catalog's component names, one per line, for the composition prompt.
+
+    A comma-joined list renders inside a prose sentence and the model echoes the
+    separator into a component name ("ReceiptCard,"); a line-per-name list keeps the
+    names exact (the provider schema then constrains them further via ``enum``).
+    """
+
+    return "\n".join(f"- {name}" for name in catalog.component_names())
+
 
 _SYSTEM_INSTRUCTIONS: Mapping[Capability, str] = {
     Capability.INTENT_RESOLUTION: (
@@ -476,12 +488,12 @@ class ModelServing:
                         "catalog_id": catalog.catalog_id,
                         "task": task,
                         "context": json.dumps(context or {}, sort_keys=True, default=str),
-                        "allowed_components": ", ".join(catalog.component_names()),
+                        "allowed_components": render_component_names(catalog),
                         "task_context_fields": render_task_context_fields(),
                     },
                 ),
                 COMPOSITION_RESPONSE_SCHEMA,
-                response_json_schema=COMPOSITION_RESPONSE_JSON_SCHEMA,
+                response_json_schema=composition_response_json_schema(),
             )
             response = self._provider.generate(request)
             task_cost.record(response.usage)
