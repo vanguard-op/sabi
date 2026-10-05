@@ -164,7 +164,8 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-113 | C-012 | qa-engineer | Done | — |
 | T-114 | FEAT-011 | infra-engineer | Done | — |
 | T-115 | C-012 | ai-engineer | Done | — |
-| T-116 | C-012 | ai-engineer | In Progress | — |
+| T-116 | C-012 | ai-engineer | Done | — |
+| T-117 | C-012 | ai-engineer | In Progress | — |
 
 ## Decisions log
 
