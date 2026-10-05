@@ -56,6 +56,7 @@ from core.retrieval import (
     render_untrusted_block,
 )
 from core.schemas import (
+    COMPOSITION_RESPONSE_JSON_SCHEMA,
     COMPOSITION_RESPONSE_SCHEMA,
     FALLBACK_TASKS,
     INTENT_RESPONSE_SCHEMA,
@@ -452,6 +453,7 @@ class ModelServing:
                     },
                 ),
                 COMPOSITION_RESPONSE_SCHEMA,
+                response_json_schema=COMPOSITION_RESPONSE_JSON_SCHEMA,
             )
             response = self._provider.generate(request)
             task_cost.record(response.usage)
@@ -529,6 +531,7 @@ class ModelServing:
         prompt_version: str,
         contents: str,
         response_schema: Mapping[str, Any],
+        response_json_schema: Mapping[str, Any] | None = None,
     ) -> ModelRequest:
         path = CAPABILITY_MODEL_PATH[capability]
         return ModelRequest(
@@ -540,6 +543,7 @@ class ModelServing:
             system_instruction=_SYSTEM_INSTRUCTIONS[capability],
             contents=contents,
             response_schema=response_schema,
+            response_json_schema=response_json_schema,
             decoding=CAPABILITY_DECODING[capability],
             timeout_seconds=self._settings.timeout_seconds,
         )

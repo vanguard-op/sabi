@@ -74,6 +74,43 @@ def test_generate_constrains_output_and_parses_json():
     assert config["response_mime_type"] == "application/json"
     assert config["temperature"] == 0.0
     assert config["response_schema"] == {"type": "object"}
+    assert "response_json_schema" not in config
+
+
+def test_generate_prefers_a_full_json_schema_when_supplied():
+    """A dynamic output sets ``response_json_schema`` and omits ``response_schema``.
+
+    The composition stream needs ``additionalProperties`` on its message bodies,
+    which the Developer API only accepts through ``response_json_schema``; sending
+    both would be ambiguous.
+    """
+
+    full = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"messages": {"type": "array"}},
+        "required": ["messages"],
+    }
+    request = _request()
+    request = ModelRequest(
+        capability=request.capability,
+        model_path=request.model_path,
+        model_id=request.model_id,
+        prompt_id=request.prompt_id,
+        prompt_version=request.prompt_version,
+        system_instruction=request.system_instruction,
+        contents=request.contents,
+        response_schema=request.response_schema,
+        decoding=request.decoding,
+        timeout_seconds=request.timeout_seconds,
+        response_json_schema=full,
+    )
+    models = _FakeModels(text='{"messages": []}')
+    provider = _provider(client=_FakeClient(models))
+    provider.generate(request)
+    config = models.calls[0]["config"]
+    assert config["response_json_schema"] == full
+    assert "response_schema" not in config
 
 
 def test_non_json_text_is_returned_unparsed():

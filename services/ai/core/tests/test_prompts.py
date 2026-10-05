@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from core.config import Capability, prompt_version_for
@@ -121,7 +123,7 @@ def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
     # catalog: the negotiated catalogId and its components are rendered in, and the
     # template keeps the token mechanism and the security rules (FEAT-011, MQ-003).
     assert "[[catalog_id]]" in text
-    assert "[[catalog_components]]" in text
+    assert "[[allowed_components]]" in text
     assert "[[task]]" in text
     assert "[[context]]" in text
     assert "v0.9" in text
@@ -136,3 +138,79 @@ def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
     assert "outside the catalog" in text
     assert "record lookup" in text
     assert "prewritten" in text.lower()
+
+
+# --- Rendered-prompt integrity ----------------------------------------------------
+# Every placeholder a capability prompt declares must be supplied by the serving
+# layer, or the model silently receives the literal token. Mocked model tests cannot
+# catch this: they assert on the request object, not on whether a token rendered, so
+# a prompt/code key mismatch degrades every surface to the fallback while the suite
+# stays green. These render each prompt with the exact substitution map ``serving``
+# builds and assert the result is clean and grounded (FEAT-011, MQ-003).
+
+_PLACEHOLDER_RE = re.compile(r"\[\[[a-z_]+\]\]")
+
+
+def _render_values(capability, catalog):
+    """The values ``serving`` supplies for each capability, built the same way.
+
+    Kept in lockstep with ``core.serving``: a placeholder the prompt declares and
+    this map omits renders as a literal token and fails the assertions below, which
+    is the regression the composition token caused.
+    """
+
+    if capability is Capability.INTENT_RESOLUTION:
+        return {
+            "user_message": "pay my electricity",
+            "locale": "en",
+            "channel": "app",
+            "retrieved_data": "RETRIEVED DATA\n[]\nEND RETRIEVED DATA",
+            "conversation_history": "",
+            "clarifying_questions_asked": "0",
+            "clarification_limit": "3",
+        }
+    if capability is Capability.DISCOVERY_RANKING:
+        return {
+            "user_query": "electricity",
+            "category": "none",
+            "retrieved_data": "RETRIEVED DATA\n[]\nEND RETRIEVED DATA",
+        }
+    if capability is Capability.INTERFACE_COMPOSITION:
+        return {
+            "catalog_id": catalog.catalog_id,
+            "task": "confirmation",
+            "context": "{}",
+            "allowed_components": ", ".join(catalog.component_names()),
+        }
+    raise AssertionError(f"no render map for {capability}")
+
+
+@pytest.mark.parametrize("capability", list(Capability))
+def test_every_capability_prompt_renders_without_leftover_placeholders(capability):
+    from core.a2ui_catalog import published_catalog
+
+    prompt = load_prompt(capability)
+    rendered = render(prompt.text, _render_values(capability, published_catalog()))
+    leftover = _PLACEHOLDER_RE.findall(rendered)
+    assert leftover == [], f"{capability.value} renders unresolved placeholders: {leftover}"
+
+
+def test_composition_prompt_renders_the_real_catalog_component_names():
+    """The model must receive the catalog's component names, not a token or a copy.
+
+    The composition placeholder and the serving key once disagreed, so the model saw
+    ``components: [[catalog_components]]`` and returned an empty message stream,
+    which failed validation and degraded every surface to the fallback (D-052).
+    """
+
+    from core.a2ui_catalog import published_catalog
+
+    catalog = published_catalog()
+    rendered = render(
+        load_prompt(Capability.INTERFACE_COMPOSITION).text,
+        _render_values(Capability.INTERFACE_COMPOSITION, catalog),
+    )
+    for name in catalog.component_names():
+        assert name in rendered, f"rendered composition prompt omits catalog component {name}"
+    assert "[[catalog_components]]" not in rendered
+    assert "[[allowed_components]]" not in rendered

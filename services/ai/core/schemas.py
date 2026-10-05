@@ -329,3 +329,34 @@ COMPOSITION_RESPONSE_SCHEMA: Mapping[str, Any] = {
     },
     "required": ["messages"],
 }
+
+# The composition stream is dynamic and polymorphic: each message body and each
+# flat component is a different shape per task and component, so a schema that
+# declares concrete fields cannot cover it without either dropping valid fields or
+# constraining the model to the empty object. Google's ``response_schema`` also
+# rejects ``additionalProperties`` on the Developer API, so it cannot express an
+# open component. This draft-2020-12 schema describes the A2UI envelope (version,
+# message bodies, the ``surfaceId``/``catalogId`` fields) while leaving message
+# bodies open, and is pinned via the provider's ``response_json_schema`` field. The
+# agent-side pre-send validation (``core.a2ui``) remains the authority on the
+# component names, required properties, and executable-content rules (MQ-003).
+COMPOSITION_RESPONSE_JSON_SCHEMA: Mapping[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "messages": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "version": {"type": "string"},
+                    "createSurface": {"type": "object", "additionalProperties": True},
+                    "updateComponents": {"type": "object", "additionalProperties": True},
+                    "updateDataModel": {"type": "object", "additionalProperties": True},
+                },
+                "required": ["version"],
+            },
+        },
+    },
+    "required": ["messages"],
+}

@@ -7,7 +7,7 @@ The surface is composed against one published A2UI catalog, identified by its
 catalogId. The catalog is known to you and to the client at build time; its URI is an
 identifier, never something to fetch at runtime.
 - catalogId: [[catalog_id]]
-- components: [[catalog_components]]
+- components: [[allowed_components]]
 
 MESSAGE STREAM (A2UI v0.9)
 Produce an array of A2UI messages, each with `version` set to "v0.9" and exactly one
@@ -38,7 +38,7 @@ Compose the task you are given; never switch to a different one (FEAT-011).
   Use Recovery.
 
 RULES (non-negotiable)
-- Use only components the catalog defines: [[catalog_components]]. Never request a
+- Use only components the catalog defines: [[allowed_components]]. Never request a
   component outside the catalog.
 - Never embed executable code, scripts, event handlers, or external resource loads.
 - Never include a URL, a data: URI, or executable-looking content in any message.

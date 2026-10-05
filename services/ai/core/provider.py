@@ -56,6 +56,12 @@ class ModelRequest:
     response_schema: Mapping[str, Any]
     decoding: DecodingSettings
     timeout_seconds: float
+    # An optional full JSON Schema (draft 2020-12) for a dynamic output the
+    # provider's ``response_schema`` cannot express: a polymorphic stream whose
+    # sub-objects must stay open (``additionalProperties``), which the Developer
+    # API accepts only through ``response_json_schema``. When set it takes
+    # precedence over ``response_schema``.
+    response_json_schema: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -135,14 +141,22 @@ class GeminiProvider:
         sdk = self._load_sdk()
         client = self._get_client()
         types = sdk.types
-        config = types.GenerateContentConfig(
-            system_instruction=request.system_instruction,
-            response_mime_type="application/json",
-            response_schema=request.response_schema,
-            temperature=request.decoding.temperature,
-            top_p=request.decoding.top_p,
-            max_output_tokens=request.decoding.max_output_tokens,
-        )
+        config_kwargs: dict[str, Any] = {
+            "system_instruction": request.system_instruction,
+            "response_mime_type": "application/json",
+            "temperature": request.decoding.temperature,
+            "top_p": request.decoding.top_p,
+            "max_output_tokens": request.decoding.max_output_tokens,
+        }
+        # A dynamic, polymorphic output is expressed as a full JSON Schema and sent
+        # through ``response_json_schema``; every other capability keeps the
+        # simpler ``response_schema``. Sending both would be ambiguous, so exactly
+        # one is set.
+        if request.response_json_schema is not None:
+            config_kwargs["response_json_schema"] = request.response_json_schema
+        else:
+            config_kwargs["response_schema"] = request.response_schema
+        config = types.GenerateContentConfig(**config_kwargs)
 
         started = time.perf_counter()
         try:
