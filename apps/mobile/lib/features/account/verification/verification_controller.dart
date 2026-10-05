@@ -3,16 +3,23 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api_providers.dart';
 import '../../../core/connectivity.dart';
+import 'http_verification_repository.dart';
 import 'verification_mock.dart';
 import 'verification_models.dart';
 import 'verification_repository.dart';
 
-/// The repository the screen talks to. Live when the identity endpoints are
-/// wired; the mock satisfies the same C-020–C-022 shape until then.
-final verificationRepositoryProvider = Provider<VerificationRepository>(
-  (ref) => MockVerificationRepository(),
-);
+/// The repository the screen talks to. The mock is the default so the demo
+/// build and the widget tests never open a socket; the `USE_LIVE_REPOSITORIES`
+/// build flag selects the HTTP implementation against the gateway, exactly as
+/// the other repository providers select live versus mock.
+final verificationRepositoryProvider = Provider<VerificationRepository>((ref) {
+  if (ref.watch(apiConfigProvider).useLiveRepositories) {
+    return HttpVerificationRepository(ref.watch(apiClientProvider));
+  }
+  return MockVerificationRepository();
+});
 
 /// The screen's state machine (screens/05, "States").
 enum VerificationPhase {

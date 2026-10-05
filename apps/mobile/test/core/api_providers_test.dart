@@ -6,6 +6,9 @@ import 'package:sabi_mobile/data/http_auth_repository.dart';
 import 'package:sabi_mobile/data/http_repositories.dart';
 import 'package:sabi_mobile/data/mock_repositories.dart';
 import 'package:sabi_mobile/data/providers.dart';
+import 'package:sabi_mobile/features/account/verification/http_verification_repository.dart';
+import 'package:sabi_mobile/features/account/verification/verification_controller.dart';
+import 'package:sabi_mobile/features/account/verification/verification_mock.dart';
 import 'package:sabi_mobile/features/payment/data/http_payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/mock_payment_repository.dart';
 import 'package:sabi_mobile/features/payment/data/providers.dart';
@@ -34,6 +37,10 @@ void main() {
     expect(container.read(receiptRepositoryProvider), isA<MockReceiptRepository>());
     expect(container.read(receiptsRepositoryProvider), isA<MockReceiptsRepository>());
     expect(container.read(casesRepositoryProvider), isA<MockCasesRepository>());
+    expect(
+      container.read(verificationRepositoryProvider),
+      isA<MockVerificationRepository>(),
+    );
     expect(container.read(paymentRepositoryProvider), isA<MockPaymentRepository>());
     expect(container.read(federalRepositoryProvider), isA<MockFederalRepository>());
     expect(container.read(billRepositoryProvider), isA<MockBillRepository>());
@@ -50,6 +57,10 @@ void main() {
     expect(container.read(receiptRepositoryProvider), isA<HttpReceiptRepository>());
     expect(container.read(receiptsRepositoryProvider), isA<HttpReceiptsRepository>());
     expect(container.read(casesRepositoryProvider), isA<HttpCasesRepository>());
+    expect(
+      container.read(verificationRepositoryProvider),
+      isA<HttpVerificationRepository>(),
+    );
     expect(container.read(paymentRepositoryProvider), isA<HttpPaymentRepository>());
     expect(container.read(federalRepositoryProvider), isA<HttpFederalRepository>());
     expect(container.read(billRepositoryProvider), isA<HttpBillRepository>());
