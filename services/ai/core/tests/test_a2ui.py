@@ -252,6 +252,146 @@ def test_provider_picker_rejects_json_encoded_string_rows():
     assert any("must be an object" in error for error in result.errors)
 
 
+def test_provider_picker_rejects_an_empty_service_row():
+    """A ``{}`` row satisfies "is an object" but renders blank on the client.
+
+    ``ProviderPicker.services`` items are a ``$ref`` to ``ServiceResultRow``, whose
+    ``required`` names are ``serviceId``, ``collectingBody``, and ``category``. The
+    pre-send validator resolves the reference and refuses an empty row, so the surface
+    degrades to the same-task fallback instead of rendering blank rows (MQ-003).
+    """
+
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d1", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [{"id": "root", "component": "ProviderPicker", "services": [{}]}],
+                },
+            },
+        ]
+    }
+    result = _validate(payload)
+    assert result.ok is False
+    assert any("missing required 'serviceId'" in error for error in result.errors)
+    assert result.messages == ()
+
+
+def test_provider_picker_rejects_a_row_missing_one_required_field():
+    """One missing required field is enough to refuse the row."""
+
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d1", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ProviderPicker",
+                            "services": [{"serviceId": "svc-1", "category": "government"}],
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    result = _validate(payload)
+    assert result.ok is False
+    assert any("missing required 'collectingBody'" in error for error in result.errors)
+
+
+def test_provider_picker_accepts_a_well_formed_multi_result_picker():
+    payload = {
+        "messages": [
+            {"version": "v0.9", "createSurface": {"surfaceId": "d1", "catalogId": _CATALOG_ID}},
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "ProviderPicker",
+                            "services": [
+                                {
+                                    "serviceId": "svc-1",
+                                    "name": "Ikeja Electric",
+                                    "collectingBody": "Ikeja Electricity Distribution Company",
+                                    "category": "electricity",
+                                    "knownAmount": 1200000,
+                                    "currency": "NGN",
+                                    "status": "active",
+                                    "confidence": 0.9,
+                                },
+                                {
+                                    "serviceId": "svc-2",
+                                    "collectingBody": "Eko Electricity Distribution Company",
+                                    "category": "electricity",
+                                },
+                            ],
+                        }
+                    ],
+                },
+            },
+        ]
+    }
+    result = _validate(payload)
+    assert result.ok is True
+    assert result.errors == ()
+
+
+def test_inline_object_array_items_enforce_their_required_fields():
+    """The same resolution applies to an inline object ``items`` schema, not only a ``$ref``."""
+
+    from core.a2ui_catalog import A2uiCatalog
+
+    catalog = A2uiCatalog(
+        catalog_id="https://test.example/catalog.json",
+        components={
+            "Picker": {
+                "type": "object",
+                "properties": {
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"label": {"type": "string"}},
+                            "required": ["label"],
+                        },
+                    }
+                },
+                "required": ["rows"],
+            }
+        },
+    )
+    payload = {
+        "messages": [
+            {
+                "version": "v0.9",
+                "createSurface": {
+                    "surfaceId": "d1",
+                    "catalogId": "https://test.example/catalog.json",
+                },
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": "d1",
+                    "components": [{"id": "root", "component": "Picker", "rows": [{}]}],
+                },
+            },
+        ]
+    }
+    result = validate_a2ui_stream(payload, catalog=catalog)
+    assert result.ok is False
+    assert any("missing required 'label'" in error for error in result.errors)
+
+
 def test_discovery_single_result_uses_a_flat_service_row():
     payload = {
         "messages": [

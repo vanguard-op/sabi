@@ -11,9 +11,9 @@ client as a broken surface. The client repeats the validation on receipt
 
 Validation is deliberately structural and standalone: the catalog schema is JSON
 Schema, but the checks here (known message type, version, catalog id, component
-name, required properties, primitive property types, no executable content) are the
-ones the agent must never let through, and they are the same checks the client's
-gate performs by name.
+name, required properties, primitive property types, a referenced row component's
+required properties, no executable content) are the ones the agent must never let
+through, and they are the same checks the client's gate performs by name.
 """
 
 from __future__ import annotations
@@ -89,7 +89,89 @@ def _is_executable_or_external(text: str) -> str | None:
     return None
 
 
-def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]) -> None:
+def _resolve_component_ref(catalog: A2uiCatalog, ref: str) -> Mapping[str, Any] | None:
+    """Resolve a catalog-local ``$ref`` (``#/components/<Name>``) to its schema.
+
+    The published catalog is one JSON Schema document; an array property whose items
+    are a ``$ref`` to a catalog component (``ProviderPicker.services`` items reference
+    ``ServiceResultRow``) means every element must satisfy that component's schema,
+    including its ``required`` properties. A reference that does not point at a catalog
+    component returns ``None``: this structural pass cannot judge it, and the client's
+    full schema validation remains the authority.
+    """
+
+    prefix = "#/components/"
+    if not ref.startswith(prefix):
+        return None
+    schema = catalog.components.get(ref[len(prefix) :])
+    return schema if isinstance(schema, Mapping) else None
+
+
+def _object_items_schema(
+    catalog: A2uiCatalog, items: Any
+) -> tuple[Mapping[str, Any] | None, str | None]:
+    """The schema and ``$ref`` for array items that are object-shaped.
+
+    ``items`` may be a ``$ref`` to a catalog component or an inline object schema;
+    both describe the element shape. A primitive ``items`` type yields ``(None, None)``
+    and is not checked here.
+    """
+
+    if not isinstance(items, Mapping):
+        return None, None
+    ref = items.get("$ref")
+    if isinstance(ref, str):
+        return _resolve_component_ref(catalog, ref), ref
+    if items.get("type") == "object" or "properties" in items or "required" in items:
+        return items, None
+    return None, None
+
+
+def _check_object_against_schema(
+    value: Mapping[str, Any],
+    schema: Mapping[str, Any],
+    what: str,
+    errors: list[str],
+    *,
+    catalog: A2uiCatalog,
+    seen: frozenset[str],
+) -> None:
+    """Check an object against a resolved component or inline object schema.
+
+    Only the checks this structural pass can decide are made: the schema's ``required``
+    names must be present and each present declared property must have the declared
+    type. An absent optional property is not an error. ``seen`` carries the ``$ref``
+    chain so a self-referential catalog cannot recurse forever.
+    """
+
+    required = schema.get("required")
+    if isinstance(required, Sequence) and not isinstance(required, (str, bytes)):
+        for name in required:
+            if isinstance(name, str) and name not in value:
+                errors.append(f"{what} is missing required {name!r}")
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        for prop, declared in properties.items():
+            if prop in value:
+                _check_property_type(
+                    value[prop],
+                    declared,
+                    f"{what} {prop!r}",
+                    errors,
+                    catalog=catalog,
+                    seen=seen,
+                )
+
+
+def _check_property_type(
+    value: Any,
+    declared: Any,
+    what: str,
+    errors: list[str],
+    *,
+    catalog: A2uiCatalog,
+    seen: frozenset[str] = frozenset(),
+) -> None:
     """Check a value against a JSON-Schema ``type`` (string or list, nullable).
 
     A nested schema (a mapping, for example an array's ``items`` or a sub-object) is
@@ -98,8 +180,11 @@ def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]
     ``items`` when the items declare an object shape, because a list of JSON-encoded
     strings where the catalog requires row objects passes the container check but
     renders nothing on the client: the client's picker drops a non-object entry, so the
-    surface would be silently empty. Refusing it here degrades to the same-task
-    fallback instead (MQ-003, FEAT-011).
+    surface would be silently empty. When those items are a ``$ref`` to a catalog
+    component, the referenced schema is resolved and every element is checked against
+    its ``required`` properties too: a row of ``{}`` satisfies "is an object" but
+    renders blank on the client, so it is refused here and the surface degrades to the
+    same-task fallback instead (MQ-003, FEAT-011).
     """
 
     if value is None:
@@ -112,16 +197,41 @@ def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]
             errors.append(f"{what} must not be null")
         return
     if isinstance(declared, Mapping):
+        ref = declared.get("$ref")
+        if isinstance(ref, str):
+            # A component reference: resolve it and check the value against the
+            # referenced component's schema. A reference outside the catalog is left
+            # to the client's full schema validation.
+            resolved = _resolve_component_ref(catalog, ref)
+            if resolved is not None and ref not in seen:
+                if not isinstance(value, Mapping):
+                    errors.append(f"{what} must be an object")
+                    return
+                _check_object_against_schema(
+                    value, resolved, what, errors, catalog=catalog, seen=seen | {ref}
+                )
+            return
         # A property schema object: check the declared ``type`` and, for an array of
-        # object items, that each element is an object.
-        _check_property_type(value, declared.get("type"), what, errors)
+        # object items, that each element is an object and (when the items resolve to
+        # a component or an inline object schema) that it carries the required fields.
+        _check_property_type(value, declared.get("type"), what, errors, catalog=catalog, seen=seen)
         items = declared.get("items")
-        if _expects_object_items(declared.get("type"), items) and isinstance(
-            value, (list, tuple)
-        ):
+        if _expects_object_items(declared.get("type"), items) and isinstance(value, (list, tuple)):
+            item_schema, item_ref = _object_items_schema(catalog, items)
             for index, item in enumerate(value):
                 if not isinstance(item, Mapping):
                     errors.append(f"{what}[{index}] must be an object")
+                    continue
+                if item_schema is None or (item_ref is not None and item_ref in seen):
+                    continue
+                _check_object_against_schema(
+                    item,
+                    item_schema,
+                    f"{what}[{index}]",
+                    errors,
+                    catalog=catalog,
+                    seen=(seen | {item_ref}) if item_ref is not None else seen,
+                )
         return
     names = declared if isinstance(declared, list) else [declared]
     for name in names:
@@ -152,7 +262,7 @@ def _expects_object_items(declared_type: Any, items: Any) -> bool:
     if "$ref" in items:
         return True
     item_type = items.get("type")
-    return item_type == "object" or "properties" in items
+    return item_type == "object" or "properties" in items or "required" in items
 
 
 @dataclass(frozen=True)
@@ -315,5 +425,6 @@ def _validate_component(
                 declared_schema,
                 f"component {name!r} {required!r}",
                 errors,
+                catalog=catalog,
             )
     return name, component_id == "root"

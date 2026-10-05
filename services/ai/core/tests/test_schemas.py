@@ -195,6 +195,38 @@ def test_composition_schema_requires_each_components_catalog_properties():
         assert "additional_properties" not in branch
 
 
+def test_composition_schema_inlines_the_referenced_service_result_row():
+    """``ProviderPicker.services`` items carry the row's required fields inline.
+
+    The Developer API cannot express ``$ref``, so the catalog's
+    ``items: {"$ref": "#/components/ServiceResultRow"}`` was flattened to a bare
+    ``{"type": "object"}`` that ``{}`` satisfied: the model emitted empty rows and the
+    client rendered blank entries. The inlined items schema now requires
+    ``serviceId``, ``collectingBody``, and ``category`` (MQ-003, FEAT-011).
+    """
+
+    from core.schemas import composition_response_json_schema
+
+    schema = composition_response_json_schema()
+    variants = schema["properties"]["messages"]["items"]["properties"]["updateComponents"][
+        "properties"
+    ]["components"]["items"]["anyOf"]
+    picker = next(
+        branch
+        for branch in variants
+        if branch["properties"]["component"]["enum"] == ["ProviderPicker"]
+    )
+    items = picker["properties"]["services"]["items"]
+    assert items["type"] == "object"
+    assert set(items["required"]) == {"serviceId", "collectingBody", "category"}
+    assert "serviceId" in items["properties"]
+    assert "collectingBody" in items["properties"]
+    assert "category" in items["properties"]
+    # The row schema must stay open by omission: the Developer API rejects
+    # ``additionalProperties``.
+    assert "additionalProperties" not in items
+
+
 def test_composition_schema_bounds_the_envelope_fields():
     from core.schemas import composition_response_json_schema
 

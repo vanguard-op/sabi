@@ -199,6 +199,34 @@ def test_composes_a_multi_result_discovery_from_the_gateway_context_shape() -> N
     assert "s2" in provider.last_request.contents
 
 
+def test_discovery_with_an_empty_service_row_falls_back() -> None:
+    """A ProviderPicker whose rows are empty degrades to the same-task fallback.
+
+    The live model emitted ``services: [{}, {}]`` and put the real rows as orphan
+    sibling ServiceResultRow components; ``{}`` satisfied the old object-only check and
+    the client rendered a blank row per entry. The validator now resolves the items
+    ``$ref`` against the catalog and refuses a row missing a required field, so the task
+    stays completable through the client fallback rather than rendering blank rows
+    (MQ-003, FEAT-011).
+    """
+
+    payload = _a2ui(
+        "discover-empty",
+        [{"id": "root", "component": "ProviderPicker", "services": [{}, {}]}],
+    )
+    client, _ = build_test_client([json_response(payload, model_id=FLASH_MODEL_ID)])
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={
+            "task": "discovery",
+            "context": _GATEWAY_DISCOVERY_CONTEXT,
+            "catalogId": _CATALOG_ID,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"messages": [], "fallback": "discovery"}
+
+
 def test_composes_a_verification_surface() -> None:
     client, provider = build_test_client(
         [json_response(_verification_stream(), model_id=FLASH_MODEL_ID)]
@@ -293,9 +321,7 @@ def test_invalid_composition_keeps_the_new_task_fallback() -> None:
 
 
 def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
-    client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
-    )
+    client, provider = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     client.post(
         "/v1/agent/surfaces",
         json={
@@ -307,7 +333,7 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     request = provider.last_request
     assert request.model_id == FLASH_MODEL_ID
     assert request.prompt_id == "interface_composition"
-    assert request.prompt_version == "v5"
+    assert request.prompt_version == "v6"
     assert request.decoding.temperature == 0.0
     assert _CATALOG_ID in request.contents
     assert "Verification" in request.contents and "Recovery" in request.contents
@@ -339,9 +365,7 @@ def test_no_compatible_catalog_falls_back_to_the_same_task() -> None:
 
 
 def test_unknown_catalog_does_not_call_the_model() -> None:
-    client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
-    )
+    client, provider = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     client.post(
         "/v1/agent/surfaces",
         json={"task": "confirmation", "context": {}, "catalogId": "https://nope/catalog.json"},
@@ -434,9 +458,7 @@ def test_context_defaults_to_an_empty_object() -> None:
 
 
 def test_context_may_carry_arbitrary_task_data() -> None:
-    client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
-    )
+    client, provider = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     context = {
         "reference": "FT-1",
         "payee": "FIRS",
@@ -459,9 +481,7 @@ def test_missing_task_context_falls_back_without_calling_the_model() -> None:
     is a logged server decision, not a silent empty model response.
     """
 
-    client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
-    )
+    client, provider = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
         json={"task": "confirmation", "context": {"amount": 500000}, "catalogId": _CATALOG_ID},

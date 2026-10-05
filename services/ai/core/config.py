@@ -58,8 +58,13 @@ INTENT_PROMPT_VERSION = "v4"
 # catalog-derived: the prompt now renders the component names one per line (a
 # comma-joined list was echoed into a component name) and states that a component's
 # required properties are flat properties on the component rather than routed through
-# ``updateDataModel``, matching what the pre-send validator checks.
-INTERFACE_COMPOSITION_PROMPT_VERSION = "v5"
+# ``updateDataModel``, matching what the pre-send validator checks. It moved to
+# ``v6`` when a discovery result row became a required inline object: the provider
+# schema inlines the referenced ``ServiceResultRow`` (``$ref`` is unavailable there)
+# and the prompt now states that the rows belong inside the root ProviderPicker's
+# ``services`` property, never as empty objects and never as orphan sibling
+# components the root does not reference (MQ-003, FEAT-011).
+INTERFACE_COMPOSITION_PROMPT_VERSION = "v6"
 
 # The serving confidence cutoff for intent resolution. Below it the model asks exactly
 # one clarifying question and never presents a payment intent (model-quality.md,

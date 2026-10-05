@@ -113,11 +113,11 @@ def test_intent_prompt_v4_keeps_the_pinned_cutoff_and_example_shapes():
     assert "unmappable" in text.lower()
 
 
-def test_composition_prompt_v5_carries_the_a2ui_catalog_contract():
+def test_composition_prompt_v6_carries_the_a2ui_catalog_contract():
     from core.config import INTERFACE_COMPOSITION_PROMPT_VERSION
 
     prompt = load_prompt(Capability.INTERFACE_COMPOSITION)
-    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v5"
+    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v6"
     text = prompt.text
     # The composed surface is an A2UI v0.9 message stream against the published
     # catalog: the negotiated catalogId and its components are rendered in, and the
@@ -150,6 +150,12 @@ def test_composition_prompt_v5_carries_the_a2ui_catalog_contract():
     # required properties are flat on the component, not routed through updateDataModel.
     assert "flat properties" in text
     assert "Do not use it to carry a" in text
+    # A discovery result row is a required inline object on the root picker: the rows
+    # live in `services`, never as empty objects and never as orphan siblings the root
+    # does not reference (MQ-003, FEAT-011).
+    assert "inside `services` on the root ProviderPicker" in text
+    assert "separate sibling components" in text
+    assert "empty row object" in text
 
 
 def test_composition_prompt_states_the_shared_per_task_fields():

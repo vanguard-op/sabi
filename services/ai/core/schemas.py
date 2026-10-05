@@ -441,19 +441,27 @@ COMPOSITION_RESPONSE_SCHEMA: Mapping[str, Any] = {
 _PRIMITIVE_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
 
 
-def _catalog_property_schema(declared: Any) -> Mapping[str, Any]:
+def _catalog_property_schema(catalog: Any, declared: Any) -> Mapping[str, Any]:
     """A provider-facing schema for one catalog property declaration.
 
     The catalog declares a property as ``{"type": "integer"}``, a nullable
     ``{"type": ["integer", "null"]}``, an array ``{"type": "array", "items": ...}``,
     or a component ``$ref``. Gemini's ``response_json_schema`` speaks JSON Schema
-    2020-12, so a nullable union is expressed as a two-branch ``anyOf`` and an
-    array keeps an object ``items`` for a referenced row type. Anything the catalog
-    does not type is left open rather than guessed.
+    2020-12, so a nullable union is expressed as a two-branch ``anyOf`` and a
+    component ``$ref`` is inlined from the catalog: the Developer API cannot express
+    ``$ref``, so an array of referenced rows (``ProviderPicker.services`` items
+    referencing ``ServiceResultRow``) is expanded to the row's own properties and
+    ``required`` names. Without that the items schema degenerated to a bare
+    ``{"type": "object"}`` that ``{}`` satisfied, so the model emitted empty rows and
+    the client rendered blank entries (MQ-003, FEAT-011). Anything the catalog does
+    not type is left open rather than guessed.
     """
 
     if not isinstance(declared, Mapping):
         return {}
+    ref = declared.get("$ref")
+    if isinstance(ref, str):
+        return _catalog_ref_schema(catalog, ref)
     declared_type = declared.get("type")
     if isinstance(declared_type, list):
         branches = [{"type": item} for item in declared_type if item in _PRIMITIVE_TYPES]
@@ -464,14 +472,37 @@ def _catalog_property_schema(declared: Any) -> Mapping[str, Any]:
         return branches[0] if len(branches) == 1 else {"anyOf": branches}
     if declared_type == "array":
         items = declared.get("items")
-        if isinstance(items, Mapping) and "$ref" in items:
-            return {"type": "array", "items": {"type": "object"}}
         if isinstance(items, Mapping):
-            return {"type": "array", "items": _catalog_property_schema(items)}
+            return {"type": "array", "items": _catalog_property_schema(catalog, items)}
         return {"type": "array", "items": {}}
     if isinstance(declared_type, str) and declared_type in _PRIMITIVE_TYPES:
         return {"type": declared_type}
     return {}
+
+
+def _catalog_ref_schema(catalog: Any, ref: str) -> Mapping[str, Any]:
+    """A provider-facing object schema for a catalog ``$ref``, inlined.
+
+    The referenced component's declared properties are described and its ``required``
+    names are carried over, so a referenced row must be a complete object rather than
+    an empty one. A reference that does not point at a catalog component stays a
+    permissive object: the agent-side validator is the authority and refuses what it
+    cannot resolve.
+    """
+
+    prefix = "#/components/"
+    name = ref[len(prefix) :] if ref.startswith(prefix) else ""
+    if not name or not catalog.defines(name):
+        return {"type": "object"}
+    properties = {
+        prop: _catalog_property_schema(catalog, declared)
+        for prop, declared in catalog.property_types(name).items()
+    }
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(catalog.required_properties(name)),
+    }
 
 
 def _catalog_component_variant(catalog: Any, name: str) -> Mapping[str, Any]:
@@ -491,7 +522,7 @@ def _catalog_component_variant(catalog: Any, name: str) -> Mapping[str, Any]:
         "component": {"type": "string", "enum": [name]},
     }
     for prop, declared in catalog.property_types(name).items():
-        properties[prop] = _catalog_property_schema(declared)
+        properties[prop] = _catalog_property_schema(catalog, declared)
     return {
         "type": "object",
         "properties": properties,
