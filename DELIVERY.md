@@ -124,7 +124,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-073 | — | infra-engineer | Done | — |
 | T-074 | FEAT-003, FEAT-005 | backend-engineer | Done | — |
 | T-075 | — | infra-engineer | Done | — |
-| T-076 | — | infra-engineer | In Progress | — |
+| T-076 | — | infra-engineer | Done | — |
 | T-077 | — | frontend-engineer | Done | — |
 | T-078 | — | frontend-engineer | Done | — |
 | T-079 | — | backend-engineer | Done | — |
@@ -172,6 +172,9 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-121 | C-012 | ai-engineer | Done | — |
 | T-122 | C-012 | ai-engineer | Done | — |
 | T-123 | C-012 | frontend-engineer | Done | — |
+| T-124 | C-012 | ai-engineer | In Progress | — |
+| T-125 | C-012 | frontend-engineer | In Progress | — |
+| T-126 | — | infra-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -231,6 +234,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-052 | A capability prompt's placeholders and the keys the renderer supplies are verified by a test over every prompt (no unresolved `[[...]]` after render), not by asserting the literal placeholder text | The composition prompt used `[[catalog_components]]` while the code supplied `allowed_components`, so the model was given no component names and every surface silently fell back; the prompt test asserted the literal token, encoding the bug. Mocked model tests cannot catch this, so the check must be on the rendered prompt itself | lead |
 | D-053 | A live-model contract test per composition task asserts a valid non-empty A2UI stream, and skips with its cause when no key or credit is available rather than passing against a mock; the provider response schema is derived from the published catalog so the model cannot emit an empty envelope | Three successive prompt and schema bugs reached staging because the model is mocked everywhere; a green mock hid each one. The derived schema also removes the second hand-maintained copy of the component set | lead |
 | D-054 | Every judged capability runs on the stable pinned model `gemini-3.1-flash-lite`; the primary/preview `gemini-3.1-pro-preview` path is removed, including for interface composition | Interface composition was routed to the preview pro model, against the intent of D-026: composition runs on every surface while the user waits, and pro is a preview model at preview cost (composition calls measured 10-15s each and consumed the prepayment credits). One stable, cheaper model for all capabilities removes the deprecation exposure and the cost | user |
+| D-055 | `gcp-up` ensures the Artifact Registry repository out of band (gcloud, when absent), builds and pushes the images, then runs a single `terraform apply`; the two-phase apply of D-036 is superseded | With the registry and the images present before the apply, the platform and the workloads land in one pass, so no Cloud Run service is created before its image exists and the transient placeholder revision D-036 described never occurs. Verified by repeated successful `up` runs | lead |
 
 ## Definition of Done
 
