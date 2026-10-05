@@ -484,7 +484,7 @@ void main() {
     );
   });
 
-  testWidgets('a provider-picker round trip preserves the turns', (
+  testWidgets('several matches render the composed picker inline, not a sheet', (
     tester,
   ) async {
     final catalogue = _Catalogue(
@@ -509,14 +509,14 @@ void main() {
     await tester.pump();
     await tester.tap(_sendButton);
     await tester.pumpAndSettle();
-    // The sheet blocks on a choice; the conversation stays behind it.
-    expect(find.text('Which one do you mean?'), findsOneWidget);
-    // Dismiss without choosing: the turns are still there afterwards.
-    await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle();
+    // The composed provider picker is the chat path: both candidates render
+    // inline in the conversation and no modal sheet opens (D-050).
     expect(find.text('Which one do you mean?'), findsNothing);
-    expect(find.text('council levy'), findsOneWidget);
+    expect(find.byType(ServiceResultRow), findsNWidgets(2));
     expect(find.text('Onitsha North LGA'), findsOneWidget);
+    expect(find.text('Onitsha South LGA'), findsOneWidget);
+    // The conversation is preserved underneath.
+    expect(find.text('council levy'), findsOneWidget);
   });
 
   testWidgets('an offline queued request stays in the conversation', (

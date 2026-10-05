@@ -292,9 +292,10 @@ class HomeController extends Notifier<HomeState> {
 
   /// Submits a free-form request as a new conversation turn.
   ///
-  /// Returns the selectable candidates when the caller should act on them
-  /// (present the provider picker); null when the state moved to clarifying,
-  /// conversational, not-covered, queued, or error.
+  /// Returns the selectable candidates when the turn reached discovery; the
+  /// conversation renders them inline and the user selects one there. Null when
+  /// the state moved to clarifying, conversational, not-covered, queued, or
+  /// error.
   Future<List<ServiceSummary>?> submit(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return null;
@@ -519,6 +520,51 @@ class HomeController extends Notifier<HomeState> {
       ),
     );
     return intent.candidates;
+  }
+
+  /// Selects a discovery result and composes its confirmation inline, so the
+  /// conversation is the primary control surface: the turn moves to
+  /// [HomePhase.confirmation] with the chosen service and the Payment
+  /// Confirmation screen stays an explicit alternate the user may choose
+  /// instead (D-050, screens.md "dual path"). Selecting never navigates.
+  ///
+  /// The service is resolved from the turn's own candidates, never taken from
+  /// the action's context, so the agent cannot name a service the client did
+  /// not resolve.
+  Future<void> selectService(String serviceId) async {
+    final turn = state.current;
+    if (turn == null) return;
+    ServiceSummary? selected;
+    for (final candidate in turn.candidates) {
+      if (candidate.serviceId == serviceId) {
+        selected = candidate;
+        break;
+      }
+    }
+    if (selected == null) return;
+    final service = selected;
+    // The composer disables on `composing`, so a second request cannot append
+    // while the confirmation is being composed for this turn.
+    _updateCurrent((turn) => turn.copyWith(phase: HomePhase.composing));
+    final intent = turn.intent;
+    final surface = await _compose(
+      SurfaceTask.confirmation,
+      context: {
+        'amount': service.knownAmount ?? intent?.amount,
+        'currency': service.currency,
+        'payee': service.collectingBody,
+        'reference': intent?.reference,
+      },
+    );
+    _updateCurrent(
+      (turn) => turn.copyWith(
+        phase: HomePhase.confirmation,
+        selectedService: service,
+        surface: surface.stream,
+        surfaceTask: SurfaceTask.confirmation,
+        surfaceFailed: !surface.accepted,
+      ),
+    );
   }
 
   Future<List<ServiceSummary>?> _searchFallback(

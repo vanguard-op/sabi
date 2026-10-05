@@ -8,7 +8,6 @@ import '../../components/confirmation_summary.dart';
 import '../../components/empty_state.dart';
 import '../../components/error_state.dart';
 import '../../components/offline_banner.dart';
-import '../../components/provider_picker_sheet.dart';
 import '../../components/receipt_card.dart';
 import '../../components/reauth_dialog.dart';
 import '../../components/sab_button.dart';
@@ -74,23 +73,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final text = _composer.text;
     if (text.trim().isEmpty) return;
     _composer.clear();
-    final controller = ref.read(homeControllerProvider.notifier);
-    final candidates = await controller.submit(text);
-    if (!mounted || candidates == null) return;
-    // More than one collecting body is ambiguous: the picker blocks until a
-    // choice is made, and the conversation underneath is preserved (screens.md).
-    if (candidates.length > 1) {
-      final chosen = await showSabProviderPickerSheet(
-        context,
-        candidates: candidates,
-      );
-      if (chosen != null && mounted) _openService(chosen.serviceId);
-    }
-    // A single match stays on the composed discovery surface as a selectable
-    // row, so the user still confirms the target (FEAT-004).
+    // The conversation resolves and renders the result inline. Several matches
+    // are a composed provider picker, a single match a composed result row; in
+    // both the user selects in the conversation rather than being sent to a
+    // screen (FEAT-004, FEAT-011, D-050).
+    await ref.read(homeControllerProvider.notifier).submit(text);
   }
 
-  void _openService(String serviceId) => context.push('/pay/$serviceId');
+  /// The explicit alternate route: the Payment Confirmation screen. Only the
+  /// confirmation surface's own action reaches it, never a discovery selection
+  /// (D-050, screens.md "dual path").
+  void _openPaymentScreen(String serviceId) => context.push('/pay/$serviceId');
+
+  /// Selects a discovery result in the conversation: the turn composes its
+  /// confirmation inline rather than navigating away.
+  void _selectService(String serviceId) {
+    ref.read(homeControllerProvider.notifier).selectService(serviceId);
+  }
 
   /// Opens the existing screen for a record the conversation rendered inline,
   /// so the user may take either route to the same record (user-flow Flow 9).
@@ -191,7 +190,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 receipts: receipts,
                 state: state,
                 scrollController: _conversationScroll,
-                onOpenService: _openService,
+                onSelectService: _selectService,
+                onOpenPaymentScreen: _openPaymentScreen,
                 onOpenRecord: _openRecord,
                 onOpenVerification: _openVerification,
                 onRetry: () =>
@@ -217,7 +217,8 @@ class _Conversation extends ConsumerWidget {
     required this.receipts,
     required this.state,
     required this.scrollController,
-    required this.onOpenService,
+    required this.onSelectService,
+    required this.onOpenPaymentScreen,
     required this.onOpenRecord,
     required this.onOpenVerification,
     required this.onRetry,
@@ -227,7 +228,12 @@ class _Conversation extends ConsumerWidget {
   final List<ReceiptSummary> receipts;
   final HomeState state;
   final ScrollController scrollController;
-  final ValueChanged<String> onOpenService;
+
+  /// Selects a discovery result in the conversation (never navigates).
+  final ValueChanged<String> onSelectService;
+
+  /// Opens the Payment Confirmation screen, the explicit alternate route.
+  final ValueChanged<String> onOpenPaymentScreen;
   final ValueChanged<ResolvedRecord> onOpenRecord;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
@@ -273,7 +279,8 @@ class _Conversation extends ConsumerWidget {
           _Turn(
             turn: state.turns[i],
             isLatest: i == state.turns.length - 1,
-            onOpenService: onOpenService,
+            onSelectService: onSelectService,
+            onOpenPaymentScreen: onOpenPaymentScreen,
             onOpenRecord: onOpenRecord,
             onOpenVerification: onOpenVerification,
             onRetry: onRetry,
@@ -292,7 +299,8 @@ class _Turn extends ConsumerWidget {
   const _Turn({
     required this.turn,
     required this.isLatest,
-    required this.onOpenService,
+    required this.onSelectService,
+    required this.onOpenPaymentScreen,
     required this.onOpenRecord,
     required this.onOpenVerification,
     required this.onRetry,
@@ -304,7 +312,8 @@ class _Turn extends ConsumerWidget {
   /// A retry only makes sense for the request in front of the user; an earlier
   /// failed turn is history, so it renders its notice without the action.
   final bool isLatest;
-  final ValueChanged<String> onOpenService;
+  final ValueChanged<String> onSelectService;
+  final ValueChanged<String> onOpenPaymentScreen;
   final ValueChanged<ResolvedRecord> onOpenRecord;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
@@ -349,11 +358,11 @@ class _Turn extends ConsumerWidget {
           ),
           HomePhase.discovery => _Discovery(
             turn: turn,
-            onOpenService: onOpenService,
+            onSelectService: onSelectService,
           ),
           HomePhase.confirmation => _Confirmation(
             turn: turn,
-            onOpenService: onOpenService,
+            onOpenPaymentScreen: onOpenPaymentScreen,
           ),
           HomePhase.verifying => _Verifying(
             turn: turn,
@@ -376,7 +385,7 @@ class _Turn extends ConsumerWidget {
           HomePhase.clarifying => _Clarification(
             question: turn.intent?.reply,
             candidates: turn.candidates,
-            onOpenService: onOpenService,
+            onSelectService: onSelectService,
           ),
           HomePhase.conversational => _ConversationReply(
             text: assistantReplyFor(turn, strings),
@@ -407,11 +416,14 @@ class _Turn extends ConsumerWidget {
 class _Discovery extends StatelessWidget {
   const _Discovery({
     required this.turn,
-    required this.onOpenService,
+    required this.onSelectService,
   });
 
   final ConversationTurn turn;
-  final ValueChanged<String> onOpenService;
+
+  /// Selects a result in the conversation: the controller composes its
+  /// confirmation inline. Selecting never navigates (D-050).
+  final ValueChanged<String> onSelectService;
 
   @override
   Widget build(BuildContext context) {
@@ -420,12 +432,12 @@ class _Discovery extends StatelessWidget {
       onAction: (action) {
         if (action.name == SabiActions.selectService) {
           final id = action.context['serviceId']?.toString();
-          if (id != null && id.isNotEmpty) onOpenService(id);
+          if (id != null && id.isNotEmpty) onSelectService(id);
         }
       },
       fallback: (context) => _DiscoveryFallback(
         candidates: turn.candidates,
-        onOpenService: onOpenService,
+        onSelectService: onSelectService,
       ),
     );
   }
@@ -436,11 +448,11 @@ class _Discovery extends StatelessWidget {
 class _DiscoveryFallback extends StatelessWidget {
   const _DiscoveryFallback({
     required this.candidates,
-    required this.onOpenService,
+    required this.onSelectService,
   });
 
   final List<ServiceSummary> candidates;
-  final ValueChanged<String> onOpenService;
+  final ValueChanged<String> onSelectService;
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +462,7 @@ class _DiscoveryFallback extends StatelessWidget {
         for (final service in candidates) ...[
           ServiceResultRow(
             service: service,
-            onSelect: () => onOpenService(service.serviceId),
+            onSelect: () => onSelectService(service.serviceId),
           ),
           const SizedBox(height: SabSpacing.sm),
         ],
@@ -465,10 +477,16 @@ class _DiscoveryFallback extends StatelessWidget {
 /// from the machine-actionable intent, never the reply. The payment screen stays
 /// an equal alternate route the user may choose instead.
 class _Confirmation extends ConsumerWidget {
-  const _Confirmation({required this.turn, required this.onOpenService});
+  const _Confirmation({
+    required this.turn,
+    required this.onOpenPaymentScreen,
+  });
 
   final ConversationTurn turn;
-  final ValueChanged<String> onOpenService;
+
+  /// Opens the Payment Confirmation screen, the explicit alternate route to
+  /// the same task. The user chooses it; it is never a fallback.
+  final ValueChanged<String> onOpenPaymentScreen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -486,8 +504,10 @@ class _Confirmation extends ConsumerWidget {
         A2uiSurfaceView(
           stream: turn.surface,
           fallback: (context) => ConfirmationSummary(
-            amount: intent?.amount ?? 0,
-            currency: intent?.currency ?? 'NGN',
+            // The selected service's own known amount is the grounded source;
+            // the intent amount covers a task-named confirmation.
+            amount: service?.knownAmount ?? intent?.amount ?? 0,
+            currency: service?.currency ?? intent?.currency ?? 'NGN',
             payee: service?.collectingBody ?? intent?.target ?? '',
             reference: intent?.reference,
           ),
@@ -498,7 +518,7 @@ class _Confirmation extends ConsumerWidget {
           SabButton(
             label: strings.openPaymentScreen,
             variant: SabButtonVariant.ghost,
-            onPressed: () => onOpenService(serviceId),
+            onPressed: () => onOpenPaymentScreen(serviceId),
           ),
       ],
     );
@@ -523,10 +543,12 @@ class _Verifying extends ConsumerWidget {
       onAction: (action) {
         if (action.name == SabiActions.openVerification) onOpenVerification();
       },
+      // The identity ceremony is completed on the Identity screen, so the
+      // action names that screen rather than implying it finishes here.
       fallback: (context) => _TaskCard(
         title: strings.verifyInlineTitle,
         body: assistantReplyFor(turn, strings),
-        actionLabel: strings.verifyInlineAction,
+        actionLabel: strings.openVerificationScreen,
         onAction: onOpenVerification,
       ),
     );
@@ -773,12 +795,15 @@ class _Clarification extends ConsumerWidget {
   const _Clarification({
     required this.question,
     required this.candidates,
-    required this.onOpenService,
+    required this.onSelectService,
   });
 
   final String? question;
   final List<ServiceSummary> candidates;
-  final ValueChanged<String> onOpenService;
+
+  /// Selecting one of the closest matches resolves it in the conversation
+  /// rather than leaving for a screen.
+  final ValueChanged<String> onSelectService;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -820,7 +845,7 @@ class _Clarification extends ConsumerWidget {
             for (final service in candidates) ...[
               ServiceResultRow(
                 service: service,
-                onSelect: () => onOpenService(service.serviceId),
+                onSelect: () => onSelectService(service.serviceId),
               ),
               const SizedBox(height: SabSpacing.sm),
             ],

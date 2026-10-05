@@ -583,7 +583,9 @@ class _TaskCard extends ConsumerWidget {
     final colors = SabColorTokens.of(context);
     final strings = ref.watch(sabStringsProvider);
     final label = switch (actionKind) {
-      'verification' => strings.verifyInlineAction,
+      // The identity ceremony finishes on the Identity screen, so the action
+      // names that screen rather than implying it completes inline.
+      'verification' => strings.openVerificationScreen,
       'recovery' => strings.openCase,
       _ => null,
     };

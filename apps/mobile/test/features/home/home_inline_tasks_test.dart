@@ -334,9 +334,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _submit(tester, 'pay a regulated bill');
-      // The composed surface is held, not failed, and carries the client-owned
-      // next-step action (FEAT-011).
-      expect(find.text(SabStrings.english.verifyInlineAction), findsOneWidget);
+      // The composed surface is held, not failed, and its action names the
+      // Identity screen the ceremony completes on rather than implying it
+      // finishes inline (FEAT-011).
+      expect(
+        find.text(SabStrings.english.openVerificationScreen),
+        findsOneWidget,
+      );
       expect(find.text(SabStrings.english.verifyInlineBody), findsOneWidget);
     });
 
