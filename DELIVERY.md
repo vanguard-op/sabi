@@ -166,8 +166,9 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-115 | C-012 | ai-engineer | Done | — |
 | T-116 | C-012 | ai-engineer | Done | — |
 | T-117 | C-012 | ai-engineer | Done | — |
-| T-118 | MQ-001–004 | product-shaper | In Progress | — |
-| T-119 | MQ-001–004 | ai-engineer | In Progress | — |
+| T-118 | MQ-001–004 | product-shaper | Done | — |
+| T-119 | MQ-001–004 | ai-engineer | Done | — |
+| T-120 | MQ-001–004 | qa-engineer | In Progress | — |
 
 ## Decisions log
 
@@ -226,6 +227,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-051 | Sabi adopts the real A2UI protocol via the official Flutter GenUI SDK renderer (`github.com/flutter/genui`, v0.9.1), with a client-published Sabi catalog as a JSON Schema; the hand-rolled composed-surface parser is retired and every agent-composed surface (confirmation, amount entry, discovery, receipt, verification, recovery) renders through it. A2UI-shaped payloads become the C-012 contract | Investigation showed the current code is an A2UI-shaped lookalike: the message names match, but the component catalogue is a server-side hand copy of the client's (already drifted, which is why every composition falls back) with no negotiation or schema validation. Using the maintained renderer and one catalog removes the drift and the duplicated protocol | user |
 | D-052 | A capability prompt's placeholders and the keys the renderer supplies are verified by a test over every prompt (no unresolved `[[...]]` after render), not by asserting the literal placeholder text | The composition prompt used `[[catalog_components]]` while the code supplied `allowed_components`, so the model was given no component names and every surface silently fell back; the prompt test asserted the literal token, encoding the bug. Mocked model tests cannot catch this, so the check must be on the rendered prompt itself | lead |
 | D-053 | A live-model contract test per composition task asserts a valid non-empty A2UI stream, and skips with its cause when no key or credit is available rather than passing against a mock; the provider response schema is derived from the published catalog so the model cannot emit an empty envelope | Three successive prompt and schema bugs reached staging because the model is mocked everywhere; a green mock hid each one. The derived schema also removes the second hand-maintained copy of the component set | lead |
+| D-054 | Every judged capability runs on the stable pinned model `gemini-3.1-flash-lite`; the primary/preview `gemini-3.1-pro-preview` path is removed, including for interface composition | Interface composition was routed to the preview pro model, against the intent of D-026: composition runs on every surface while the user waits, and pro is a preview model at preview cost (composition calls measured 10-15s each and consumed the prepayment credits). One stable, cheaper model for all capabilities removes the deprecation exposure and the cost | user |
 
 ## Definition of Done
 
