@@ -175,7 +175,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-124 | C-012 | ai-engineer | Done | — |
 | T-125 | C-012 | frontend-engineer | Done | — |
 | T-126 | — | infra-engineer | Done | — |
-| T-127 | — | infra-engineer | In Progress | — |
+| T-127 | — | infra-engineer | Done | — |
 
 ## Decisions log
 
@@ -236,6 +236,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | D-053 | A live-model contract test per composition task asserts a valid non-empty A2UI stream, and skips with its cause when no key or credit is available rather than passing against a mock; the provider response schema is derived from the published catalog so the model cannot emit an empty envelope | Three successive prompt and schema bugs reached staging because the model is mocked everywhere; a green mock hid each one. The derived schema also removes the second hand-maintained copy of the component set | lead |
 | D-054 | Every judged capability runs on the stable pinned model `gemini-3.1-flash-lite`; the primary/preview `gemini-3.1-pro-preview` path is removed, including for interface composition | Interface composition was routed to the preview pro model, against the intent of D-026: composition runs on every surface while the user waits, and pro is a preview model at preview cost (composition calls measured 10-15s each and consumed the prepayment credits). One stable, cheaper model for all capabilities removes the deprecation exposure and the cost | user |
 | D-055 | `gcp-up` ensures the Artifact Registry repository out of band (gcloud, when absent), builds and pushes the images, then runs a single `terraform apply`; the two-phase apply of D-036 is superseded | With the registry and the images present before the apply, the platform and the workloads land in one pass, so no Cloud Run service is created before its image exists and the transient placeholder revision D-036 described never occurs. Verified by repeated successful `up` runs | lead |
+| D-056 | `gcp-up` creates the Artifact Registry repository with a targeted Terraform apply before the image build, not out of band with gcloud, and the three GCP lifecycle workflows share one concurrency group; the out-of-band mechanism of D-055 is superseded | The out-of-band gcloud create collided with Terraform's own repository resource on a fresh environment (`409 already exists`), which would break the `destroy` -> `up` rebuild D-033 depends on; a targeted apply keeps the registry in Terraform state from creation. The shared group stops `up` and `destroy` overlapping | lead |
 
 ## Definition of Done
 
