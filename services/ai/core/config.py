@@ -1,10 +1,15 @@
 """Pinned model build, decoding settings, and cost ceilings.
 
 This module is the single place the model version policy from the model-quality
-contract is realised: the exact provider model ID for the primary and flash paths is
+contract is realised: the one exact provider model ID every capability runs on is
 fixed here, and every model-backed capability has pinned decoding settings so an
 evaluation run is reproducible. Changing a constant here is a model version change and
 requires a full evaluation run before it ships.
+
+Every judged capability runs on the same stable pinned build; there is deliberately no
+primary or preview path, so a preview model cannot be reintroduced behind a capability
+without a model version change to this file (model-quality.md, "Model version and
+fallback").
 
 The cost ceilings come from the non-functional requirements (NFR-050 to NFR-052). A
 cost is measured per completed user task, so retries and clarification turns count
@@ -20,11 +25,11 @@ from decimal import Decimal
 from enum import Enum
 
 # --- Pinned provider build -------------------------------------------------------
-# The primary provider is Gemini 3.1 Pro with the lower-cost Flash-Lite path for
-# high-volume intent resolution (model-quality.md, "Model version and fallback").
-# Both IDs are stable endpoints, chosen over the preview builds so the default does
-# not carry preview deprecation exposure. Prices reviewed 2026-10-03.
-PRIMARY_MODEL_ID = "gemini-3.1-pro-preview"
+# Every model-backed capability runs on the stable Flash-Lite build
+# (model-quality.md, "Model version and fallback"; D-054). The ID is a stable endpoint,
+# not a preview build, so no capability carries preview deprecation exposure. The
+# single path is deliberate: no preview/primary model is pinned, so it cannot be
+# reintroduced by a capability routing change. Price reviewed 2026-10-05.
 FLASH_MODEL_ID = "gemini-3.1-flash-lite"
 
 # Prompt artifacts are versioned alongside the model build they were tuned for.
@@ -71,9 +76,13 @@ MAX_RESULTS = 5
 
 
 class ModelPath(Enum):
-    """Which pinned provider path a capability runs on."""
+    """Which pinned provider path a capability runs on.
 
-    PRIMARY = "primary"
+    One stable build backs every capability (D-054), so there is a single path. The
+    enum is kept so a call still names the path it used, and so a future path is an
+    explicit addition here rather than an implicit fallback.
+    """
+
     FLASH = "flash"
 
 
@@ -85,12 +94,13 @@ class Capability(Enum):
     INTERFACE_COMPOSITION = "interface_composition"
 
 
-# Intent resolution and discovery ranking are the high-volume paths; interface
-# composition runs on the stronger primary model.
+# Every capability runs on the one stable pinned build. Interface composition runs
+# while the user waits on every surface, so it is on the cheaper stable path rather
+# than the removed preview build (D-054).
 CAPABILITY_MODEL_PATH: Mapping[Capability, ModelPath] = {
     Capability.INTENT_RESOLUTION: ModelPath.FLASH,
     Capability.DISCOVERY_RANKING: ModelPath.FLASH,
-    Capability.INTERFACE_COMPOSITION: ModelPath.PRIMARY,
+    Capability.INTERFACE_COMPOSITION: ModelPath.FLASH,
 }
 
 # Per-capability prompt artifact versions. Intent resolution moved to ``v2`` to carry
@@ -167,10 +177,9 @@ class ModelPrice:
 
 
 # Published list prices at the pinned build. Reviewed whenever the model changes.
+# Only the pinned build is priced; an unpriced model resolves to zero cost, so no
+# preview model can quietly accrue cost without a price entry being added here.
 MODEL_PRICES: Mapping[str, ModelPrice] = {
-    PRIMARY_MODEL_ID: ModelPrice(
-        input_per_million=Decimal("2.00"), output_per_million=Decimal("12.00")
-    ),
     FLASH_MODEL_ID: ModelPrice(
         input_per_million=Decimal("0.25"), output_per_million=Decimal("1.50")
     ),
@@ -186,7 +195,6 @@ class ModelSettings:
     """
 
     api_key: str = field(repr=False, default="")
-    primary_model_id: str = PRIMARY_MODEL_ID
     flash_model_id: str = FLASH_MODEL_ID
     timeout_seconds: float = 20.0
 
@@ -213,13 +221,20 @@ class ModelSettings:
 
         return cls(
             api_key=source.get("GEMINI_API_KEY", ""),
-            primary_model_id=_text("GEMINI_MODEL_ID", PRIMARY_MODEL_ID),
             flash_model_id=_text("GEMINI_FLASH_MODEL_ID", FLASH_MODEL_ID),
             timeout_seconds=timeout,
         )
 
     def model_id_for(self, path: ModelPath) -> str:
-        return self.primary_model_id if path is ModelPath.PRIMARY else self.flash_model_id
+        """The provider model ID for a path.
+
+        There is one stable path today, so it always resolves to the pinned build.
+        An unknown path is a programming error rather than a silent fallback.
+        """
+
+        if path is not ModelPath.FLASH:
+            raise ValueError(f"unknown model path: {path!r}")
+        return self.flash_model_id
 
     def model_id_for_capability(self, capability: Capability) -> str:
         return self.model_id_for(CAPABILITY_MODEL_PATH[capability])

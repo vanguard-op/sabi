@@ -34,7 +34,7 @@ import pytest
 
 from core.a2ui import validate_a2ui_stream
 from core.a2ui_catalog import published_catalog
-from core.config import PRIMARY_MODEL_ID, ModelSettings
+from core.config import FLASH_MODEL_ID, ModelSettings
 from core.provider import GeminiProvider, ModelProvider, ModelRequest, ModelResponse
 from core.retrieval import KeywordRetrievalIndex
 from core.serving import MODEL_SOURCE, ModelServing
@@ -202,7 +202,7 @@ def test_real_model_composes_a_valid_non_empty_stream(
         f"with {len(provider.last_response.text)} chars, so this is a composition regression"
     )
     assert outcome.used_fallback is False, f"{task}: composition degraded to a fallback"
-    assert outcome.model_id == PRIMARY_MODEL_ID
+    assert outcome.model_id == FLASH_MODEL_ID
     assert len(outcome.messages) > 0, f"{task}: the model returned an empty stream"
 
     validation = validate_a2ui_stream({"messages": list(outcome.messages)}, catalog=_CATALOG)

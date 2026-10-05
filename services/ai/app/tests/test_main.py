@@ -84,4 +84,4 @@ def test_settings_are_exposed_on_app_state() -> None:
     app = app_main.create_app()
     settings = app.state.settings
     assert isinstance(settings, ModelSettings)
-    assert settings.primary_model_id == ModelSettings().primary_model_id
+    assert settings.flash_model_id == ModelSettings().flash_model_id

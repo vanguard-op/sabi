@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from composition.tests.conftest import build_test_client
 from core.a2ui_catalog import published_catalog
-from core.config import PRIMARY_MODEL_ID
+from core.config import FLASH_MODEL_ID
 from core.errors import ProviderUnavailable
 from core.schemas import FALLBACK_TASKS
 from core.testing import json_response
@@ -89,7 +89,7 @@ def _valid_stream() -> dict:
 
 
 def test_composes_a_catalogue_valid_surface() -> None:
-    client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
         json={
@@ -110,7 +110,7 @@ def test_composes_a_catalogue_valid_surface() -> None:
 
 def test_composes_a_verification_surface() -> None:
     client, provider = build_test_client(
-        [json_response(_verification_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_verification_stream(), model_id=FLASH_MODEL_ID)]
     )
     response = client.post(
         "/v1/agent/surfaces",
@@ -127,7 +127,7 @@ def test_composes_a_verification_surface() -> None:
 
 
 def test_composes_a_recovery_surface() -> None:
-    client, _ = build_test_client([json_response(_recovery_stream(), model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(_recovery_stream(), model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
         json={"task": "recovery", "context": {"status": "refunding"}, "catalogId": _CATALOG_ID},
@@ -150,7 +150,7 @@ def test_receipt_accepts_a_resolved_record_context() -> None:
     """
 
     client, provider = build_test_client(
-        [json_response(_record_receipt_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_record_receipt_stream(), model_id=FLASH_MODEL_ID)]
     )
     context = {
         "recordKind": "receipt",
@@ -182,7 +182,7 @@ def test_every_contract_task_is_accepted() -> None:
         "recovery",
     }
     for task in sorted(FALLBACK_TASKS):
-        client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
+        client, _ = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
         response = client.post(
             "/v1/agent/surfaces", json={"task": task, "context": {}, "catalogId": _CATALOG_ID}
         )
@@ -192,7 +192,7 @@ def test_every_contract_task_is_accepted() -> None:
 
 def test_invalid_composition_keeps_the_new_task_fallback() -> None:
     payload = _a2ui("s1", [{"id": "root", "component": "EvilWidget"}])
-    client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(payload, model_id=FLASH_MODEL_ID)])
     for task in ("verification", "recovery"):
         response = client.post(
             "/v1/agent/surfaces", json={"task": task, "context": {}, "catalogId": _CATALOG_ID}
@@ -203,7 +203,7 @@ def test_invalid_composition_keeps_the_new_task_fallback() -> None:
 
 def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
     client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
     )
     client.post(
         "/v1/agent/surfaces",
@@ -214,7 +214,7 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
         },
     )
     request = provider.last_request
-    assert request.model_id == PRIMARY_MODEL_ID
+    assert request.model_id == FLASH_MODEL_ID
     assert request.prompt_id == "interface_composition"
     assert request.prompt_version == "v5"
     assert request.decoding.temperature == 0.0
@@ -249,7 +249,7 @@ def test_no_compatible_catalog_falls_back_to_the_same_task() -> None:
 
 def test_unknown_catalog_does_not_call_the_model() -> None:
     client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
     )
     client.post(
         "/v1/agent/surfaces",
@@ -263,7 +263,7 @@ def test_unknown_catalog_does_not_call_the_model() -> None:
 
 def test_unknown_component_falls_back_but_stays_200() -> None:
     payload = _a2ui("s1", [{"id": "root", "component": "EvilWidget"}])
-    client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(payload, model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces", json={"task": "confirmation", "context": {}, "catalogId": _CATALOG_ID}
     )
@@ -274,7 +274,7 @@ def test_unknown_component_falls_back_but_stays_200() -> None:
 
 
 def test_malformed_stream_falls_back() -> None:
-    client, _ = build_test_client([json_response({"messages": "nope"}, model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response({"messages": "nope"}, model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces", json={"task": "amount_entry", "context": {}, "catalogId": _CATALOG_ID}
     )
@@ -295,7 +295,7 @@ def test_executable_content_falls_back() -> None:
             }
         ],
     )
-    client, _ = build_test_client([json_response(payload, model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(payload, model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces", json={"task": "receipt", "context": {}, "catalogId": _CATALOG_ID}
     )
@@ -334,7 +334,7 @@ def test_missing_task_is_rejected_with_the_error_envelope() -> None:
 
 
 def test_context_defaults_to_an_empty_object() -> None:
-    client, _ = build_test_client([json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)])
+    client, _ = build_test_client([json_response(_valid_stream(), model_id=FLASH_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces", json={"task": "confirmation", "catalogId": _CATALOG_ID}
     )
@@ -344,7 +344,7 @@ def test_context_defaults_to_an_empty_object() -> None:
 
 def test_context_may_carry_arbitrary_task_data() -> None:
     client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
     )
     context = {
         "reference": "FT-1",
@@ -369,7 +369,7 @@ def test_missing_task_context_falls_back_without_calling_the_model() -> None:
     """
 
     client, provider = build_test_client(
-        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(_valid_stream(), model_id=FLASH_MODEL_ID)]
     )
     response = client.post(
         "/v1/agent/surfaces",

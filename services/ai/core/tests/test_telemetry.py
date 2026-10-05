@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from core.config import FLASH_MODEL_ID, PRIMARY_MODEL_ID, Capability
+from core.config import FLASH_MODEL_ID, Capability
 from core.provider import ModelUsage
 from core.telemetry import CostTracker, TaskCost, estimate_cost
 
@@ -33,7 +33,7 @@ def test_small_task_stays_within_ceiling():
 
 
 def test_task_cost_mapping_is_serialisable():
-    task = CostTracker().begin(Capability.INTERFACE_COMPOSITION, model_id=PRIMARY_MODEL_ID)
+    task = CostTracker().begin(Capability.INTERFACE_COMPOSITION, model_id=FLASH_MODEL_ID)
     task.record(ModelUsage(input_tokens=1000, output_tokens=200))
     mapping = task.to_mapping()
     assert mapping["capability"] == "interface_composition"
