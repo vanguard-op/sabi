@@ -156,6 +156,12 @@ abstract final class SabiActions {
 // resolved through the data model, so a `{path: ...}` binding from the agent
 // works (A2UI data binding).
 
+/// A scalar that is either [type] or null, matching the published document's
+/// `['<type>', 'null']` for an optional field. The document is the contract the
+/// agent composes against, so an explicit null it permits must validate here
+/// too; a non-nullable runtime type refused it and silently fell back.
+Schema _nullable(JsonType type) => S.combined(type: [type, JsonType.nil]);
+
 final CatalogItem _confirmationSummaryItem = CatalogItem(
   name: SabiCatalog.confirmationSummary.value,
   dataSchema: S.object(
@@ -163,8 +169,8 @@ final CatalogItem _confirmationSummaryItem = CatalogItem(
       'amount': S.integer(),
       'currency': S.string(),
       'payee': S.string(),
-      'charges': S.integer(),
-      'reference': S.string(),
+      'charges': _nullable(JsonType.int),
+      'reference': _nullable(JsonType.string),
     },
     required: ['amount', 'payee'],
   ),
@@ -176,20 +182,38 @@ final CatalogItem _amountEntryItem = CatalogItem(
   dataSchema: S.object(
     properties: {
       'currency': S.string(),
-      'minimum': S.integer(),
-      'maximum': S.integer(),
-      'prompt': S.string(),
+      'minimum': _nullable(JsonType.int),
+      'maximum': _nullable(JsonType.int),
+      'prompt': _nullable(JsonType.string),
     },
   ),
   widgetBuilder: _amountEntry,
 );
 
+/// The `ServiceResultRow` data shape, authored once and shared by the standalone
+/// row item and by each entry of [SabiCatalog.providerPicker]'s `services`
+/// array. The published document points `ProviderPicker.services.items` at
+/// `#/components/ServiceResultRow`, so an entry must carry the same declared
+/// properties and the same required fields; without them the client-side
+/// validation accepted an empty `{}` entry and the picker drew a blank row.
+final Schema _serviceResultRowSchema = S.object(
+  properties: {
+    'serviceId': S.string(),
+    'name': S.string(),
+    'collectingBody': S.string(),
+    'category': S.string(),
+    'knownAmount': _nullable(JsonType.int),
+    'currency': S.string(),
+    'status': S.string(),
+    'confidence': S.number(),
+  },
+  required: ['serviceId', 'collectingBody', 'category'],
+);
+
 final CatalogItem _providerPickerItem = CatalogItem(
   name: SabiCatalog.providerPicker.value,
   dataSchema: S.object(
-    properties: {
-      'services': S.list(items: S.object(properties: {})),
-    },
+    properties: {'services': S.list(items: _serviceResultRowSchema)},
     required: ['services'],
   ),
   widgetBuilder: _providerPicker,
@@ -197,19 +221,7 @@ final CatalogItem _providerPickerItem = CatalogItem(
 
 final CatalogItem _serviceResultRowItem = CatalogItem(
   name: SabiCatalog.serviceResultRow.value,
-  dataSchema: S.object(
-    properties: {
-      'serviceId': S.string(),
-      'name': S.string(),
-      'collectingBody': S.string(),
-      'category': S.string(),
-      'knownAmount': S.integer(),
-      'currency': S.string(),
-      'status': S.string(),
-      'confidence': S.number(),
-    },
-    required: ['serviceId', 'collectingBody', 'category'],
-  ),
+  dataSchema: _serviceResultRowSchema,
   widgetBuilder: _serviceResultRow,
 );
 
@@ -234,10 +246,7 @@ final CatalogItem _receiptCardItem = CatalogItem(
 final CatalogItem _statusPillItem = CatalogItem(
   name: SabiCatalog.statusPill.value,
   dataSchema: S.object(
-    properties: {
-      'status': S.string(),
-      'label': S.string(),
-    },
+    properties: {'status': S.string(), 'label': _nullable(JsonType.string)},
     required: ['status'],
   ),
   widgetBuilder: _statusPill,
@@ -248,8 +257,8 @@ final CatalogItem _verificationItem = CatalogItem(
   dataSchema: S.object(
     properties: {
       'title': S.string(),
-      'body': S.string(),
-      'actionLabel': S.string(),
+      'body': _nullable(JsonType.string),
+      'actionLabel': _nullable(JsonType.string),
     },
     required: ['title'],
   ),
@@ -261,9 +270,9 @@ final CatalogItem _recoveryItem = CatalogItem(
   dataSchema: S.object(
     properties: {
       'title': S.string(),
-      'body': S.string(),
-      'status': S.string(),
-      'actionLabel': S.string(),
+      'body': _nullable(JsonType.string),
+      'status': _nullable(JsonType.string),
+      'actionLabel': _nullable(JsonType.string),
     },
     required: ['title'],
   ),
@@ -381,10 +390,7 @@ Widget _recovery(CatalogItemContext ctx) {
     actionKind: 'recovery',
     status: data['status']?.toString(),
     onAction: () => ctx.dispatchEvent(
-      UserActionEvent(
-        name: SabiActions.openCase,
-        sourceComponentId: ctx.id,
-      ),
+      UserActionEvent(name: SabiActions.openCase, sourceComponentId: ctx.id),
     ),
   );
 }
@@ -657,10 +663,8 @@ class _BoundNumbers extends StatelessWidget {
       builder: (context, resolvedAmount) => BoundNumber(
         dataContext: dataContext,
         value: charges,
-        builder: (context, resolvedCharges) => builder(
-          resolvedAmount?.toInt(),
-          resolvedCharges?.toInt(),
-        ),
+        builder: (context, resolvedCharges) =>
+            builder(resolvedAmount?.toInt(), resolvedCharges?.toInt()),
       ),
     );
   }
