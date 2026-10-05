@@ -110,6 +110,12 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | Phase 1: Foundations | 2026-10-02 | C-001–C-016 implemented and conformant; FEAT-001/003/004/011/012 accepted; MQ-001–MQ-003 live bars deferred under D-022; post-phase fixes T-026–T-029 and T-045 verified and merged; the D-024 Operations Console wave shipped C-039–C-044 and the staff console |
 | Phase 2: The payment loop | 2026-10-03 | C-017–C-038 implemented and conformant (C-035 at revision 1); FEAT-002/005/006/007/008/009/010 accepted; QA gate passed on API 53 + AI 16 + mobile 255 integration tests with both services booting; MQ-001–MQ-003 live bars deferred under D-022; the post-Phase-2 wave T-068–T-127 (C-009 rev 4, C-012 rev 2; D-037–D-056) verified and merged |
 
+### Active phase
+
+| Task | Feature | Owner | Status | Contract |
+|---|---|---|---|---|
+| T-128 | FEAT-011 | frontend-engineer | In Progress | C-012 |
+
 ## Decisions log
 
 | # | Decision | Rationale | By |
