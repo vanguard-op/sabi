@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.config import PRIMARY_MODEL_ID
+from core.config import FLASH_MODEL_ID
 from core.errors import ProviderUnavailable
 from core.testing import FakeModelProvider as _FakeModelProvider
 from core.testing import json_response
@@ -253,7 +253,7 @@ def test_composed_confirmation_uses_catalogue_components(
 
     catalog_id = published_catalog().catalog_id
     composition_serving._provider = scripted(
-        [json_response(valid_stream(), model_id=PRIMARY_MODEL_ID)]
+        [json_response(valid_stream(), model_id=FLASH_MODEL_ID)]
     )
     with ai_client_factory(composition=composition_serving) as client:
         body = client.post(
@@ -297,7 +297,7 @@ def test_unknown_component_is_refused_and_the_task_stays_completable(
                         },
                     ]
                 },
-                model_id=PRIMARY_MODEL_ID,
+                model_id=FLASH_MODEL_ID,
             )
         ]
     )
@@ -421,9 +421,7 @@ def test_surface_naming_a_catalog_component_renders(ai_client_factory, compositi
             },
         ]
     }
-    composition_serving._provider = scripted(
-        [json_response(stream, model_id=PRIMARY_MODEL_ID)]
-    )
+    composition_serving._provider = scripted([json_response(stream, model_id=FLASH_MODEL_ID)])
     with ai_client_factory(composition=composition_serving) as client:
         body = client.post(
             "/v1/agent/surfaces",
@@ -468,9 +466,7 @@ def test_surface_naming_a_component_outside_the_catalog_falls_back(
                 },
             ]
         }
-        composition_serving._provider = scripted(
-            [json_response(stream, model_id=PRIMARY_MODEL_ID)]
-        )
+        composition_serving._provider = scripted([json_response(stream, model_id=FLASH_MODEL_ID)])
         with ai_client_factory(composition=composition_serving) as client:
             body = client.post(
                 "/v1/agent/surfaces",

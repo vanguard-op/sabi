@@ -23,20 +23,23 @@ _AI_ROOT = _ROOT / "services" / "ai"
 
 
 def test_pinned_model_build_matches_the_quality_contract() -> None:
-    """The pinned primary and flash builds; the code must match the decision of record.
+    """The single stable pinned build; the code must match the decision of record.
 
-    D-026 moves the high-volume path from ``gemini-3-flash-preview`` to the
-    stable, lower-cost ``gemini-3.1-flash-lite``, and the delivery Stack table
-    records the same. ``model-quality.md`` still names the superseded preview
-    build (a doc gap reported at this gate); the constant here follows the
-    decision of record, not the stale document. This is a substrate check, not
-    the MQ accuracy bar, which remains unmeasured and reported separately.
+    D-054 removes the primary/preview path entirely: every capability -- intent
+    resolution, discovery ranking, interface composition, and Nigerian-language
+    understanding -- runs on the stable, lower-cost ``gemini-3.1-flash-lite``, so no
+    capability carries preview deprecation exposure. ``model-quality.md`` "Model
+    version and fallback" names the same single build. This is a substrate check,
+    not the MQ accuracy bar, which remains unmeasured and reported separately.
     """
 
-    from core.config import FLASH_MODEL_ID, PRIMARY_MODEL_ID
+    import core.config
+    from core.config import FLASH_MODEL_ID
 
-    assert PRIMARY_MODEL_ID == "gemini-3.1-pro-preview"
     assert FLASH_MODEL_ID == "gemini-3.1-flash-lite"
+    # The removed preview path must not resurface as a constant or a member: a
+    # routing change alone cannot reintroduce it (D-054).
+    assert not hasattr(core.config, "PRIMARY_MODEL_ID")
 
 
 def test_decoding_is_pinned_temperature_zero_for_every_capability() -> None:
@@ -68,11 +71,15 @@ def test_cost_ceilings_match_the_nfr_contract() -> None:
     assert COST_CEILINGS[Capability.INTERFACE_COMPOSITION].usd == Decimal("0.02")
 
 
-def test_primary_capabilities_run_on_the_model_path_the_contract_names() -> None:
+def test_every_capability_runs_on_the_one_stable_model_path() -> None:
     from core.config import CAPABILITY_MODEL_PATH, Capability, ModelPath
 
-    assert CAPABILITY_MODEL_PATH[Capability.INTERFACE_COMPOSITION] is ModelPath.PRIMARY
-    assert CAPABILITY_MODEL_PATH[Capability.INTENT_RESOLUTION] is ModelPath.FLASH
+    # D-054: interface composition moves off the removed preview pro path onto the
+    # same stable flash build as intent resolution and the rest, so there is a
+    # single path for every capability.
+    assert [member.name for member in ModelPath] == ["FLASH"]
+    for capability in Capability:
+        assert CAPABILITY_MODEL_PATH[capability] is ModelPath.FLASH
 
 
 def test_golden_set_and_evaluation_harness_are_absent_from_this_delivery() -> None:
