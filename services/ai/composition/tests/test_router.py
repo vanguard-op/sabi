@@ -130,7 +130,7 @@ def test_composes_a_recovery_surface() -> None:
     client, _ = build_test_client([json_response(_recovery_stream(), model_id=PRIMARY_MODEL_ID)])
     response = client.post(
         "/v1/agent/surfaces",
-        json={"task": "recovery", "context": {"caseReference": "CASE-7"}, "catalogId": _CATALOG_ID},
+        json={"task": "recovery", "context": {"status": "refunding"}, "catalogId": _CATALOG_ID},
     )
     assert response.status_code == 200
     body = response.json()
@@ -152,7 +152,13 @@ def test_receipt_accepts_a_resolved_record_context() -> None:
     client, provider = build_test_client(
         [json_response(_record_receipt_stream(), model_id=PRIMARY_MODEL_ID)]
     )
-    context = {"recordKind": "receipt", "reference": "FT-2026-1", "receiptId": "rcpt-9"}
+    context = {
+        "recordKind": "receipt",
+        "reference": "FT-2026-1",
+        "receiptId": "rcpt-9",
+        "payee": "FIRS",
+        "amount": 500000,
+    }
     response = client.post(
         "/v1/agent/surfaces",
         json={"task": "receipt", "context": context, "catalogId": _CATALOG_ID},
@@ -200,12 +206,17 @@ def test_composition_runs_on_the_pinned_primary_model_and_prompt() -> None:
         [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
     )
     client.post(
-        "/v1/agent/surfaces", json={"task": "receipt", "context": {}, "catalogId": _CATALOG_ID}
+        "/v1/agent/surfaces",
+        json={
+            "task": "receipt",
+            "context": {"reference": "FT-1", "payee": "FIRS", "amount": 100},
+            "catalogId": _CATALOG_ID,
+        },
     )
     request = provider.last_request
     assert request.model_id == PRIMARY_MODEL_ID
     assert request.prompt_id == "interface_composition"
-    assert request.prompt_version == "v3"
+    assert request.prompt_version == "v4"
     assert request.decoding.temperature == 0.0
     assert _CATALOG_ID in request.contents
     assert "Verification" in request.contents and "Recovery" in request.contents
@@ -328,12 +339,51 @@ def test_context_may_carry_arbitrary_task_data() -> None:
     client, provider = build_test_client(
         [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
     )
-    context = {"receiptNumber": "FT-1", "kind": "official_e_receipt"}
+    context = {
+        "reference": "FT-1",
+        "payee": "FIRS",
+        "amount": 100,
+        "kind": "official_e_receipt",
+    }
     client.post(
         "/v1/agent/surfaces",
         json={"task": "receipt", "context": context, "catalogId": _CATALOG_ID},
     )
     assert "FT-1" in provider.last_request.contents
+
+
+def test_missing_task_context_falls_back_without_calling_the_model() -> None:
+    """A caller that omits a task's required fields degrades explicitly (C-012, FEAT-011).
+
+    The confirmation context carries `amount` but no `payee`: the exact input that,
+    under the contradictory prompt, made the model emit an empty stream. The serving
+    layer now returns the same-task fallback before the model is asked, so the failure
+    is a logged server decision, not a silent empty model response.
+    """
+
+    client, provider = build_test_client(
+        [json_response(_valid_stream(), model_id=PRIMARY_MODEL_ID)]
+    )
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={"task": "confirmation", "context": {"amount": 500000}, "catalogId": _CATALOG_ID},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"messages": [], "fallback": "confirmation"}
+    assert provider.requests == []
+
+
+def test_missing_context_fallback_applies_to_every_task() -> None:
+    """An empty context never composes a surface and never reaches the model."""
+
+    for task in sorted(FALLBACK_TASKS):
+        client, provider = build_test_client([])
+        response = client.post(
+            "/v1/agent/surfaces", json={"task": task, "context": {}, "catalogId": _CATALOG_ID}
+        )
+        assert response.status_code == 200, task
+        assert response.json() == {"messages": [], "fallback": task}
+        assert provider.requests == [], task
 
 
 # --- Security --------------------------------------------------------------------

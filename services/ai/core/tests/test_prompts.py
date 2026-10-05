@@ -113,11 +113,11 @@ def test_intent_prompt_v4_keeps_the_pinned_cutoff_and_example_shapes():
     assert "unmappable" in text.lower()
 
 
-def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
+def test_composition_prompt_v4_carries_the_a2ui_catalog_contract():
     from core.config import INTERFACE_COMPOSITION_PROMPT_VERSION
 
     prompt = load_prompt(Capability.INTERFACE_COMPOSITION)
-    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v3"
+    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION == "v4"
     text = prompt.text
     # The composed surface is an A2UI v0.9 message stream against the published
     # catalog: the negotiated catalogId and its components are rendered in, and the
@@ -126,6 +126,7 @@ def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
     assert "[[allowed_components]]" in text
     assert "[[task]]" in text
     assert "[[context]]" in text
+    assert "[[task_context_fields]]" in text
     assert "v0.9" in text
     assert "createSurface" in text
     assert "updateComponents" in text
@@ -138,6 +139,28 @@ def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
     assert "outside the catalog" in text
     assert "record lookup" in text
     assert "prewritten" in text.lower()
+    # The required-property rule is satisfiable: the prompt states the per-task
+    # required context and scopes the empty-stream escape hatch to a task the catalog
+    # genuinely cannot represent, so it never demands a property the context lacks.
+    assert "REQUIRED CONTEXT PER TASK" in text
+    assert "the caller supplies and what the context carries" in text
+    assert "Do not return an" in text and "empty list when CONTEXT carries" in text
+    assert "every message must pass" not in text.lower()
+
+
+def test_composition_prompt_states_the_shared_per_task_fields():
+    """The prompt's per-task fields are the same contract the serving guard uses."""
+
+    from core.config import INTERFACE_COMPOSITION_PROMPT_VERSION
+    from core.schemas import TASK_CONTEXT_FIELDS
+
+    prompt = load_prompt(Capability.INTERFACE_COMPOSITION)
+    rendered = render(prompt.text, _render_values(Capability.INTERFACE_COMPOSITION, _catalog()))
+    assert prompt.version == INTERFACE_COMPOSITION_PROMPT_VERSION
+    for task, fields in TASK_CONTEXT_FIELDS.items():
+        assert f"- {task}: " in rendered
+        for field in fields:
+            assert field in rendered
 
 
 # --- Rendered-prompt integrity ----------------------------------------------------
@@ -149,6 +172,12 @@ def test_composition_prompt_v3_carries_the_a2ui_catalog_contract():
 # builds and assert the result is clean and grounded (FEAT-011, MQ-003).
 
 _PLACEHOLDER_RE = re.compile(r"\[\[[a-z_]+\]\]")
+
+
+def _catalog():
+    from core.a2ui_catalog import published_catalog
+
+    return published_catalog()
 
 
 def _render_values(capability, catalog):
@@ -176,11 +205,14 @@ def _render_values(capability, catalog):
             "retrieved_data": "RETRIEVED DATA\n[]\nEND RETRIEVED DATA",
         }
     if capability is Capability.INTERFACE_COMPOSITION:
+        from core.schemas import render_task_context_fields
+
         return {
             "catalog_id": catalog.catalog_id,
             "task": "confirmation",
             "context": "{}",
             "allowed_components": ", ".join(catalog.component_names()),
+            "task_context_fields": render_task_context_fields(),
         }
     raise AssertionError(f"no render map for {capability}")
 

@@ -263,7 +263,9 @@ def test_compose_surface_returns_a_validated_stream(catalogue):
         {"id": "root", "component": "ConfirmationSummary", "amount": 500000, "payee": "Ikeja"},
     )
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface("confirmation", {"amount": 500000}, catalog_id=_CATALOG_ID)
+    outcome = serving.compose_surface(
+        "confirmation", {"amount": 500000, "payee": "Ikeja Electric"}, catalog_id=_CATALOG_ID
+    )
     assert outcome.source == "model"
     assert outcome.messages
     assert outcome.fallback == "confirmation"
@@ -277,7 +279,7 @@ def test_compose_surface_accepts_the_new_tasks(catalogue, task):
     component = "Verification" if task == "verification" else "Recovery"
     payload = _stream({"id": "root", "component": component, "title": "Verify"})
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
-    outcome = serving.compose_surface(task, {"state": "pending"}, catalog_id=_CATALOG_ID)
+    outcome = serving.compose_surface(task, {"status": "pending"}, catalog_id=_CATALOG_ID)
     assert outcome.source == "model"
     assert outcome.fallback == task
     assert task in provider.last_request.contents
@@ -295,7 +297,9 @@ def test_compose_surface_receipt_carries_a_resolved_record(catalogue):
     )
     serving, provider = _serving(catalogue, [json_response(payload, model_id="primary")])
     outcome = serving.compose_surface(
-        "receipt", {"reference": "FT-1", "receiptId": "rcpt-1"}, catalog_id=_CATALOG_ID
+        "receipt",
+        {"reference": "FT-1", "payee": "Agency", "amount": 100, "receiptId": "rcpt-1"},
+        catalog_id=_CATALOG_ID,
     )
     assert outcome.source == "model"
     assert outcome.fallback == "receipt"
@@ -363,9 +367,72 @@ def test_compose_surface_rejects_a_malformed_message(catalogue):
 
 def test_compose_surface_falls_back_when_the_provider_fails(catalogue):
     serving, _ = _serving(catalogue, [ProviderUnavailable("down")])
-    outcome = serving.compose_surface("receipt", catalog_id=_CATALOG_ID)
+    outcome = serving.compose_surface(
+        "receipt", {"reference": "FT-1", "payee": "Agency", "amount": 1}, catalog_id=_CATALOG_ID
+    )
     assert outcome.used_fallback is True
     assert outcome.fallback == "receipt"
+
+
+def test_compose_surface_does_not_call_the_model_without_the_task_context(catalogue):
+    """A task missing its required fields degrades explicitly, never via an empty model stream.
+
+    The caller owns composing each task's context from real data (C-012, FEAT-011); a
+    missing required field cannot be composed truthfully, so the serving layer returns
+    the same-task fallback before the model is asked. The provider must not be called,
+    so the empty-stream escape hatch is reserved for a genuinely uncomposable task.
+    """
+
+    serving, provider = _serving(
+        catalogue, [json_response(_stream({"id": "root", "component": "ConfirmationSummary"}))]
+    )
+    # A confirmation context with amount but no payee: the exact input that made the
+    # model return an empty stream under the contradictory rules.
+    outcome = serving.compose_surface("confirmation", {"amount": 500000}, catalog_id=_CATALOG_ID)
+    assert outcome.used_fallback is True
+    assert outcome.source == "fallback"
+    assert outcome.messages == ()
+    assert outcome.fallback == "confirmation"
+    assert provider.requests == []
+
+
+def test_compose_surface_treats_a_null_required_field_as_absent(catalogue):
+    serving, provider = _serving(catalogue, [])
+    outcome = serving.compose_surface(
+        "receipt", {"reference": "FT-1", "payee": None, "amount": 100}, catalog_id=_CATALOG_ID
+    )
+    assert outcome.used_fallback is True
+    assert provider.requests == []
+
+
+@pytest.mark.parametrize(
+    ("task", "context"),
+    [
+        ("confirmation", {"amount": 500000, "payee": "Ikeja"}),
+        ("amount_entry", {"currency": "NGN"}),
+        ("receipt", {"reference": "FT-1", "payee": "Agency", "amount": 100}),
+        ("discovery", {"results": [{"serviceId": "s", "collectingBody": "b", "category": "c"}]}),
+        ("verification", {"status": "unverified"}),
+        ("recovery", {"status": "pending"}),
+    ],
+)
+def test_compose_surface_calls_the_model_when_the_task_context_is_complete(
+    catalogue, task, context
+):
+    """Every task with its required context reaches the model, so the prompt is satisfiable."""
+
+    serving, provider = _serving(
+        catalogue,
+        [json_response(_stream({"id": "root", "component": "Verification", "title": "x"}))],
+    )
+    serving.compose_surface(task, context, catalog_id=_CATALOG_ID)
+    assert len(provider.requests) == 1
+    # The rendered prompt names the task's required fields, so the model is never
+    # asked for a property the context does not carry.
+    from core.schemas import TASK_CONTEXT_FIELDS
+
+    for field in TASK_CONTEXT_FIELDS[task]:
+        assert field in provider.last_request.contents
 
 
 def test_compose_surface_falls_back_without_a_compatible_catalog(catalogue):
@@ -434,6 +501,8 @@ def test_composition_validates_against_the_injected_catalog(catalogue):
         ]
     )
     serving = ModelServing(provider, catalogue, catalog=custom)
-    outcome = serving.compose_surface("confirmation", catalog_id=custom.catalog_id)
+    outcome = serving.compose_surface(
+        "confirmation", {"amount": 1, "payee": "Ikeja"}, catalog_id=custom.catalog_id
+    )
     assert outcome.source == "model"
     assert outcome.catalog_id == custom.catalog_id

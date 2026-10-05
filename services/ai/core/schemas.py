@@ -267,6 +267,65 @@ FALLBACK_TASKS: frozenset[str] = frozenset(
     {"confirmation", "amount_entry", "receipt", "discovery", "verification", "recovery"}
 )
 
+# The context fields each task's surface is composed from (C-012, FEAT-011). The
+# caller composes the context from real data it holds: a confirmation has a payee
+# and an amount, a receipt has the record's own fields, a verification has the
+# current status, a recovery has the case state, a discovery has the candidate
+# services, and an amount entry knows the currency it is collecting in. Those
+# fields are the ones the catalog marks required on the task's component, so the
+# caller is responsible for supplying them and the prompt is never asked to invent
+# a property the context cannot carry.
+#
+# A task whose context omits a field here cannot be composed truthfully: the
+# serving layer degrades it to the same-task fallback *before* calling the model,
+# so the empty-stream escape hatch is reserved for a task the model genuinely
+# cannot fit to the catalog, and a missing-context fallback is a logged, explicit
+# server decision rather than a silent empty model response. The mapping is also
+# rendered into the prompt, so the model and the caller agree on what each task
+# requires. `receipt`'s fields mirror the ReceiptCard required set; `discovery`
+# carries the candidate rows the ProviderPicker binds to.
+TASK_CONTEXT_FIELDS: Mapping[str, frozenset[str]] = {
+    "confirmation": frozenset({"amount", "payee"}),
+    "amount_entry": frozenset({"currency"}),
+    "receipt": frozenset({"reference", "payee", "amount"}),
+    "discovery": frozenset({"results"}),
+    "verification": frozenset({"status"}),
+    "recovery": frozenset({"status"}),
+}
+
+
+def missing_task_context(task: str, context: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """The required context fields a task is missing, in catalog order.
+
+    An empty tuple means the context carries every field the task's surface is
+    composed from (``amount_entry`` requires only the collecting currency). An
+    unknown task reports nothing here: it is rejected by the router as a 400.
+    """
+
+    required = TASK_CONTEXT_FIELDS.get(task)
+    if not required:
+        return ()
+    supplied = context or {}
+    # ``None`` is as absent as a missing key: a null carries no value to compose
+    # from and the model would have to invent one.
+    return tuple(sorted(name for name in required if supplied.get(name) in (None, "", [], {})))
+
+
+def render_task_context_fields() -> str:
+    """The per-task required context, rendered for the composition prompt.
+
+    Keeps the prompt's statement of each task's fields in lockstep with the
+    server-side guard: both derive from :data:`TASK_CONTEXT_FIELDS`, so the model
+    is never told to require a field the caller is not responsible for, and the
+    caller is never required to send a field the prompt does not name.
+    """
+
+    lines = []
+    for task in sorted(TASK_CONTEXT_FIELDS):
+        fields = ", ".join(sorted(TASK_CONTEXT_FIELDS[task]))
+        lines.append(f"- {task}: {fields}")
+    return "\n".join(lines)
+
 
 # --- Provider response schemas ---------------------------------------------------
 # Passed to the provider so generation is constrained to the contract. ``nullable``

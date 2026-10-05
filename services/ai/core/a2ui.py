@@ -93,8 +93,13 @@ def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]
     """Check a value against a JSON-Schema ``type`` (string or list, nullable).
 
     A nested schema (a mapping, for example an array's ``items`` or a sub-object) is
-    left to the client's full schema validation; this pre-send pass checks only the
-    primitive declarations it can decide without a JSON Schema engine.
+    mostly left to the client's full schema validation; this pre-send pass checks only
+    what it can decide without a JSON Schema engine. It does recurse into an array's
+    ``items`` when the items declare an object shape, because a list of JSON-encoded
+    strings where the catalog requires row objects passes the container check but
+    renders nothing on the client: the client's picker drops a non-object entry, so the
+    surface would be silently empty. Refusing it here degrades to the same-task
+    fallback instead (MQ-003, FEAT-011).
     """
 
     if value is None:
@@ -107,7 +112,16 @@ def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]
             errors.append(f"{what} must not be null")
         return
     if isinstance(declared, Mapping):
-        # A nested schema (array items, sub-object): accept the container type only.
+        # A property schema object: check the declared ``type`` and, for an array of
+        # object items, that each element is an object.
+        _check_property_type(value, declared.get("type"), what, errors)
+        items = declared.get("items")
+        if _expects_object_items(declared.get("type"), items) and isinstance(
+            value, (list, tuple)
+        ):
+            for index, item in enumerate(value):
+                if not isinstance(item, Mapping):
+                    errors.append(f"{what}[{index}] must be an object")
         return
     names = declared if isinstance(declared, list) else [declared]
     for name in names:
@@ -121,6 +135,24 @@ def _check_property_type(value: Any, declared: Any, what: str, errors: list[str]
         if isinstance(value, expected):
             return
     errors.append(f"{what} has the wrong type")
+
+
+def _expects_object_items(declared_type: Any, items: Any) -> bool:
+    """Whether an array property declares object-shaped items.
+
+    ``items`` may be an inline object schema (``{"type": "object"}`` or a schema with
+    properties) or a ``$ref`` to a catalog component; both mean the array's elements
+    are objects. A primitive ``items`` type is not checked here.
+    """
+
+    if declared_type != "array":
+        return False
+    if not isinstance(items, Mapping):
+        return False
+    if "$ref" in items:
+        return True
+    item_type = items.get("type")
+    return item_type == "object" or "properties" in items
 
 
 @dataclass(frozen=True)

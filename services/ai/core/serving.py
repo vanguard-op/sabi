@@ -66,6 +66,8 @@ from core.schemas import (
     IntentModelOutput,
     RankingResult,
     ServiceSummary,
+    missing_task_context,
+    render_task_context_fields,
 )
 from core.telemetry import CostTracker, TaskCost
 
@@ -437,6 +439,31 @@ class ModelServing:
                 cost=task_cost,
             )
 
+        # The caller composes each task's context from the real data it holds
+        # (C-012, FEAT-011). A required field that is genuinely absent cannot be
+        # composed truthfully, so degrade to the same-task fallback here, with a
+        # logged reason, rather than calling the model to invent the field or to
+        # take the empty-stream escape hatch. The model is only asked when the
+        # context actually carries the task's fields, so the prompt's rules are
+        # satisfiable.
+        missing = missing_task_context(task, context)
+        if missing:
+            logger.info(
+                "composition_missing_context task=%s missing=%s",
+                task,
+                ",".join(missing),
+            )
+            return CompositionOutcome(
+                messages=(),
+                fallback=fallback_key,
+                source=FALLBACK_SOURCE,
+                catalog_id=catalog.catalog_id,
+                model_id=None,
+                prompt_version=self._version_for(capability),
+                used_fallback=True,
+                cost=task_cost,
+            )
+
         try:
             prompt = load_prompt(capability, self._version_for(capability))
             request = self._build_request(
@@ -450,6 +477,7 @@ class ModelServing:
                         "task": task,
                         "context": json.dumps(context or {}, sort_keys=True, default=str),
                         "allowed_components": ", ".join(catalog.component_names()),
+                        "task_context_fields": render_task_context_fields(),
                     },
                 ),
                 COMPOSITION_RESPONSE_SCHEMA,
