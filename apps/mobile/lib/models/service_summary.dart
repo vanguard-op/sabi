@@ -3,9 +3,10 @@ import 'package:flutter/foundation.dart';
 /// A discovery result from the catalogue (CONTRACTS.md C-010 `ServiceSummary`).
 ///
 /// Amounts are integer minor units (kobo) and always paired with `currency`;
-/// the wire uses the contract's `service_id`/`collecting_body`/`known_amount`
-/// keys. Parsing also tolerates camelCase because the contracts and DELIVERY
-/// disagree on case.
+/// the HTTP wire is camelCase (DELIVERY.md, D-018) and `toJson` emits exactly
+/// the catalog's `ServiceResultRow` shape, since the composed discovery
+/// surface receives these rows as its context. Parsing tolerates the former
+/// snake_case so stored or in-flight payloads keep resolving.
 @immutable
 class ServiceSummary {
   const ServiceSummary({
@@ -32,14 +33,15 @@ class ServiceSummary {
 
   bool get hasKnownAmount => knownAmount != null;
 
-  /// Serialises to the contract's snake_case shape. Used to hand a discovery
-  /// result to the composed-surface renderer.
+  /// Serialises to the camelCase wire shape (C-010, D-018). Used to hand a
+  /// discovery result to the composed-surface renderer, which validates it
+  /// against the published catalog's camelCase `ServiceResultRow`.
   Map<String, dynamic> toJson() => {
-    'service_id': serviceId,
+    'serviceId': serviceId,
     'name': name,
-    'collecting_body': collectingBody,
+    'collectingBody': collectingBody,
     'category': category,
-    'known_amount': knownAmount,
+    'knownAmount': knownAmount,
     'currency': currency,
     'status': status,
     'confidence': confidence,
