@@ -170,6 +170,7 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-119 | MQ-001–004 | ai-engineer | Done | — |
 | T-120 | MQ-001–004 | qa-engineer | Done | — |
 | T-121 | C-012 | ai-engineer | Done | — |
+| T-122 | C-012 | ai-engineer | In Progress | — |
 
 ## Decisions log
 
