@@ -3,19 +3,29 @@
 # Manual by design (D-033). Bringing the staging environment up costs money, so
 # this workflow never runs on push: an operator dispatches it explicitly.
 #
-# It authenticates to GCP, applies the Terraform stack once to create the
-# platform (Artifact Registry, Secret Manager, Cloud SQL, network, and service
-# accounts), builds and pushes the four images into the now-existing registry,
-# applies a second time to deploy the built tag, runs the Alembic migrations
+# It authenticates to GCP, ensures the Artifact Registry repository exists
+# (via gcloud, only when it is absent), builds and pushes the four images into
+# it, applies the Terraform stack once, writes the one secret Terraform cannot
+# generate, runs the Alembic migrations and the catalogue seed as Cloud Run jobs
 # inside the VPC, and prints the mapped URLs and the DNS records to add at
 # Namecheap.
 #
-# The apply runs twice on purpose: the first `up` run pushed to
-# `us-central1-docker.pkg.dev/sabi-hq/sabi` before `terraform apply` had created
-# that Artifact Registry repository, so the push failed with
-# `Repository "sabi" not found`. The registry — and every other platform
-# resource — must exist before any push. See the two apply steps for the
-# ordering detail and the transient placeholder-revision note.
+# The ordering is deliberate. Cloud Run refuses to create a service or job whose
+# image is not yet in Artifact Registry, and the provider then leaves the
+# half-created service un-State'd (hashicorp/terraform-provider-google#14493).
+# So the images must exist before the apply, and the repository must exist
+# before the images can be pushed. Ensuring the repository first lets the
+# platform and the workloads land in a single apply, with no placeholder
+# revision (D-055, superseding the two-phase apply of D-036).
+#
+# The repository is also declared in Terraform
+# (infra/terraform-gcp/artifact_registry.tf). On an environment Terraform
+# already tracks it — every `up` after a previous `up` — the ensure step finds
+# it and does nothing, and the apply leaves it unchanged. On a fresh environment
+# (a first `up`, or the `destroy` -> `up` rebuild of D-033) it is not in state
+# yet, so the ensure step creates it out of band and the apply's create then
+# collides with it (409 already exists). That rebuild path is not covered by
+# this workflow as it stands.
 #
 # Auth is Workload Identity Federation (NFR-024): no long-lived service-account
 # key is committed. Set these repository variables:
@@ -94,10 +104,11 @@ jobs:
       - name: Ensure the image repository exists
         # Cloud Run refuses a service or job whose image is not yet in Artifact
         # Registry, and the provider leaves such a half-created service un-State'd
-        # (hashicorp/terraform-provider-google#14493). So the registry is created
-        # here, out of band, and the images are pushed before the single apply:
-        # every resource — platform and workloads — then lands together, which is
-        # the ordering the provider requires.
+        # (hashicorp/terraform-provider-google#14493). So the repository is
+        # ensured here — only when it is absent — and the images are pushed
+        # before the single apply, so the workloads can be created in the same
+        # pass as the rest of the platform. The repository is Terraform-managed
+        # (see the header for the fresh-environment caveat).
         run: |
           set -euo pipefail
           if ! gcloud artifacts repositories describe sabi \
@@ -138,7 +149,7 @@ jobs:
       - name: Terraform apply
         # One apply. The images now exist, so the Cloud Run services, jobs, their
         # IAM, and the domain mappings are created in the same pass as the
-        # platform (D-036).
+        # platform (D-055).
         env:
           TF_VAR_container_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_api_min_instances: ${{ inputs.api_min_instances }}
