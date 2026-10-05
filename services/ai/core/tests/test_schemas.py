@@ -188,8 +188,11 @@ def test_composition_schema_requires_each_components_catalog_properties():
         for required in catalog.required_properties(name):
             assert required in branch["required"], name
             assert required in branch["properties"], name
-        # Flat properties stay open: additionalProperties is never closed.
-        assert branch["additionalProperties"] is True
+        # Flat properties stay open by omission: the Developer API rejects
+        # ``additionalProperties``, and a JSON Schema object without it is open by
+        # default. The keyword must never reappear.
+        assert "additionalProperties" not in branch
+        assert "additional_properties" not in branch
 
 
 def test_composition_schema_bounds_the_envelope_fields():
@@ -200,3 +203,78 @@ def test_composition_schema_bounds_the_envelope_fields():
     components = item["properties"]["updateComponents"]["properties"]["components"]
     assert components["minItems"] >= 1
     assert item["properties"]["updateDataModel"]["required"] == ["surfaceId", "path"]
+
+
+def _walk_property_names(value, path=""):
+    """Every path in ``value`` where ``additionalProperties`` appears.
+
+    A structural walk, not a substring check, so the word inside a description or
+    comment cannot mask a real occurrence.
+    """
+
+    import collections.abc
+
+    hits: list[str] = []
+    if isinstance(value, collections.abc.Mapping):
+        for key, item in value.items():
+            here = f"{path}/{key}"
+            if key in ("additionalProperties", "additional_properties"):
+                hits.append(here)
+            hits.extend(_walk_property_names(item, here))
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            hits.extend(_walk_property_names(item, f"{path}[{index}]"))
+    return hits
+
+
+def test_composition_schema_emits_no_developer_api_rejected_construct():
+    """The derived schema must not contain a construct the Developer API rejects.
+
+    ``additionalProperties`` (bool or object) makes the google-genai SDK raise
+    ``ValueError: additionalProperties is only supported in Gemini Enterprise Agent
+    Platform mode`` from the schema transform, which surfaces as
+    ``ProviderUnavailable`` before the request is sent. The check walks the whole
+    document so a nested occurrence cannot hide.
+    """
+
+    from core.schemas import composition_response_json_schema
+
+    schema = composition_response_json_schema()
+    assert _walk_property_names(schema) == []
+
+
+def test_composition_schema_passes_the_sdk_schema_transform_for_every_task():
+    """The schema survives the SDK's transform for every composition task.
+
+    The defect this pins cost a live-model failure: ``discovery``'s
+    ``ProviderPicker`` shape tripped ``additionalProperties`` and every request for
+    that task failed at construct time. Asserting the transform here catches the
+    whole class without a model call.
+
+    The provider path is ``response_json_schema``; the SDK runs the same
+    ``process_schema``/``t_schema`` transform that raised, so the test drives that
+    exact path. The SDK is imported here rather than at module scope so a missing
+    optional install skips instead of erroring the suite; the client is built with a
+    fixed dummy key and the transform never touches the network.
+    """
+
+    import json
+
+    import pytest
+
+    genai = pytest.importorskip("google.genai")
+    from google.genai import _transformers
+
+    from core.schemas import FALLBACK_TASKS, composition_response_json_schema
+
+    schema = composition_response_json_schema()
+    client = genai.Client(api_key="test-transform-only")
+
+    for task in sorted(FALLBACK_TASKS):
+        document = json.loads(json.dumps(schema))
+        # ``process_schema`` mutates in place and is where the rejection is raised.
+        _transformers.process_schema(document, client._api_client)
+        assert _walk_property_names(document) == [], task
+        # ``t_schema`` runs ``process_schema`` then coerces to the typed ``Schema``,
+        # so it is the strictest form of the transform the SDK performs.
+        _transformers.t_schema(client._api_client, json.loads(json.dumps(schema)))

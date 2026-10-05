@@ -391,20 +391,30 @@ COMPOSITION_RESPONSE_SCHEMA: Mapping[str, Any] = {
 }
 
 # The composition stream is dynamic and polymorphic: each message body and each
-# flat component is a different shape per task and component. Google's
-# ``response_schema`` rejects ``additionalProperties`` on the Developer API, so it
-# cannot express an open component; the envelope is therefore pinned via the
-# provider's ``response_json_schema`` field (draft 2020-12).
+# flat component is a different shape per task and component. The envelope is
+# pinned via the provider's ``response_json_schema`` field (draft 2020-12) and the
+# model is constrained to a real, populated A2UI stream.
 #
-# A schema that declares only ``items: {"type": "object"}`` and requires only
-# ``version`` is satisfiable by ``{"messages": [{}]}`` and by ``{"version": ...}``
-# bodies with nothing in them, so the model emits empty envelopes that the
-# agent-side pre-send validation then rejects as ``version None`` / ``no surface``
-# / ``no root``. The schema below closes that gap while leaving each component's
-# flat properties open (``additionalProperties: true``):
+# The Developer API cannot carry ``additionalProperties`` at all. The SDK's
+# ``_transformers._raise_for_unsupported_mldev_properties`` raises for any truthy
+# ``additionalProperties`` (bool or schema object) on the non-Vertex path, so the
+# schema must not emit it: a schema carrying the keyword fails at request
+# construction with ``ValueError: additionalProperties is only supported in Gemini
+# Enterprise Agent Platform mode``, which surfaces as ``ProviderUnavailable``.
+# Openness is the JSON Schema default, so the flat component properties stay open
+# by simply not closing them: a JSON Schema object without ``additionalProperties``
+# permits additional properties, and ``t_schema``/``process_schema`` leaves it
+# open. This is the mechanism the Developer API accepts, verified against the SDK's
+# own transformer rather than assumed.
+#
+# The only constructs the SDK's transformer supports are ``type``, ``properties``,
+# ``required``, ``items``, ``minItems``, ``enum``, ``nullable`` and ``anyOf``
+# (``oneOf``/``allOf``/``not``/``contains``/``prefixItems``/``const`` are rejected
+# when the schema is coerced to a ``Schema``). The envelope is therefore stated
+# with those:
 #
 #   * the array requires at least one message (``minItems``);
-#   * each message requires a v0.9 ``version`` and exactly one body, via ``anyOf``;
+#   * each message requires a v0.9 ``version`` and a body, via ``anyOf``;
 #   * ``createSurface`` requires ``surfaceId``/``catalogId``, ``updateComponents``
 #     requires a non-empty ``components`` array, ``updateDataModel`` requires a
 #     ``path``;
@@ -413,12 +423,18 @@ COMPOSITION_RESPONSE_SCHEMA: Mapping[str, Any] = {
 #     their declared primitive types; every other property the catalog declares is
 #     described too, so the model is not left to invent an unconstrained one.
 #
+# The enumerate-only supported keywords mean two A2UI rules the validator cares
+# about cannot be stated structurally here: that a message carries *exactly* one
+# body (``anyOf`` gives at-least-one) and that the components contain a ``root``
+# (no ``contains``/``const`` is available). Those stay with the agent-side
+# validator, which is the authority on component names, required properties, the
+# single body, and the root (FEAT-011, MQ-003).
+#
 # The component variants are derived from the same published catalog the
 # agent-side pre-send validation uses, so the two cannot disagree on a component's
 # required properties (FEAT-011, MQ-003). Optional and task-specific flat
-# properties stay open: the model may add any property the catalog's
-# ``additionalProperties: true`` permits, and the validator remains the authority
-# on names, required properties, and executable-content rules.
+# properties stay open, and the validator remains the authority on names, required
+# properties, and executable-content rules.
 _PRIMITIVE_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
 
 
@@ -460,11 +476,11 @@ def _catalog_component_variant(catalog: Any, name: str) -> Mapping[str, Any]:
 
     Every property the catalog declares is described (with its declared type), not
     only the required ones. Leaving an optional property unnamed makes it an
-    unconstrained ``additionalProperties`` entry, and the model then degenerates when
-    it tries to emit one: a ``receipt`` context carrying ``kind`` produced a
-    malformed, truncated response until ``kind`` was typed. Naming the property keeps
-    the model on the rails without closing the object; ``additionalProperties: true``
-    still permits any property the catalog allows.
+    unconstrained entry, and the model then degenerates when it tries to emit one: a
+    ``receipt`` context carrying ``kind`` produced a malformed, truncated response
+    until ``kind`` was typed. Naming the property keeps the model on the rails; the
+    object is left open by not closing it, which is the JSON Schema default and the
+    only open-object form the Developer API accepts.
     """
 
     properties: dict[str, Any] = {
@@ -477,7 +493,6 @@ def _catalog_component_variant(catalog: Any, name: str) -> Mapping[str, Any]:
         "type": "object",
         "properties": properties,
         "required": ["id", "component", *catalog.required_properties(name)],
-        "additionalProperties": True,
     }
 
 
@@ -493,8 +508,11 @@ def composition_response_json_schema() -> Mapping[str, Any]:
 
     catalog = published_catalog()
     variants = [_catalog_component_variant(catalog, name) for name in catalog.component_names()]
+    # No top-level ``$schema`` marker: the SDK's ``t_schema`` coercion rejects it as
+    # an unknown field on ``Schema``, and ``response_json_schema`` is documented as
+    # draft 2020-12 by default, so the marker adds nothing the transform or the API
+    # needs. The document is still draft 2020-12 JSON Schema.
     return {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
             "messages": {
@@ -511,7 +529,6 @@ def composition_response_json_schema() -> Mapping[str, Any]:
                                 "catalogId": {"type": "string", "enum": [catalog.catalog_id]},
                             },
                             "required": ["surfaceId", "catalogId"],
-                            "additionalProperties": True,
                         },
                         "updateComponents": {
                             "type": "object",
@@ -524,7 +541,6 @@ def composition_response_json_schema() -> Mapping[str, Any]:
                                 },
                             },
                             "required": ["surfaceId", "components"],
-                            "additionalProperties": True,
                         },
                         "updateDataModel": {
                             "type": "object",
@@ -534,7 +550,6 @@ def composition_response_json_schema() -> Mapping[str, Any]:
                                 "value": {},
                             },
                             "required": ["surfaceId", "path"],
-                            "additionalProperties": True,
                         },
                     },
                     "required": ["version"],
@@ -543,10 +558,8 @@ def composition_response_json_schema() -> Mapping[str, Any]:
                         {"required": ["updateComponents"]},
                         {"required": ["updateDataModel"]},
                     ],
-                    "additionalProperties": True,
                 },
             },
         },
         "required": ["messages"],
-        "additionalProperties": True,
     }
