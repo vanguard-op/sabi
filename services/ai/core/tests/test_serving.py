@@ -411,7 +411,10 @@ def test_compose_surface_treats_a_null_required_field_as_absent(catalogue):
         ("confirmation", {"amount": 500000, "payee": "Ikeja"}),
         ("amount_entry", {"currency": "NGN"}),
         ("receipt", {"reference": "FT-1", "payee": "Agency", "amount": 100}),
-        ("discovery", {"results": [{"serviceId": "s", "collectingBody": "b", "category": "c"}]}),
+        (
+            "discovery",
+            {"services": [{"serviceId": "s", "collectingBody": "b", "category": "c"}]},
+        ),
         ("verification", {"status": "unverified"}),
         ("recovery", {"status": "pending"}),
     ],
@@ -433,6 +436,40 @@ def test_compose_surface_calls_the_model_when_the_task_context_is_complete(
 
     for field in TASK_CONTEXT_FIELDS[task]:
         assert field in provider.last_request.contents
+
+
+def test_discovery_context_key_matches_the_client_wire_shape():
+    """Regression: discovery requires `services`, the key the client and gateway send.
+
+    The guard once required `results`, an agent-only name no client ever emitted, so
+    every live multi-result discovery reached the serving layer with its required
+    field "missing" and fell back before the model while the mocked suite stayed
+    green. The context key must be the one the client sends and the catalog's
+    ProviderPicker property uses.
+    """
+
+    from core.schemas import missing_task_context
+
+    # The exact shape the client and the gateway probe forward for discovery.
+    gateway_context = {
+        "services": [
+            {
+                "serviceId": "s1",
+                "name": "Ikeja Electric",
+                "collectingBody": "Ikeja Electric",
+                "category": "electricity",
+                "status": "active",
+            },
+            {
+                "serviceId": "s2",
+                "name": "Eko Electric",
+                "collectingBody": "EKEDC",
+                "category": "electricity",
+                "status": "active",
+            },
+        ]
+    }
+    assert missing_task_context("discovery", gateway_context) == ()
 
 
 def test_compose_surface_falls_back_without_a_compatible_catalog(catalogue):

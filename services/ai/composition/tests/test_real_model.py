@@ -72,8 +72,11 @@ _TASK_CONTEXTS: dict[str, dict] = {
         "kind": "official_e_receipt",
         "status": "settled",
     },
+    # The candidate rows ride under `services`, the key the client sends and the
+    # ProviderPicker property the catalog names; an agent-only key here would let the
+    # live test pass on a shape no real request carries (FEAT-011, MQ-003).
     "discovery": {
-        "results": [
+        "services": [
             {
                 "serviceId": "svc-ikeja-electric",
                 "name": "Ikeja Electric",

@@ -85,6 +85,60 @@ def _valid_stream() -> dict:
     )
 
 
+def _discovery_stream() -> dict:
+    """A multi-result ProviderPicker, the shape a live discovery composes."""
+
+    return _a2ui(
+        "discover-1",
+        [
+            {
+                "id": "root",
+                "component": "ProviderPicker",
+                "services": [
+                    {
+                        "serviceId": "s1",
+                        "name": "Ikeja Electric",
+                        "collectingBody": "Ikeja Electric",
+                        "category": "electricity",
+                        "status": "active",
+                    },
+                    {
+                        "serviceId": "s2",
+                        "name": "Eko Electric",
+                        "collectingBody": "EKEDC",
+                        "category": "electricity",
+                        "status": "active",
+                    },
+                ],
+            }
+        ],
+    )
+
+
+# The exact multi-result discovery context the client and the gateway probe send:
+# candidate rows under `services`, matching the catalog's ProviderPicker property.
+# The agent-only `results` key once used by mocked fixtures made every real discovery
+# fall back on missing context before the model was ever asked (FEAT-011, MQ-003).
+_GATEWAY_DISCOVERY_CONTEXT = {
+    "services": [
+        {
+            "serviceId": "s1",
+            "name": "Ikeja Electric",
+            "collectingBody": "Ikeja Electric",
+            "category": "electricity",
+            "status": "active",
+        },
+        {
+            "serviceId": "s2",
+            "name": "Eko Electric",
+            "collectingBody": "EKEDC",
+            "category": "electricity",
+            "status": "active",
+        },
+    ]
+}
+
+
 # --- Happy path ------------------------------------------------------------------
 
 
@@ -106,6 +160,43 @@ def test_composes_a_catalogue_valid_surface() -> None:
     ]
     assert body["messages"][0]["createSurface"]["catalogId"] == _CATALOG_ID
     assert body["fallback"] == "confirmation"
+
+
+def test_composes_a_multi_result_discovery_from_the_gateway_context_shape() -> None:
+    """A multi-result discovery sent as the client/gateway does reaches the model.
+
+    Regression: the serving guard required a `results` context key no client ever
+    sent, so the gateway forwards the client's `services` shape and every live
+    discovery degraded to the same-task fallback before the model was asked while
+    this suite stayed green. The multi-result ProviderPicker stream must compose.
+    """
+
+    client, provider = build_test_client(
+        [json_response(_discovery_stream(), model_id=FLASH_MODEL_ID)]
+    )
+    response = client.post(
+        "/v1/agent/surfaces",
+        json={
+            "task": "discovery",
+            "context": _GATEWAY_DISCOVERY_CONTEXT,
+            "catalogId": _CATALOG_ID,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    # The model was reached (not the missing-context fallback) and its stream is
+    # returned; a fallback here with a non-empty ProviderPicker fixture means the
+    # context shape was refused before composition.
+    assert len(provider.requests) == 1
+    assert provider.last_request is not None
+    assert body["fallback"] == "discovery"
+    assert len(body["messages"]) > 0
+    assert body["messages"][1]["updateComponents"]["components"][0]["component"] == (
+        "ProviderPicker"
+    )
+    # Both candidate rows reach the prompt, so the model composes the real picker.
+    assert "s1" in provider.last_request.contents
+    assert "s2" in provider.last_request.contents
 
 
 def test_composes_a_verification_surface() -> None:

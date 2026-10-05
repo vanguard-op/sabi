@@ -284,12 +284,15 @@ FALLBACK_TASKS: frozenset[str] = frozenset(
 # server decision rather than a silent empty model response. The mapping is also
 # rendered into the prompt, so the model and the caller agree on what each task
 # requires. `receipt`'s fields mirror the ReceiptCard required set; `discovery`
-# carries the candidate rows the ProviderPicker binds to.
+# carries the candidate rows the ProviderPicker binds to, under the same `services`
+# key the client sends and the catalog's ProviderPicker property uses (the existing
+# `results` key was an agent-only name no client ever sent, so every real discovery
+# request fell back on missing context before reaching the model).
 TASK_CONTEXT_FIELDS: Mapping[str, frozenset[str]] = {
     "confirmation": frozenset({"amount", "payee"}),
     "amount_entry": frozenset({"currency"}),
     "receipt": frozenset({"reference", "payee", "amount"}),
-    "discovery": frozenset({"results"}),
+    "discovery": frozenset({"services"}),
     "verification": frozenset({"status"}),
     "recovery": frozenset({"status"}),
 }
