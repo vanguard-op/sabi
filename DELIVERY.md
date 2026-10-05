@@ -117,7 +117,8 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | T-129 | FEAT-005, FEAT-011 | product-shaper | Done | — |
 | T-130 | FEAT-005, FEAT-011 | frontend-engineer | Done | C-017, C-018, C-033 |
 | T-131 | FEAT-002, FEAT-011 | frontend-engineer | Done | C-020, C-021, C-022 |
-| T-132 | FEAT-009, FEAT-011 | frontend-engineer | In Progress | C-026, C-027, C-028, C-029 |
+| T-132 | FEAT-009, FEAT-011 | frontend-engineer | Done | C-026, C-027, C-028, C-029 |
+| T-133 | FEAT-002 | frontend-engineer | In Progress | C-020, C-021, C-022 |
 
 ## Decisions log
 
