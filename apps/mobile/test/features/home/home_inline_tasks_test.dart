@@ -340,14 +340,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _submit(tester, 'pay a regulated bill');
-      // The composed surface is held, not failed, and its action names the
-      // Identity screen the ceremony completes on rather than implying it
-      // finishes inline (FEAT-011).
+      // The composed surface frames the task and keeps the Identity screen as
+      // the alternate route...
       expect(
         find.text(SabStrings.english.openVerificationScreen),
         findsOneWidget,
       );
-      expect(find.text(SabStrings.english.verifyInlineBody), findsOneWidget);
+      expect(find.text(SabStrings.english.verifyInlineTitle), findsOneWidget);
+      // ...and the ceremony completes inline: the shared task view collects the
+      // NIN and offers the submit action in the conversation.
+      expect(find.text('National Identity Number (NIN)'), findsOneWidget);
+      expect(find.text('Verify identity'), findsWidgets);
     });
 
     testWidgets('a record lookup renders the receipt inline', (tester) async {

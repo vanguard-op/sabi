@@ -383,6 +383,10 @@ Widget _statusPill(CatalogItemContext ctx) {
   );
 }
 
+/// The composed `Verification` surface frames the identity task above the
+/// client's ceremony shell, which completes the check inline in the
+/// conversation. Its action is the alternate route to the Identity screen,
+/// which stays reachable for a user who verifies outside the conversation.
 Widget _verification(CatalogItemContext ctx) {
   final data = _props(ctx);
   return _TaskCard(
@@ -632,8 +636,8 @@ class _TaskCard extends ConsumerWidget {
     final colors = SabColorTokens.of(context);
     final strings = ref.watch(sabStringsProvider);
     final label = switch (actionKind) {
-      // The identity ceremony finishes on the Identity screen, so the action
-      // names that screen rather than implying it completes inline.
+      // The ceremony completes inline; this action is the alternate route to
+      // the Identity screen.
       'verification' => strings.openVerificationScreen,
       'recovery' => strings.openCase,
       _ => null,

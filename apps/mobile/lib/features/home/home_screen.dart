@@ -24,6 +24,7 @@ import '../../design_system/tokens.dart';
 import '../../l10n/sab_strings.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
+import '../account/verification/verification_task_view.dart';
 import '../payment/payment_controller.dart';
 import '../payment/payment_task_view.dart';
 import 'home_controller.dart';
@@ -578,10 +579,13 @@ class _InlineAmountEntry extends ConsumerWidget {
   }
 }
 
-/// The identity-verification task composed inline (FEAT-011, screens/03-home.md
-/// "Verifying inline"). The agent composes the verification surface; the task
-/// is held, not failed, and the ceremony is completed on the existing Identity
-/// screen, which is the alternate route for the same task.
+/// The identity-verification task composed inline (FEAT-002, FEAT-011,
+/// screens/03-home.md "Verifying inline"). The agent composes the verification
+/// surface above; below it the shared [VerificationTaskView] drives the
+/// verification controller, so the ceremony — collect the NIN/BVN, submit
+/// (C-020/C-021), and show the resulting status (C-022) — completes in the
+/// conversation. The Identity screen stays the alternate route, reachable from
+/// the composed surface and from Account.
 class _Verifying extends ConsumerWidget {
   const _Verifying({required this.turn, required this.onOpenVerification});
 
@@ -591,19 +595,29 @@ class _Verifying extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
-    return A2uiSurfaceView(
-      stream: turn.surface,
-      onAction: (action) {
-        if (action.name == SabiActions.openVerification) onOpenVerification();
-      },
-      // The identity ceremony is completed on the Identity screen, so the
-      // action names that screen rather than implying it finishes here.
-      fallback: (context) => _TaskCard(
-        title: strings.verifyInlineTitle,
-        body: assistantReplyFor(turn, strings),
-        actionLabel: strings.openVerificationScreen,
-        onAction: onOpenVerification,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        A2uiSurfaceView(
+          stream: turn.surface,
+          onAction: (action) {
+            if (action.name == SabiActions.openVerification) {
+              onOpenVerification();
+            }
+          },
+          fallback: (context) => _TaskCard(
+            title: strings.verifyInlineTitle,
+            body: assistantReplyFor(turn, strings),
+            actionLabel: strings.openVerificationScreen,
+            onAction: onOpenVerification,
+          ),
+        ),
+        const SizedBox(height: SabSpacing.md),
+        // The ceremony is the prewritten shell for the composed surface: the
+        // controller is the state machine and this view dispatches its actions,
+        // so the task completes inline rather than leaving for the screen.
+        const VerificationTaskView(showHeading: false),
+      ],
     );
   }
 }

@@ -24,6 +24,7 @@ class VerificationStrings {
 
   String get title => _t('title');
   String get heading => _t('heading');
+  String get formGroup => _t('formGroup');
   String get introUnverified => _t('introUnverified');
   String get introPending => _t('introPending');
   String get introVerified => _t('introVerified');
@@ -67,6 +68,7 @@ class VerificationStrings {
   static const Map<String, String> _en = {
     'title': 'Identity verification',
     'heading': 'Verify your identity',
+    'formGroup': 'Identity details',
     'introUnverified': 'Verify once so regulated payments can go through. Discovery stays open either way.',
     'introPending': 'Your details are with the national identity provider. This usually takes a moment.',
     'introVerified': 'Your identity is verified on this account.',

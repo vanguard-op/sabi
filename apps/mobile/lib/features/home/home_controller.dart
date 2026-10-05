@@ -391,10 +391,7 @@ class HomeController extends Notifier<HomeState> {
           final surface = await _compose(
             SurfaceTask.verification,
             context: {
-              'title': assistantReplyFor(
-                ConversationTurn(request: request, phase: HomePhase.verifying),
-                ref.read(sabStringsProvider),
-              ),
+              'title': ref.read(sabStringsProvider).verifyInlineTitle,
               'body': intent.reply,
             },
           );

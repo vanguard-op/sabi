@@ -166,6 +166,26 @@ void main() {
     expect(find.byType(VerificationScreen), findsOneWidget);
   });
 
+  testWidgets('the Account entry still opens the Identity screen', (
+    tester,
+  ) async {
+    await pumpSabApp(
+      tester,
+      overrides: [
+        ..._baseOverrides(),
+        _session(authenticated: true),
+        _noopBootstrap,
+      ],
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+    // The non-conversation route to the same task: Account reaches the screen.
+    await tester.tap(find.text('Verify identity'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VerificationScreen), findsOneWidget);
+  });
+
   testWidgets('no payment route remains, so nothing reaches a deleted screen', (
     tester,
   ) async {
