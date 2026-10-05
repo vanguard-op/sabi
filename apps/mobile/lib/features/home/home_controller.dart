@@ -75,6 +75,7 @@ class ConversationTurn {
     this.afterClarificationBound = false,
     this.record,
     this.records = const [],
+    this.caseId,
     this.surface,
     this.surfaceTask,
     this.surfaceFailed = false,
@@ -113,6 +114,11 @@ class ConversationTurn {
   /// chooses which to open rather than the assistant guessing.
   final List<ResolvedRecord> records;
 
+  /// The case a recovery task is bound to, when the conversation resolved one:
+  /// a case record lookup, or a case id/reference the agent named. Null for a
+  /// recovery task with no case to drive, which renders the surface alone.
+  final String? caseId;
+
   /// The gated A2UI surface the agent composed for this turn (C-012 revision 2).
   /// Null when no task surface was requested or the response was refused, in
   /// which case the screen renders the prewritten fallback for [surfaceTask].
@@ -145,6 +151,7 @@ class ConversationTurn {
     bool? afterClarificationBound,
     ResolvedRecord? record,
     List<ResolvedRecord>? records,
+    String? caseId,
     A2uiSurfaceStream? surface,
     SurfaceTask? surfaceTask,
     bool? surfaceFailed,
@@ -159,6 +166,7 @@ class ConversationTurn {
         afterClarificationBound ?? this.afterClarificationBound,
     record: record ?? this.record,
     records: records ?? this.records,
+    caseId: caseId ?? this.caseId,
     surface: surface ?? this.surface,
     surfaceTask: surfaceTask ?? this.surfaceTask,
     surfaceFailed: surfaceFailed ?? this.surfaceFailed,
@@ -250,6 +258,9 @@ class HomeState {
 
   /// The record candidates when a lookup matched more than one.
   List<ResolvedRecord> get records => current?.records ?? const [];
+
+  /// The case the latest recovery turn is bound to, when one was resolved.
+  String? get caseId => current?.caseId;
 
   /// The gated A2UI surface the agent composed for the latest turn (C-012
   /// revision 2), or null when the prewritten fallback carries the task.
@@ -407,6 +418,7 @@ class HomeController extends Notifier<HomeState> {
           );
           return null;
         case SurfaceTask.recovery:
+          final caseId = await _recoveryCaseId(intent);
           final surface = await _compose(
             SurfaceTask.recovery,
             context: {
@@ -420,6 +432,7 @@ class HomeController extends Notifier<HomeState> {
               phase: HomePhase.recovering,
               intent: intent,
               candidates: const [],
+              caseId: caseId,
               surface: surface.stream,
               surfaceTask: SurfaceTask.recovery,
               surfaceFailed: !surface.accepted,
@@ -740,6 +753,30 @@ class HomeController extends Notifier<HomeState> {
     return null;
   }
 
+  /// The case a recovery task is bound to, so the conversation can drive the
+  /// same state machine as the Case screen. The agent may name the case id
+  /// directly, or name the payment the case tracks; either resolves to a case
+  /// the owner holds. When neither resolves, the surface still renders and no
+  /// inline task is bound, so the task is never left unreachable.
+  Future<String?> _recoveryCaseId(IntentResult intent) async {
+    final direct = intent.constraints['caseId']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final paymentId =
+        intent.constraints['paymentId']?.toString() ??
+        (intent.reference?.isNotEmpty ?? false ? intent.reference : null);
+    if (paymentId == null || paymentId.isEmpty) return null;
+    try {
+      final page = await ref.read(casesRepositoryProvider).list();
+      for (final paymentCase in page.cases) {
+        if (paymentCase.paymentId == paymentId) return paymentCase.caseId;
+      }
+    } catch (_) {
+      // A lookup failure must not stop the recovery surface rendering; the
+      // inline task is simply not bound this turn.
+    }
+    return null;
+  }
+
   /// Resolves a record lookup against the owner's own records (FEAT-003,
   /// FEAT-023; user-flow Flow 9). A single match renders inline; several matches
   /// become candidates the user chooses from; no match is stated plainly and
@@ -787,6 +824,9 @@ class HomeController extends Notifier<HomeState> {
         candidates: const [],
         record: records.length == 1 ? records.first : null,
         records: records,
+        caseId: records.length == 1
+            ? records.first.caseSummary?.caseId
+            : null,
         surface: surface,
         surfaceTask: surfaceTask,
         surfaceFailed: surface == null,

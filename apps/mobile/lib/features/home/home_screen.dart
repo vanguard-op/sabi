@@ -25,6 +25,7 @@ import '../../l10n/sab_strings.dart';
 import '../../models/receipt_summary.dart';
 import '../../models/service_summary.dart';
 import '../account/verification/verification_task_view.dart';
+import '../case/case_task_view.dart';
 import '../payment/payment_controller.dart';
 import '../payment/payment_task_view.dart';
 import 'home_controller.dart';
@@ -103,6 +104,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       context.push('/cases/${record.id}');
     }
   }
+
+  /// Opens the existing Case screen for a recovery task the conversation is
+  /// driving inline; the screen is the alternate route to the same task.
+  void _openCase(String caseId) => context.push('/cases/$caseId');
 
   /// Opens the existing identity screen for a payment that is held pending
   /// verification; the inline surface carries the held state in the
@@ -196,6 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onSelectService: _selectService,
                 onOpenReceipt: _openReceipt,
                 onOpenRecord: _openRecord,
+                onOpenCase: _openCase,
                 onOpenVerification: _openVerification,
                 onRetry: () =>
                     ref.read(homeControllerProvider.notifier).retry(),
@@ -223,6 +229,7 @@ class _Conversation extends ConsumerWidget {
     required this.onSelectService,
     required this.onOpenReceipt,
     required this.onOpenRecord,
+    required this.onOpenCase,
     required this.onOpenVerification,
     required this.onRetry,
     required this.onSupport,
@@ -238,6 +245,9 @@ class _Conversation extends ConsumerWidget {
   /// Opens the existing Receipt Detail screen for a settled bill.
   final ValueChanged<String> onOpenReceipt;
   final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  /// Opens the existing Case screen for a recovery task driven inline.
+  final ValueChanged<String> onOpenCase;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
@@ -285,6 +295,7 @@ class _Conversation extends ConsumerWidget {
             onSelectService: onSelectService,
             onOpenReceipt: onOpenReceipt,
             onOpenRecord: onOpenRecord,
+            onOpenCase: onOpenCase,
             onOpenVerification: onOpenVerification,
             onRetry: onRetry,
             onSupport: onSupport,
@@ -305,6 +316,7 @@ class _Turn extends ConsumerWidget {
     required this.onSelectService,
     required this.onOpenReceipt,
     required this.onOpenRecord,
+    required this.onOpenCase,
     required this.onOpenVerification,
     required this.onRetry,
     required this.onSupport,
@@ -318,6 +330,7 @@ class _Turn extends ConsumerWidget {
   final ValueChanged<String> onSelectService;
   final ValueChanged<String> onOpenReceipt;
   final ValueChanged<ResolvedRecord> onOpenRecord;
+  final ValueChanged<String> onOpenCase;
   final VoidCallback onOpenVerification;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
@@ -374,11 +387,12 @@ class _Turn extends ConsumerWidget {
           ),
           HomePhase.recovering => _Recovering(
             turn: turn,
-            onOpenRecord: onOpenRecord,
+            onOpenCase: onOpenCase,
           ),
           HomePhase.record => _RecordLookup(
             turn: turn,
             onOpenRecord: onOpenRecord,
+            onOpenCase: onOpenCase,
           ),
           HomePhase.noRecord => _Notice(
             title: strings.noRecordTitle,
@@ -624,38 +638,49 @@ class _Verifying extends ConsumerWidget {
 
 /// The failed-payment or case recovery task composed inline (FEAT-011,
 /// screens/03-home.md "Recovering inline"). The agent composes the recovery
-/// surface; the case may also be opened on its screen, the alternate route.
+/// surface; below it the shared [CaseTaskView] drives the case controller, so
+/// the refund, the dispute, and the timeline complete in the conversation. The
+/// case may also be opened on its screen, the alternate route.
 class _Recovering extends ConsumerWidget {
   const _Recovering({
     required this.turn,
-    required this.onOpenRecord,
+    required this.onOpenCase,
   });
 
   final ConversationTurn turn;
-  final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  /// Opens the Case screen for the recovery task, the alternate route.
+  final ValueChanged<String> onOpenCase;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(sabStringsProvider);
-    final caseId = turn.record?.caseSummary?.caseId;
-    final record = turn.record;
-    return A2uiSurfaceView(
-      stream: turn.surface,
-      onAction: (action) {
-        if (action.name == SabiActions.openCase &&
-            record != null &&
-            caseId != null) {
-          onOpenRecord(record);
-        }
-      },
-      fallback: (context) => _TaskCard(
-        title: strings.recoveringTitle,
-        body: assistantReplyFor(turn, strings),
-        actionLabel: caseId == null ? null : strings.openCase,
-        onAction: caseId == null || record == null
-            ? null
-            : () => onOpenRecord(record),
-      ),
+    final caseId = turn.caseId;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        A2uiSurfaceView(
+          stream: turn.surface,
+          onAction: (action) {
+            if (action.name == SabiActions.openCase && caseId != null) {
+              onOpenCase(caseId);
+            }
+          },
+          fallback: (context) => _TaskCard(
+            title: strings.recoveringTitle,
+            body: assistantReplyFor(turn, strings),
+            actionLabel: caseId == null ? null : strings.openCase,
+            onAction: caseId == null ? null : () => onOpenCase(caseId),
+          ),
+        ),
+        if (caseId != null) ...[
+          const SizedBox(height: SabSpacing.md),
+          // The recovery shell: the controller is the state machine and this
+          // view dispatches its actions, so the task completes inline rather
+          // than leaving for the screen.
+          CaseTaskView(caseId: caseId),
+        ],
+      ],
     );
   }
 }
@@ -665,10 +690,18 @@ class _Recovering extends ConsumerWidget {
 /// the user chooses from, each able to open the existing screen instead. No
 /// match renders no record surface (that is [HomePhase.noRecord]).
 class _RecordLookup extends ConsumerWidget {
-  const _RecordLookup({required this.turn, required this.onOpenRecord});
+  const _RecordLookup({
+    required this.turn,
+    required this.onOpenRecord,
+    required this.onOpenCase,
+  });
 
   final ConversationTurn turn;
   final ValueChanged<ResolvedRecord> onOpenRecord;
+
+  /// Opens the Case screen for a case record, the alternate route to the same
+  /// task the inline [CaseTaskView] completes.
+  final ValueChanged<String> onOpenCase;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -677,6 +710,7 @@ class _RecordLookup extends ConsumerWidget {
 
     final single = turn.record;
     if (single != null) {
+      final caseSummary = single.caseSummary;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -687,8 +721,13 @@ class _RecordLookup extends ConsumerWidget {
           A2uiSurfaceView(
             stream: turn.surface,
             onAction: (action) {
+              // A receipt opens Receipt Detail; a case composes the recovery
+              // surface whose next step opens the Case screen.
               if (action.name == SabiActions.openRecord) {
                 onOpenRecord(single);
+              } else if (action.name == SabiActions.openCase &&
+                  caseSummary != null) {
+                onOpenCase(caseSummary.caseId);
               }
             },
             fallback: (context) =>
@@ -701,6 +740,13 @@ class _RecordLookup extends ConsumerWidget {
               variant: SabButtonVariant.ghost,
               onPressed: () => onOpenRecord(single),
             ),
+          ],
+          if (caseSummary != null) ...[
+            const SizedBox(height: SabSpacing.md),
+            // The case task completes inline in the conversation: the recovery
+            // shell drives the controller, so the refund or dispute and the
+            // timeline are handled here rather than only on the screen.
+            CaseTaskView(caseId: caseSummary.caseId),
           ],
         ],
       );

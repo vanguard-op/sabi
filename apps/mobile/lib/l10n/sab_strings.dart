@@ -258,6 +258,8 @@ class SabStrings {
   String get caseOffline => _t('caseOffline');
   String get caseRefundBlocked => _t('caseRefundBlocked');
   String get caseRefundSubmitted => _t('caseRefundSubmitted');
+  String get caseDisputeBlocked => _t('caseDisputeBlocked');
+  String get caseDisputeSubmitted => _t('caseDisputeSubmitted');
   String get caseSupportBody => _t('caseSupportBody');
   String get caseReferenceLabel => _t('caseReferenceLabel');
   String get caseTypeFailedNoDelivery => _t('caseTypeFailedNoDelivery');
@@ -479,6 +481,8 @@ class SabStrings {
     'caseOffline': 'You’re offline. This is the last known state; we’ll update it when you reconnect.',
     'caseRefundBlocked': 'A refund for this reference is already in progress, so we didn’t send a second one.',
     'caseRefundSubmitted': 'Refund started. We’ll keep this case updated.',
+    'caseDisputeBlocked': 'A dispute is already open on this payment, so we didn’t raise another one.',
+    'caseDisputeSubmitted': 'Dispute raised. We’ll keep this case updated.',
     'caseSupportBody':
         'Quote your case reference so support can pick it up straight away.',
     'caseReferenceLabel': 'Case reference',
