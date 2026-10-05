@@ -172,9 +172,10 @@ Carried from the Phase 2 report; comments and configuration only, no behaviour c
 | T-121 | C-012 | ai-engineer | Done | — |
 | T-122 | C-012 | ai-engineer | Done | — |
 | T-123 | C-012 | frontend-engineer | Done | — |
-| T-124 | C-012 | ai-engineer | In Progress | — |
-| T-125 | C-012 | frontend-engineer | In Progress | — |
-| T-126 | — | infra-engineer | In Progress | — |
+| T-124 | C-012 | ai-engineer | Done | — |
+| T-125 | C-012 | frontend-engineer | Done | — |
+| T-126 | — | infra-engineer | Done | — |
+| T-127 | — | infra-engineer | In Progress | — |
 
 ## Decisions log
 
