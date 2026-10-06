@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `47fc660`. 14 documents: overview,
+`docs/Sabi/` — git submodule `vanguard-op/sabi-docs`, pinned at `6af03be`. 14 documents: overview,
 user-personas, branding, features, nfr, roadmap, architecture, operations, schema, model-quality,
 risk-log, user-flow, screens (+ 9 screen specs). The roadmap owns build order; this file owns state.
 
@@ -171,6 +171,7 @@ redefined elsewhere. Source: `docs/Sabi/branding.md`, "Design System".
 | D-055 | `gcp-up` ensures the Artifact Registry repository out of band (gcloud, when absent), builds and pushes the images, then runs a single `terraform apply`; the two-phase apply of D-036 is superseded | With the registry and the images present before the apply, the platform and the workloads land in one pass, so no Cloud Run service is created before its image exists and the transient placeholder revision D-036 described never occurs. Verified by repeated successful `up` runs | lead |
 | D-056 | `gcp-up` creates the Artifact Registry repository with a targeted Terraform apply before the image build, not out of band with gcloud, and the three GCP lifecycle workflows share one concurrency group; the out-of-band mechanism of D-055 is superseded | The out-of-band gcloud create collided with Terraform's own repository resource on a fresh environment (`409 already exists`), which would break the `destroy` -> `up` rebuild D-033 depends on; a targeted apply keeps the registry in Terraform state from creation. The shared group stops `up` and `destroy` overlapping | lead |
 | D-057 | Every task completes inline in the conversation: payment authorisation and mandate signing, variable amount entry, the identity ceremony, and case/failure recovery. A screen left with no entry point is removed rather than kept as dead code; Payment Confirmation is removed, while Identity Verification and Case stay because the Account tab and Receipt Detail still reach them. Supersedes D-050's alternate-route clause for Payment Confirmation | Once the conversation completes these tasks, Payment Confirmation had no remaining entry point, and an unreachable screen is dead code. Identity Verification and Case remain reachable from non-chat surfaces, so removing them would break those flows instead of tidying | user |
+| D-058 | The GCP staging network foundation (API enablement, VPC, run subnet, database firewall, private-services range and peering) lives in its own long-lived Terraform state that `gcp-up` applies and `gcp-destroy` never deletes; `destroy` tears down only the workloads | Cloud Run Direct VPC egress leaves a Google-managed `serverless-ipv4-cloudrun-*` reservation that is released asynchronously (orphaned >12h in staging) and blocks deletion of both the run subnet and the `servicenetworking.googleapis.com` connection, so a whole-stack `terraform destroy` is unreliable; the network and peering cost nothing, so persisting them is free and makes `destroy`/`up` idempotent. Supersedes D-033's implication that `destroy` removes the entire stack | user |
 
 ## Definition of Done
 
