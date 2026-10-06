@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored). `make gcp-foundation-plan` uses it.
+# Staging: pre-release validation and stakeholder review (architecture.md,
+# Environments); GCP us-central1 (D-032).
+
+project_id  = "sabi-hq"
+environment = "staging"
+region      = "us-central1"

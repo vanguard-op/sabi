@@ -26,9 +26,6 @@ locals {
 }
 
 resource "google_secret_manager_secret" "app" {
-  # Secret Manager must be enabled before the containers are created.
-  depends_on = [google_project_service.required]
-
   for_each = local.app_secrets
 
   secret_id = "${local.prefix}-${lower(replace(each.key, "_", "-"))}"

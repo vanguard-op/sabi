@@ -8,7 +8,10 @@ provider "google" {
 locals {
   # Staging environment naming. Kept beside the AWS stack (infra/terraform/) so
   # the existing AWS baseline is not touched; this stack is the hosted staging
-  # environment of D-032/D-033.
+  # workload environment of D-032/D-033, with the free network foundation split
+  # into its own long-lived root (foundation/) under D-058. The prefix here must
+  # stay in step with the foundation root: it is how this root's data sources
+  # find the network and run subnet.
   prefix = "${var.project}-${var.environment}"
 
   labels = {

@@ -1,8 +1,12 @@
 # Sabi GCP staging lifecycle: `stop`.
 #
-# Manual by design (D-033). Scales every Cloud Run service to zero and stops the
-# Cloud SQL instance, then reports the residual idle cost. The environment is
-# rebuilt by `gcp-up`; nothing is destroyed here.
+# Manual by design (D-033). Scales every Cloud Run service to zero instances and
+# stops the Cloud SQL instance, then reports the residual idle cost. The
+# environment is rebuilt by `gcp-up`; nothing is destroyed here.
+#
+# Cloud Run already scales to zero at `--min-instances=0`, so that flag alone is
+# the whole change: Cloud Run's `autoscaling.knative.dev/maxScale` must be a
+# positive integer (only minScale may be 0), and `--max-instances=0` is rejected.
 #
 # Set the same repository variables as `gcp-up`. Auth is Workload Identity
 # Federation (NFR-024).
@@ -35,12 +39,16 @@ jobs:
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
       - name: Scale every Cloud Run service to zero
+        # `--min-instances=0` lets Cloud Run scale to zero; it is already the
+        # only change needed. `--max-instances=0` is invalid: Cloud Run's
+        # autoscaling.knative.dev/maxScale must be a positive integer, and only
+        # minScale may be 0.
         run: |
           set -euo pipefail
           for svc in sabi-staging-api sabi-staging-ai sabi-staging-payments sabi-staging-console; do
             gcloud run services update "$svc" \
               --project="${{ vars.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" \
-              --min-instances=0 --max-instances=0 --quiet
+              --min-instances=0 --quiet
             echo "scaled $svc to zero"
           done
 
@@ -55,7 +63,7 @@ jobs:
           {
             echo "## Sabi staging stopped"
             echo
-            echo "Cloud Run services are scaled to zero and Cloud SQL is suspended. Idle cost is storage and registry only, roughly:"
+            echo "Cloud Run sits at zero instances and Cloud SQL is suspended. Idle cost is storage and registry only, roughly:"
             echo
             echo "| Item | Approx. monthly idle |"
             echo "|---|---|"
@@ -63,7 +71,7 @@ jobs:
             echo "| Artifact Registry images | \$0.10 / GiB |"
             echo "| Cloud SQL backups | from storage usage |"
             echo "| Secret Manager secret versions | \$0.06 per active version after 6 |"
-            echo "| Compute | \$0 (Cloud Run at zero, SQL suspended) |"
+            echo "| Compute | \$0 (Cloud Run at zero instances, SQL suspended) |"
             echo
             echo "Expect roughly \$2-3/mo while stopped (D-033). Run \`gcp-up\` to resume."
           } >> "$GITHUB_STEP_SUMMARY"

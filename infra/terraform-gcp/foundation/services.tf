@@ -1,12 +1,15 @@
-# API enablement. The stack owns the services it needs so a fresh project can be
-# built from this configuration alone, rather than depending on an operator having
-# enabled each API out-of-band. `disable_on_destroy = false` keeps a `destroy`
-# from disabling shared APIs (Cloud Resource Manager in particular) that the
-# project continues to need.
+# API enablement. The foundation root owns the APIs the whole staging
+# environment needs, so a fresh project can be built from this configuration
+# alone rather than depending on an operator having enabled each API
+# out-of-band. `disable_on_destroy = false` keeps a `destroy` from disabling
+# shared APIs (Cloud Resource Manager in particular) that the project continues
+# to need.
 #
-# Enablement is deliberately a prerequisite for the rest: every resource that
-# depends on one of these APIs references the corresponding service resource, so
-# Terraform orders creation after the API is live.
+# Enablement is deliberately a prerequisite for the rest of this root: the
+# network, peering, and firewall reference the corresponding service resources,
+# so Terraform orders creation after the API is live. The workload root
+# (infra/terraform-gcp) no longer tracks these resources; it relies on this
+# foundation being applied first (D-058).
 
 locals {
   required_services = toset([

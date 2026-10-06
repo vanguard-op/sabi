@@ -10,6 +10,7 @@ SHELL := /bin/bash
 ENV ?= dev
 TF_DIR := infra/terraform
 GCP_TF_DIR := infra/terraform-gcp
+GCP_FOUNDATION_DIR := infra/terraform-gcp/foundation
 GCP_ENV ?= staging
 
 # Resolve a Python tool from a service's virtualenv when one is present, and from
@@ -27,7 +28,8 @@ venv_activate = $(if $(wildcard $(1)/.venv/bin/python),PATH="$(CURDIR)/$(1)/.ven
         catalog-generate catalog-check \
         lint lint-backend lint-ai lint-mobile format format-backend format-ai check \
         tf-init tf-fmt tf-validate tf-plan tf-apply tf-destroy \
-        gcp-init gcp-fmt gcp-validate gcp-plan gcp-apply gcp-up gcp-stop gcp-destroy
+        gcp-init gcp-fmt gcp-validate gcp-plan gcp-apply gcp-up gcp-stop gcp-destroy \
+        gcp-foundation-init gcp-foundation-plan gcp-foundation-apply
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -189,6 +191,19 @@ gcp-plan: ## Plan the GCP stack for GCP_ENV (default staging)
 
 gcp-apply: ## Apply the GCP stack (paid; requires explicit go-ahead)
 	terraform -chdir=$(GCP_TF_DIR) apply -var-file=envs/$(GCP_ENV)/terraform.tfvars
+
+# The long-lived network foundation (D-058): API enablement, VPC, run subnet,
+# private-services range and peering, database firewall. It costs nothing and
+# `gcp-destroy` never removes it. `gcp-up` applies it before the workload root.
+
+gcp-foundation-init: ## Initialise the GCP network foundation stack for GCP_ENV (default staging)
+	terraform -chdir=$(GCP_FOUNDATION_DIR) init -backend-config=envs/$(GCP_ENV)/backend.hcl
+
+gcp-foundation-plan: ## Plan the GCP network foundation for GCP_ENV (default staging)
+	terraform -chdir=$(GCP_FOUNDATION_DIR) plan -var-file=envs/$(GCP_ENV)/terraform.tfvars
+
+gcp-foundation-apply: ## Apply the GCP network foundation (free; long-lived, D-058)
+	terraform -chdir=$(GCP_FOUNDATION_DIR) apply -var-file=envs/$(GCP_ENV)/terraform.tfvars
 
 gcp-up: ## Bring the GCP staging environment up (dispatches the gcp-up workflow)
 	gh workflow run gcp-up.yml

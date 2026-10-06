@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in. `make gcp-foundation-init` uses it.
+#
+# State lives in gs://sabi-hq-tfstate (us-central1, versioning on, uniform
+# access — D-034). The bucket survives `destroy`, and this foundation state is
+# long-lived (D-058): `gcp-destroy` never deletes it.
+bucket = "sabi-hq-tfstate"
+prefix = "sabi/staging-foundation"

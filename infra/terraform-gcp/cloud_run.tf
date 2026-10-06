@@ -138,8 +138,8 @@ resource "google_cloud_run_v2_service" "private_services" {
     # the internet without a VPC hop.
     vpc_access {
       network_interfaces {
-        network    = google_compute_network.main.id
-        subnetwork = google_compute_subnetwork.run.id
+        network    = data.google_compute_network.main.id
+        subnetwork = data.google_compute_subnetwork.run.id
       }
       egress = "PRIVATE_RANGES_ONLY"
     }
@@ -219,8 +219,8 @@ resource "google_cloud_run_v2_service" "public_services" {
 
     vpc_access {
       network_interfaces {
-        network    = google_compute_network.main.id
-        subnetwork = google_compute_subnetwork.run.id
+        network    = data.google_compute_network.main.id
+        subnetwork = data.google_compute_subnetwork.run.id
       }
       egress = "PRIVATE_RANGES_ONLY"
     }

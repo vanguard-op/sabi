@@ -3,25 +3,30 @@
 # Manual by design (D-033). Bringing the staging environment up costs money, so
 # this workflow never runs on push: an operator dispatches it explicitly.
 #
-# It authenticates to GCP, creates the Artifact Registry repository with a
-# targeted Terraform apply (a bootstrap), builds and pushes the four images into
-# it, applies the rest of the Terraform stack, writes the one secret Terraform
-# cannot generate, runs the Alembic migrations and the catalogue seed as Cloud
-# Run jobs inside the VPC, and prints the mapped URLs and the DNS records to add
-# at Namecheap.
+# It authenticates to GCP, applies the long-lived network foundation
+# (infra/terraform-gcp/foundation: API enablement, VPC, run subnet,
+# private-services range and peering, database firewall; D-058), creates the
+# Artifact Registry repository with a targeted Terraform apply (a bootstrap),
+# builds and pushes the four images into it, applies the rest of the workload
+# Terraform stack, writes the one secret Terraform cannot generate, runs the
+# Alembic migrations and the catalogue seed as Cloud Run jobs inside the VPC,
+# and prints the mapped URLs and the DNS records to add at Namecheap.
 #
-# The ordering is deliberate. Cloud Run refuses to create a service or job whose
-# image is not yet in Artifact Registry, and the provider then leaves the
-# half-created service un-State'd (hashicorp/terraform-provider-google#14493).
-# So the repository must exist before the images can be pushed, and the images
-# must exist before the apply that creates the services. The repository is
-# Terraform-managed (infra/terraform-gcp/artifact_registry.tf), so the bootstrap
-# apply targets it alone (with the APIs it depends on); because Terraform
-# creates it, the repository is always in state, and a fresh environment (a
-# first `up`, or the `destroy` -> `up` rebuild of D-033) never collides with an
-# out-of-band create (409 already exists). The full apply then creates the
-# platform and the workloads in one pass, with no placeholder revision (D-055,
-# superseding the two-phase apply of D-036).
+# The ordering is deliberate. The foundation is applied first because it owns
+# the APIs and the network the workload root reads through data sources; it is
+# free and `gcp-destroy` never removes it (D-058). Cloud Run refuses to create a
+# service or job whose image is not yet in Artifact Registry, and the provider
+# then leaves the half-created service un-State'd
+# (hashicorp/terraform-provider-google#14493). So the repository must exist
+# before the images can be pushed, and the images must exist before the apply
+# that creates the services. The repository is Terraform-managed
+# (infra/terraform-gcp/artifact_registry.tf), so the bootstrap apply targets it
+# alone (with the APIs it depends on); because Terraform creates it, the
+# repository is always in state, and a fresh environment (a first `up`, or the
+# `destroy` -> `up` rebuild of D-033) never collides with an out-of-band create
+# (409 already exists). The full apply then creates the platform and the
+# workloads in one pass, with no placeholder revision (D-055, superseding the
+# two-phase apply of D-036).
 #
 # Auth is Workload Identity Federation (NFR-024): no long-lived service-account
 # key is committed. Set these repository variables:
@@ -94,22 +99,39 @@ jobs:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terraform_wrapper: false
 
-      - name: Terraform init
+      - name: Terraform init (network foundation)
+        run: |
+          set -euo pipefail
+          cp "${TF_DIR}/foundation/envs/staging/backend.hcl.example" "${TF_DIR}/foundation/envs/staging/backend.hcl"
+          cp "${TF_DIR}/foundation/envs/staging/terraform.tfvars.example" "${TF_DIR}/foundation/envs/staging/terraform.tfvars"
+          terraform -chdir="${TF_DIR}/foundation" init -input=false -backend-config=envs/staging/backend.hcl
+
+      - name: Terraform init (workload)
         run: |
           set -euo pipefail
           cp "${TF_DIR}/envs/staging/backend.hcl.example" "${TF_DIR}/envs/staging/backend.hcl"
           cp "${TF_DIR}/envs/staging/terraform.tfvars.example" "${TF_DIR}/envs/staging/terraform.tfvars"
           terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
 
+      - name: Apply the network foundation
+        # Long-lived and free (D-058). Applying it before the registry bootstrap
+        # enables the APIs and creates the VPC, run subnet, private-services
+        # range and peering, and the database firewall the workload root reads
+        # through data sources. `gcp-destroy` never removes it. On an
+        # environment that already tracks it this is a refresh and a no-op.
+        run: |
+          set -euo pipefail
+          terraform -chdir="${TF_DIR}/foundation" apply -input=false -auto-approve \
+            -var-file=envs/staging/terraform.tfvars
+
       - name: Bootstrap the image repository
         # Cloud Run refuses a service or job whose image is not yet in Artifact
         # Registry, and the provider leaves such a half-created service un-State'd
         # (hashicorp/terraform-provider-google#14493). The repository is created
         # here, through Terraform, so it is in state before the full apply and a
-        # fresh environment cannot collide with an out-of-band create. `-target`
-        # pulls in the required APIs (google_project_service.required) as a
-        # dependency; on an environment that already tracks the repository this
-        # is a no-op.
+        # fresh environment cannot collide with an out-of-band create. Its API is
+        # enabled by the foundation apply above; on an environment that already
+        # tracks the repository this is a no-op.
         run: |
           set -euo pipefail
           terraform -chdir="${TF_DIR}" apply -input=false -auto-approve \

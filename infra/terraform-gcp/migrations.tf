@@ -20,8 +20,8 @@ resource "google_cloud_run_v2_job" "migrate_primary" {
 
       vpc_access {
         network_interfaces {
-          network    = google_compute_network.main.id
-          subnetwork = google_compute_subnetwork.run.id
+          network    = data.google_compute_network.main.id
+          subnetwork = data.google_compute_subnetwork.run.id
         }
         egress = "PRIVATE_RANGES_ONLY"
       }
@@ -117,8 +117,8 @@ resource "google_cloud_run_v2_job" "seed_catalogue" {
 
       vpc_access {
         network_interfaces {
-          network    = google_compute_network.main.id
-          subnetwork = google_compute_subnetwork.run.id
+          network    = data.google_compute_network.main.id
+          subnetwork = data.google_compute_subnetwork.run.id
         }
         egress = "PRIVATE_RANGES_ONLY"
       }
@@ -196,8 +196,8 @@ resource "google_cloud_run_v2_job" "migrate_payments" {
 
       vpc_access {
         network_interfaces {
-          network    = google_compute_network.main.id
-          subnetwork = google_compute_subnetwork.run.id
+          network    = data.google_compute_network.main.id
+          subnetwork = data.google_compute_subnetwork.run.id
         }
         egress = "PRIVATE_RANGES_ONLY"
       }

@@ -36,7 +36,7 @@ resource "google_sql_database_instance" "main" {
     # Private IP only: no public address and no authorized networks.
     ip_configuration {
       ipv4_enabled    = false
-      private_network = google_compute_network.main.id
+      private_network = data.google_compute_network.main.id
     }
 
     # NFR-023: encryption at rest. Google-managed keys are the default; backups
@@ -58,12 +58,6 @@ resource "google_sql_database_instance" "main" {
       hour = 4
     }
   }
-
-  # The SQL Admin API and the private-services peering must be live first.
-  depends_on = [
-    google_project_service.required,
-    google_service_networking_connection.private_services,
-  ]
 }
 
 # Primary store: users, credentials, catalogue, providers, capabilities, cases,

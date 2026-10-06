@@ -1,6 +1,13 @@
 # Networking for Cloud Run private egress and the private-IP Cloud SQL
 # instance. No load balancer, no static IP, no Memorystore: Cloud Run serves
 # directly and TLS comes from Cloud Run domain mapping (D-032).
+#
+# This root is the long-lived foundation of D-058: a whole-stack `destroy` was
+# unreliable because Cloud Run Direct VPC egress leaves a Google-managed
+# `serverless-ipv4-cloudrun-*` reservation that is released asynchronously and
+# blocks deletion of both the run subnet and the service-networking connection.
+# The network and peering cost nothing, so they persist here while
+# `gcp-destroy` tears down only the workload root.
 
 resource "google_compute_network" "main" {
   name                    = local.prefix

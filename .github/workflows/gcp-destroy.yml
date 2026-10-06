@@ -1,8 +1,14 @@
 # Sabi GCP staging lifecycle: `destroy`.
 #
-# Manual by design (D-033). Destroys the whole Terraform stack but leaves the
-# state bucket (gs://sabi-hq-tfstate) so the environment can be rebuilt, then
-# reports the residual cost.
+# Manual by design (D-033). Destroys the workload Terraform stack only
+# (infra/terraform-gcp: Cloud Run services and jobs, Cloud SQL, secrets, IAM,
+# domain mappings). The long-lived network foundation
+# (infra/terraform-gcp/foundation: API enablement, VPC, run subnet,
+# private-services peering, database firewall) and the state bucket
+# (gs://sabi-hq-tfstate) are retained (D-058), so the environment can be rebuilt
+# by `gcp-up`. This is what makes `destroy` reliable: a whole-stack destroy was
+# blocked by the Google-managed `serverless-ipv4-cloudrun-*` reservation that
+# Cloud Run Direct VPC egress leaves behind. Reports the residual cost.
 #
 # Set the same repository variables as `gcp-up`. Auth is Workload Identity
 # Federation (NFR-024).
@@ -56,8 +62,10 @@ jobs:
           terraform -chdir="${TF_DIR}" init -input=false -backend-config=envs/staging/backend.hcl
 
       - name: Terraform destroy
-        # The state bucket is not part of this stack, so destroy leaves it. The
-        # image tag is irrelevant to destroy but required to build the plan.
+        # The state bucket is not part of this stack, and the network foundation
+        # lives in its own state (D-058), so this destroy removes the workloads
+        # only and leaves both. The image tag is irrelevant to destroy but
+        # required to build the plan.
         env:
           TF_VAR_container_image_tag: "latest"
         run: |
@@ -71,7 +79,8 @@ jobs:
           {
             echo "## Sabi staging destroyed"
             echo
-            echo "The Terraform stack is gone. The state bucket \`gs://sabi-hq-tfstate\` is retained so the environment can be rebuilt."
+            echo "The workload Terraform stack is gone. The network foundation and the state bucket \`gs://sabi-hq-tfstate\` are retained so the environment can be rebuilt."
             echo
-            echo "Residual cost is the state bucket only, roughly \$0.05/mo (D-033). Run \`gcp-up\` to rebuild."
+            echo "The foundation (API enablement, VPC, run subnet, private-services peering, database firewall) costs \$0."
+            echo "Residual cost is the state bucket only, roughly \$0.05/mo (D-058). Run \`gcp-up\` to rebuild."
           } >> "$GITHUB_STEP_SUMMARY"
