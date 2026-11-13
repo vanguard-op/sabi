@@ -24,7 +24,7 @@ dependencies:
   # Platform authenticator for the WebAuthn ceremony (D-028). The relying party
   # stays self-hosted (C-001-C-004, D-004); the plugin only frames the request
   # and response and runs the OS prompt.
-  passkeys: ^2.23.1
+  passkeys: ^2.24.1
   # The official Flutter GenUI SDK, the maintained renderer for A2UI v0.9
   # (FEAT-011, D-051). The package is alpha, so every composed surface has a
   # prewritten fallback and the task never depends on it. `json_schema_builder`
